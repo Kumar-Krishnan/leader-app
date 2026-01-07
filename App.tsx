@@ -1,20 +1,45 @@
+import React from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+import { NavigationContainer } from '@react-navigation/native';
+import { AuthProvider } from './src/contexts/AuthContext';
+import RootNavigator from './src/navigation/RootNavigator';
+import { Platform } from 'react-native';
+
+const linking = {
+  prefixes: ['http://localhost:8081', 'leaderapp://'],
+  config: {
+    screens: {
+      Auth: {
+        screens: {
+          SignIn: 'sign-in',
+          SignUp: 'sign-up',
+        },
+      },
+      Main: {
+        screens: {
+          Threads: 'threads',
+          Meetings: 'meetings',
+          Resources: 'resources',
+          LeaderHub: 'leader-hub',
+          Profile: 'profile',
+        },
+      },
+    },
+  },
+};
 
 export default function App() {
   return (
-    <View style={styles.container}>
-      <Text>Open up App.tsx to start working on your app!</Text>
-      <StatusBar style="auto" />
-    </View>
+    <AuthProvider>
+      <NavigationContainer 
+        linking={Platform.OS === 'web' ? linking : undefined}
+        documentTitle={{
+          formatter: () => 'Leader App',
+        }}
+      >
+        <StatusBar style="light" />
+        <RootNavigator />
+      </NavigationContainer>
+    </AuthProvider>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
