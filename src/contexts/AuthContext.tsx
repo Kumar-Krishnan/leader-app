@@ -25,14 +25,64 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    console.log('[AuthContext] init, isSupabaseConfigured:', isSupabaseConfigured);
+    
     // Skip auth if Supabase isn't configured
     if (!isSupabaseConfigured) {
+      console.log('[AuthContext] Supabase not configured, setting loading false');
       setLoading(false);
       return;
     }
 
-    // Get initial session
+    // Check what's in localStorage for debugging
+    if (typeof localStorage !== 'undefined') {
+      const authKeys = Object.keys(localStorage).filter(k => k.includes('supabase') || k.includes('auth'));
+      console.log('[AuthContext] Auth keys in localStorage:', authKeys);
+      authKeys.forEach(key => {
+        try {
+          const value = localStorage.getItem(key);
+          console.log(`[AuthContext] ${key}:`, value?.substring(0, 100) + '...');
+        } catch (e) {
+          console.error(`[AuthContext] Error reading ${key}:`, e);
+        }
+      });
+    }
+
+    // Get initial session with timeout (handles corrupted cache)
+    console.log('[AuthContext] Calling getSession()...');
+    const timeoutId = setTimeout(async () => {
+      console.warn('[AuthContext] getSession timed out after 3s');
+      
+      // Check if we already tried to recover (prevent infinite loop)
+      const recoveryAttempted = sessionStorage.getItem('auth_recovery_attempted');
+      
+      if (typeof localStorage !== 'undefined' && !recoveryAttempted) {
+        console.log('[AuthContext] Clearing corrupted session and reloading...');
+        // Mark that we attempted recovery
+        sessionStorage.setItem('auth_recovery_attempted', 'true');
+        
+        // Clear corrupted auth data
+        Object.keys(localStorage).forEach(key => {
+          if (key.includes('supabase') || key.includes('auth')) {
+            console.log('[AuthContext] Removing:', key);
+            localStorage.removeItem(key);
+          }
+        });
+        
+        // Reload to get fresh client
+        window.location.reload();
+        return;
+      }
+      
+      // Already tried recovery, just show login
+      console.log('[AuthContext] Recovery already attempted, showing login');
+      sessionStorage.removeItem('auth_recovery_attempted');
+      setLoading(false);
+    }, 3000);
+
     supabase.auth.getSession().then(({ data: { session } }) => {
+      clearTimeout(timeoutId);
+      console.log('[AuthContext] Got session:', !!session, session?.user?.email);
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
@@ -40,7 +90,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } else {
         setLoading(false);
       }
-    }).catch(() => {
+    }).catch((err) => {
+      clearTimeout(timeoutId);
+      console.error('[AuthContext] getSession error:', err);
       setLoading(false);
     });
 
@@ -62,6 +114,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const fetchProfile = async (userId: string) => {
+    console.log('[AuthContext] fetchProfile starting for:', userId);
     try {
       const { data, error } = await supabase
         .from('profiles')
@@ -70,10 +123,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .single();
 
       if (error) throw error;
+      console.log('[AuthContext] fetchProfile got data:', !!data);
       setProfile(data);
     } catch (error) {
-      console.error('Error fetching profile:', error);
+      console.error('[AuthContext] fetchProfile error:', error);
     } finally {
+      console.log('[AuthContext] fetchProfile complete, setting loading false');
       setLoading(false);
     }
   };

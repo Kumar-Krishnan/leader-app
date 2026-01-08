@@ -1,14 +1,18 @@
 import React from 'react';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Text, View, StyleSheet } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
 import ThreadsScreen from '../screens/main/ThreadsScreen';
+import ThreadDetailScreen from '../screens/main/ThreadDetailScreen';
+import ManageMembersScreen from '../screens/parish/ManageMembersScreen';
 import MeetingsScreen from '../screens/main/MeetingsScreen';
 import ResourcesScreen from '../screens/main/ResourcesScreen';
 import ProfileScreen from '../screens/main/ProfileScreen';
 import LeaderResourcesScreen from '../screens/leader/LeaderResourcesScreen';
-import { MainTabParamList } from './types';
+import { MainStackParamList, MainTabParamList } from './types';
 
+const Stack = createNativeStackNavigator<MainStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
 const TabIcon = ({ icon, focused }: { icon: string; focused: boolean }) => (
@@ -17,7 +21,7 @@ const TabIcon = ({ icon, focused }: { icon: string; focused: boolean }) => (
   </View>
 );
 
-export default function MainNavigator() {
+function MainTabs() {
   const { isLeader } = useAuth();
 
   return (
@@ -72,6 +76,34 @@ export default function MainNavigator() {
   );
 }
 
+export default function MainNavigator() {
+  return (
+    <Stack.Navigator
+      screenOptions={{
+        headerStyle: { backgroundColor: '#1E293B' },
+        headerTintColor: '#F8FAFC',
+        headerTitleStyle: { fontWeight: '600' },
+      }}
+    >
+      <Stack.Screen 
+        name="MainTabs" 
+        component={MainTabs} 
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="ThreadDetail"
+        component={ThreadDetailScreen}
+        options={{ title: 'Thread' }}
+      />
+      <Stack.Screen
+        name="ManageMembers"
+        component={ManageMembersScreen}
+        options={{ title: 'Manage Members' }}
+      />
+    </Stack.Navigator>
+  );
+}
+
 const styles = StyleSheet.create({
   tabBar: {
     backgroundColor: '#1E293B',
@@ -100,5 +132,3 @@ const styles = StyleSheet.create({
     transform: [{ scale: 1.1 }],
   },
 });
-
-

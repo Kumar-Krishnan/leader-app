@@ -1,23 +1,30 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { useAuth } from '../../contexts/AuthContext';
+import { useParish } from '../../contexts/ParishContext';
 import { supabase } from '../../lib/supabase';
 import { Meeting } from '../../types/database';
 
 export default function MeetingsScreen() {
-  const { isLeader } = useAuth();
+  const { currentParish, isParishLeader } = useParish();
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchMeetings();
-  }, []);
+    if (currentParish) {
+      fetchMeetings();
+    } else {
+      setLoading(false);
+    }
+  }, [currentParish]);
 
   const fetchMeetings = async () => {
+    if (!currentParish) return;
+
     try {
       const { data, error } = await supabase
         .from('meetings')
         .select('*')
+        .eq('parish_id', currentParish.id)
         .gte('date', new Date().toISOString())
         .order('date', { ascending: true });
 
@@ -62,11 +69,11 @@ export default function MeetingsScreen() {
       <Text style={styles.emptyIcon}>📅</Text>
       <Text style={styles.emptyTitle}>No upcoming meetings</Text>
       <Text style={styles.emptyText}>
-        {isLeader 
+        {isParishLeader 
           ? 'Schedule a meeting to get your group together.'
           : 'Upcoming meetings will appear here.'}
       </Text>
-      {isLeader && (
+      {isParishLeader && (
         <TouchableOpacity style={styles.emptyButton}>
           <Text style={styles.emptyButtonText}>Schedule Meeting</Text>
         </TouchableOpacity>
@@ -85,8 +92,11 @@ export default function MeetingsScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Meetings</Text>
-        {isLeader && (
+        <View>
+          <Text style={styles.title}>Meetings</Text>
+          <Text style={styles.parishName}>{currentParish?.name}</Text>
+        </View>
+        {isParishLeader && (
           <TouchableOpacity style={styles.newButton}>
             <Text style={styles.newButtonText}>+ New</Text>
           </TouchableOpacity>
@@ -118,7 +128,7 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     paddingHorizontal: 20,
     paddingTop: 60,
     paddingBottom: 20,
@@ -127,6 +137,11 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: '700',
     color: '#F8FAFC',
+  },
+  parishName: {
+    fontSize: 14,
+    color: '#3B82F6',
+    marginTop: 4,
   },
   newButton: {
     backgroundColor: '#3B82F6',

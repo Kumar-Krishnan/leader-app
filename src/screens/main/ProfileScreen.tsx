@@ -1,9 +1,16 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Switch, ScrollView } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Switch, ScrollView, Modal } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
+import { useParish } from '../../contexts/ParishContext';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { MainStackParamList } from '../../navigation/types';
 
 export default function ProfileScreen() {
+  const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const { profile, signOut, isLeader, isAdmin } = useAuth();
+  const { currentParish, parishes, setCurrentParish, isParishAdmin, canApproveRequests, pendingRequests } = useParish();
+  const [showParishPicker, setShowParishPicker] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = React.useState(
     profile?.notification_preferences?.push_enabled ?? true
   );
@@ -33,6 +40,45 @@ export default function ProfileScreen() {
         <View style={[styles.roleBadge, { backgroundColor: roleBadge.color }]}>
           <Text style={styles.roleBadgeText}>{roleBadge.text}</Text>
         </View>
+      </View>
+
+      {/* Parish Selection */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Current Parish</Text>
+        <TouchableOpacity 
+          style={styles.parishSelector}
+          onPress={() => setShowParishPicker(true)}
+        >
+          <View style={styles.parishIcon}>
+            <Text style={styles.parishIconText}>⛪</Text>
+          </View>
+          <View style={styles.parishInfo}>
+            <Text style={styles.parishName}>{currentParish?.name}</Text>
+            <Text style={styles.parishRole}>{currentParish?.role}</Text>
+          </View>
+          <Text style={styles.switchText}>Switch</Text>
+        </TouchableOpacity>
+
+        {isParishAdmin && currentParish?.code && (
+          <View style={styles.codeContainer}>
+            <Text style={styles.codeLabel}>Parish Join Code:</Text>
+            <Text style={styles.codeValue}>{currentParish.code}</Text>
+          </View>
+        )}
+
+        {canApproveRequests && (
+          <TouchableOpacity 
+            style={styles.manageButton}
+            onPress={() => navigation.navigate('ManageMembers')}
+          >
+            <Text style={styles.manageButtonText}>Manage Members</Text>
+            {pendingRequests.length > 0 && (
+              <View style={styles.pendingBadge}>
+                <Text style={styles.pendingBadgeText}>{pendingRequests.length}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        )}
       </View>
 
       <View style={styles.section}>
@@ -78,25 +124,40 @@ export default function ProfileScreen() {
         </View>
       </View>
 
-      {isLeader && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Leader Options</Text>
-          
-          <TouchableOpacity style={styles.menuItem}>
-            <Text style={styles.menuItemText}>Manage Members</Text>
-            <Text style={styles.menuItemArrow}>→</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.menuItem}>
-            <Text style={styles.menuItemText}>HubSpot Integration</Text>
-            <Text style={styles.menuItemArrow}>→</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
       <TouchableOpacity style={styles.signOutButton} onPress={signOut}>
         <Text style={styles.signOutText}>Sign Out</Text>
       </TouchableOpacity>
+
+      {/* Parish Picker Modal */}
+      <Modal visible={showParishPicker} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Switch Parish</Text>
+              <TouchableOpacity onPress={() => setShowParishPicker(false)}>
+                <Text style={styles.closeButton}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            
+            {parishes.map((parish) => (
+              <TouchableOpacity
+                key={parish.id}
+                style={[
+                  styles.parishOption,
+                  currentParish?.id === parish.id && styles.parishOptionActive,
+                ]}
+                onPress={() => {
+                  setCurrentParish(parish);
+                  setShowParishPicker(false);
+                }}
+              >
+                <Text style={styles.parishOptionName}>{parish.name}</Text>
+                <Text style={styles.parishOptionRole}>{parish.role}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -169,12 +230,94 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
     color: '#94A3B8',
     marginBottom: 16,
     textTransform: 'uppercase',
     letterSpacing: 1,
+  },
+  parishSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#0F172A',
+    borderRadius: 12,
+    padding: 12,
+  },
+  parishIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: '#334155',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  parishIconText: {
+    fontSize: 20,
+  },
+  parishInfo: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  parishName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#F8FAFC',
+  },
+  parishRole: {
+    fontSize: 13,
+    color: '#64748B',
+    textTransform: 'capitalize',
+  },
+  switchText: {
+    fontSize: 14,
+    color: '#3B82F6',
+    fontWeight: '600',
+  },
+  codeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#334155',
+  },
+  codeLabel: {
+    fontSize: 14,
+    color: '#64748B',
+  },
+  codeValue: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#3B82F6',
+    marginLeft: 8,
+    letterSpacing: 2,
+  },
+  manageButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 16,
+    backgroundColor: '#7C3AED',
+    borderRadius: 12,
+    padding: 14,
+  },
+  manageButtonText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  pendingBadge: {
+    backgroundColor: '#F59E0B',
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    marginLeft: 8,
+  },
+  pendingBadgeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
   },
   settingRow: {
     flexDirection: 'row',
@@ -194,22 +337,6 @@ const styles = StyleSheet.create({
     color: '#64748B',
     marginTop: 2,
   },
-  menuItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#334155',
-  },
-  menuItemText: {
-    fontSize: 16,
-    color: '#F8FAFC',
-  },
-  menuItemArrow: {
-    fontSize: 18,
-    color: '#64748B',
-  },
   signOutButton: {
     marginTop: 24,
     marginHorizontal: 20,
@@ -223,6 +350,55 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#1E293B',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    paddingBottom: 40,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#F8FAFC',
+  },
+  closeButton: {
+    fontSize: 20,
+    color: '#94A3B8',
+  },
+  parishOption: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: '#0F172A',
+    borderRadius: 12,
+    marginBottom: 8,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  parishOptionActive: {
+    borderColor: '#3B82F6',
+  },
+  parishOptionName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#F8FAFC',
+  },
+  parishOptionRole: {
+    fontSize: 14,
+    color: '#64748B',
+    textTransform: 'capitalize',
+  },
 });
-
-

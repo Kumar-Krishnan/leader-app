@@ -1,0 +1,481 @@
+import React, { useEffect, useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  FlatList,
+  ActivityIndicator,
+  Alert,
+  Modal,
+} from 'react-native';
+import { useParish } from '../../contexts/ParishContext';
+import { supabase } from '../../lib/supabase';
+import { ParishMember, Profile, ParishRole } from '../../types/database';
+
+interface MemberWithProfile extends ParishMember {
+  user: Profile;
+}
+
+export default function ManageMembersScreen() {
+  const { 
+    currentParish, 
+    pendingRequests, 
+    approveRequest, 
+    rejectRequest,
+    updateMemberRole,
+    refreshPendingRequests,
+    isParishLeader,
+    canApproveRequests,
+  } = useParish();
+  
+  const [members, setMembers] = useState<MemberWithProfile[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [processingId, setProcessingId] = useState<string | null>(null);
+  const [selectedMember, setSelectedMember] = useState<MemberWithProfile | null>(null);
+
+  useEffect(() => {
+    fetchMembers();
+    refreshPendingRequests();
+  }, [currentParish]);
+
+  const fetchMembers = async () => {
+    if (!currentParish) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('parish_members')
+        .select(`
+          *,
+          user:profiles!user_id(*)
+        `)
+        .eq('parish_id', currentParish.id)
+        .order('role', { ascending: true });
+
+      if (error) throw error;
+      setMembers(data || []);
+    } catch (error) {
+      console.error('Error fetching members:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleApprove = async (requestId: string) => {
+    setProcessingId(requestId);
+    const { error } = await approveRequest(requestId);
+    if (error) {
+      Alert.alert('Error', error.message);
+    } else {
+      fetchMembers();
+    }
+    setProcessingId(null);
+  };
+
+  const handleReject = async (requestId: string) => {
+    setProcessingId(requestId);
+    const { error } = await rejectRequest(requestId);
+    if (error) {
+      Alert.alert('Error', error.message);
+    }
+    setProcessingId(null);
+  };
+
+  const handleRoleChange = async (memberId: string, newRole: ParishRole) => {
+    const { error } = await updateMemberRole(memberId, newRole);
+    if (error) {
+      Alert.alert('Error', error.message);
+    } else {
+      fetchMembers();
+      setSelectedMember(null);
+    }
+  };
+
+  const getRoleBadgeColor = (role: ParishRole) => {
+    switch (role) {
+      case 'admin': return '#DC2626';
+      case 'leader': return '#7C3AED';
+      case 'leader-helper': return '#0891B2';
+      default: return '#3B82F6';
+    }
+  };
+
+  const renderRequest = ({ item }: { item: typeof pendingRequests[0] }) => (
+    <View style={styles.requestCard}>
+      <View style={styles.requestInfo}>
+        <View style={styles.avatar}>
+          <Text style={styles.avatarText}>
+            {item.user?.full_name?.[0] || '?'}
+          </Text>
+        </View>
+        <View style={styles.userInfo}>
+          <Text style={styles.userName}>{item.user?.full_name || 'Unknown'}</Text>
+          <Text style={styles.userEmail}>{item.user?.email}</Text>
+          <Text style={styles.requestDate}>
+            Requested {new Date(item.created_at).toLocaleDateString()}
+          </Text>
+        </View>
+      </View>
+      <View style={styles.requestActions}>
+        <TouchableOpacity
+          style={styles.approveButton}
+          onPress={() => handleApprove(item.id)}
+          disabled={processingId === item.id}
+        >
+          {processingId === item.id ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Text style={styles.approveButtonText}>✓</Text>
+          )}
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.rejectButton}
+          onPress={() => handleReject(item.id)}
+          disabled={processingId === item.id}
+        >
+          <Text style={styles.rejectButtonText}>✕</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
+  const renderMember = ({ item }: { item: MemberWithProfile }) => (
+    <TouchableOpacity 
+      style={styles.memberCard}
+      onPress={() => isParishLeader ? setSelectedMember(item) : null}
+      disabled={!isParishLeader || item.role === 'admin'}
+    >
+      <View style={styles.avatar}>
+        <Text style={styles.avatarText}>
+          {item.user?.full_name?.[0] || '?'}
+        </Text>
+      </View>
+      <View style={styles.memberInfo}>
+        <Text style={styles.memberName}>{item.user?.full_name || 'Unknown'}</Text>
+        <Text style={styles.memberEmail}>{item.user?.email}</Text>
+      </View>
+      <View style={[styles.roleBadge, { backgroundColor: getRoleBadgeColor(item.role) }]}>
+        <Text style={styles.roleBadgeText}>{item.role.replace('-', ' ')}</Text>
+      </View>
+    </TouchableOpacity>
+  );
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#3B82F6" />
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.title}>Manage Members</Text>
+        <Text style={styles.subtitle}>{currentParish?.name}</Text>
+      </View>
+
+      {canApproveRequests && pendingRequests.length > 0 && (
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Pending Requests</Text>
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>{pendingRequests.length}</Text>
+            </View>
+          </View>
+          <FlatList
+            data={pendingRequests}
+            renderItem={renderRequest}
+            keyExtractor={(item) => item.id}
+            scrollEnabled={false}
+          />
+        </View>
+      )}
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Members ({members.length})</Text>
+        <FlatList
+          data={members}
+          renderItem={renderMember}
+          keyExtractor={(item) => item.id}
+          scrollEnabled={false}
+        />
+      </View>
+
+      {/* Role Change Modal */}
+      <Modal visible={!!selectedMember} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Change Role</Text>
+              <TouchableOpacity onPress={() => setSelectedMember(null)}>
+                <Text style={styles.closeButton}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.modalSubtitle}>
+              {selectedMember?.user?.full_name}
+            </Text>
+
+            <View style={styles.roleOptions}>
+              <TouchableOpacity
+                style={[
+                  styles.roleOption,
+                  selectedMember?.role === 'member' && styles.roleOptionActive,
+                ]}
+                onPress={() => handleRoleChange(selectedMember!.id, 'member')}
+              >
+                <Text style={styles.roleOptionTitle}>Member</Text>
+                <Text style={styles.roleOptionDesc}>Can view and participate</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.roleOption,
+                  selectedMember?.role === 'leader-helper' && styles.roleOptionActive,
+                ]}
+                onPress={() => handleRoleChange(selectedMember!.id, 'leader-helper')}
+              >
+                <Text style={styles.roleOptionTitle}>Leader Helper</Text>
+                <Text style={styles.roleOptionDesc}>Can approve join requests</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.roleOption,
+                  selectedMember?.role === 'leader' && styles.roleOptionActive,
+                ]}
+                onPress={() => handleRoleChange(selectedMember!.id, 'leader')}
+              >
+                <Text style={styles.roleOptionTitle}>Leader</Text>
+                <Text style={styles.roleOptionDesc}>Full access, can manage roles</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#0F172A',
+  },
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: '#0F172A',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  header: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 20,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#F8FAFC',
+  },
+  subtitle: {
+    fontSize: 14,
+    color: '#3B82F6',
+    marginTop: 4,
+  },
+  section: {
+    paddingHorizontal: 20,
+    marginBottom: 24,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#94A3B8',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: 12,
+  },
+  badge: {
+    backgroundColor: '#F59E0B',
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    marginLeft: 8,
+  },
+  badgeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  requestCard: {
+    backgroundColor: '#1E293B',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#F59E0B',
+  },
+  requestInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  requestActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 8,
+  },
+  approveButton: {
+    backgroundColor: '#10B981',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  approveButtonText: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: '600',
+  },
+  rejectButton: {
+    backgroundColor: '#EF4444',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  rejectButtonText: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: '600',
+  },
+  memberCard: {
+    backgroundColor: '#1E293B',
+    borderRadius: 16,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  avatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#3B82F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  userInfo: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  userName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#F8FAFC',
+  },
+  userEmail: {
+    fontSize: 13,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  requestDate: {
+    fontSize: 12,
+    color: '#F59E0B',
+    marginTop: 4,
+  },
+  memberInfo: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  memberName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#F8FAFC',
+  },
+  memberEmail: {
+    fontSize: 13,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  roleBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  roleBadgeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+    textTransform: 'capitalize',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#1E293B',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    paddingBottom: 40,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#F8FAFC',
+  },
+  modalSubtitle: {
+    fontSize: 16,
+    color: '#94A3B8',
+    marginBottom: 24,
+  },
+  closeButton: {
+    fontSize: 20,
+    color: '#94A3B8',
+  },
+  roleOptions: {
+    gap: 12,
+  },
+  roleOption: {
+    backgroundColor: '#0F172A',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  roleOptionActive: {
+    borderColor: '#3B82F6',
+  },
+  roleOptionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#F8FAFC',
+  },
+  roleOptionDesc: {
+    fontSize: 13,
+    color: '#64748B',
+    marginTop: 4,
+  },
+});
+

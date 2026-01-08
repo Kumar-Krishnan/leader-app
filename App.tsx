@@ -2,6 +2,7 @@ import React from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer } from '@react-navigation/native';
 import { AuthProvider } from './src/contexts/AuthContext';
+import { ParishProvider } from './src/contexts/ParishContext';
 import RootNavigator from './src/navigation/RootNavigator';
 import { Platform } from 'react-native';
 
@@ -17,11 +18,16 @@ const linking = {
       },
       Main: {
         screens: {
-          Threads: 'threads',
-          Meetings: 'meetings',
-          Resources: 'resources',
-          LeaderHub: 'leader-hub',
-          Profile: 'profile',
+          MainTabs: {
+            screens: {
+              Threads: 'threads',
+              Meetings: 'meetings',
+              Resources: 'resources',
+              LeaderHub: 'leader-hub',
+              Profile: 'profile',
+            },
+          },
+          ThreadDetail: 'thread/:threadId',
         },
       },
     },
@@ -31,15 +37,17 @@ const linking = {
 export default function App() {
   return (
     <AuthProvider>
-      <NavigationContainer 
-        linking={Platform.OS === 'web' ? linking : undefined}
-        documentTitle={{
-          formatter: () => 'Leader App',
-        }}
-      >
-        <StatusBar style="light" />
-        <RootNavigator />
-      </NavigationContainer>
+      <ParishProvider>
+        <NavigationContainer 
+          linking={Platform.OS === 'web' ? linking : undefined}
+          documentTitle={{
+            formatter: () => 'Leader App',
+          }}
+        >
+          <StatusBar style="light" />
+          <RootNavigator />
+        </NavigationContainer>
+      </ParishProvider>
     </AuthProvider>
   );
 }

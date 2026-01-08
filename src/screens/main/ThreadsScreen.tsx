@@ -1,8 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
+import { useParish } from '../../contexts/ParishContext';
 import { supabase } from '../../lib/supabase';
 import { Thread } from '../../types/database';
+import CreateThreadModal from '../../components/CreateThreadModal';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { MainStackParamList } from '../../navigation/types';
+
+type NavigationProp = NativeStackNavigationProp<MainStackParamList>;
 
 interface ThreadWithDetails extends Thread {
   lastMessage?: string;
@@ -10,35 +17,59 @@ interface ThreadWithDetails extends Thread {
 }
 
 export default function ThreadsScreen() {
-  const { isLeader, user } = useAuth();
+  const navigation = useNavigation<NavigationProp>();
+  const { user } = useAuth();
+  const { currentParish, isParishLeader } = useParish();
   const [threads, setThreads] = useState<ThreadWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   useEffect(() => {
-    fetchThreads();
-  }, [user]);
+    console.log('[ThreadsScreen] useEffect, currentParish:', currentParish?.id, 'user:', user?.id);
+    if (currentParish) {
+      fetchThreads();
+    } else {
+      console.log('[ThreadsScreen] No currentParish, setting loading false');
+      setLoading(false);
+    }
+  }, [user, currentParish]);
 
   const fetchThreads = async () => {
-    if (!user) return;
+    console.log('[ThreadsScreen] fetchThreads called');
+    if (!user || !currentParish) {
+      console.log('[ThreadsScreen] Missing user or currentParish, returning');
+      return;
+    }
     
     try {
+      console.log('[ThreadsScreen] Fetching threads for parish:', currentParish.id);
       const { data, error } = await supabase
         .from('threads')
         .select('*')
+        .eq('parish_id', currentParish.id)
         .eq('is_archived', false)
         .order('updated_at', { ascending: false });
 
       if (error) throw error;
+      console.log('[ThreadsScreen] Got threads:', data?.length);
       setThreads(data || []);
     } catch (error) {
-      console.error('Error fetching threads:', error);
+      console.error('[ThreadsScreen] Error fetching threads:', error);
     } finally {
+      console.log('[ThreadsScreen] Setting loading false');
       setLoading(false);
     }
   };
 
+  const openThread = (thread: ThreadWithDetails) => {
+    navigation.navigate('ThreadDetail', {
+      threadId: thread.id,
+      threadName: thread.name,
+    });
+  };
+
   const renderThread = ({ item }: { item: ThreadWithDetails }) => (
-    <TouchableOpacity style={styles.threadCard}>
+    <TouchableOpacity style={styles.threadCard} onPress={() => openThread(item)}>
       <View style={styles.avatar}>
         <Text style={styles.avatarText}>{item.name[0]}</Text>
       </View>
@@ -61,12 +92,15 @@ export default function ThreadsScreen() {
       <Text style={styles.emptyIcon}>💬</Text>
       <Text style={styles.emptyTitle}>No threads yet</Text>
       <Text style={styles.emptyText}>
-        {isLeader 
+        {isParishLeader 
           ? 'Create a new thread to start a conversation with your group.'
           : 'You\'ll see threads here once you\'re added to one.'}
       </Text>
-      {isLeader && (
-        <TouchableOpacity style={styles.emptyButton}>
+      {isParishLeader && (
+        <TouchableOpacity 
+          style={styles.emptyButton}
+          onPress={() => setShowCreateModal(true)}
+        >
           <Text style={styles.emptyButtonText}>Create Thread</Text>
         </TouchableOpacity>
       )}
@@ -84,9 +118,15 @@ export default function ThreadsScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Threads</Text>
-        {isLeader && (
-          <TouchableOpacity style={styles.newButton}>
+        <View>
+          <Text style={styles.title}>Threads</Text>
+          <Text style={styles.parishName}>{currentParish?.name}</Text>
+        </View>
+        {isParishLeader && (
+          <TouchableOpacity 
+            style={styles.newButton}
+            onPress={() => setShowCreateModal(true)}
+          >
             <Text style={styles.newButtonText}>+ New</Text>
           </TouchableOpacity>
         )}
@@ -98,6 +138,12 @@ export default function ThreadsScreen() {
         contentContainerStyle={threads.length === 0 ? styles.emptyList : styles.list}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={renderEmptyState}
+      />
+
+      <CreateThreadModal
+        visible={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onCreated={fetchThreads}
       />
     </View>
   );
@@ -117,7 +163,7 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     paddingHorizontal: 20,
     paddingTop: 60,
     paddingBottom: 20,
@@ -126,6 +172,11 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: '700',
     color: '#F8FAFC',
+  },
+  parishName: {
+    fontSize: 14,
+    color: '#3B82F6',
+    marginTop: 4,
   },
   newButton: {
     backgroundColor: '#3B82F6',

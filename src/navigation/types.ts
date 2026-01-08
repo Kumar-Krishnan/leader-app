@@ -3,6 +3,15 @@ export type AuthStackParamList = {
   SignUp: undefined;
 };
 
+export type MainStackParamList = {
+  MainTabs: undefined;
+  ThreadDetail: {
+    threadId: string;
+    threadName: string;
+  };
+  ManageMembers: undefined;
+};
+
 export type MainTabParamList = {
   Threads: undefined;
   Meetings: undefined;
@@ -13,7 +22,6 @@ export type MainTabParamList = {
 
 export type RootStackParamList = {
   Auth: undefined;
+  ParishSelect: undefined;
   Main: undefined;
 };
-
-
