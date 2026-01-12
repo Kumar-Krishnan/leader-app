@@ -1,15 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
-import { useParish } from '../../contexts/ParishContext';
+import { useGroup } from '../../contexts/GroupContext';
 import { supabase } from '../../lib/supabase';
 import { Thread } from '../../types/database';
 import CreateThreadModal from '../../components/CreateThreadModal';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { MainStackParamList } from '../../navigation/types';
+import { ThreadsStackParamList } from '../../navigation/types';
 
-type NavigationProp = NativeStackNavigationProp<MainStackParamList>;
+type NavigationProp = NativeStackNavigationProp<ThreadsStackParamList>;
 
 interface ThreadWithDetails extends Thread {
   lastMessage?: string;
@@ -19,34 +19,34 @@ interface ThreadWithDetails extends Thread {
 export default function ThreadsScreen() {
   const navigation = useNavigation<NavigationProp>();
   const { user } = useAuth();
-  const { currentParish, isParishLeader } = useParish();
+  const { currentGroup, isGroupLeader } = useGroup();
   const [threads, setThreads] = useState<ThreadWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
 
   useEffect(() => {
-    console.log('[ThreadsScreen] useEffect, currentParish:', currentParish?.id, 'user:', user?.id);
-    if (currentParish) {
+    console.log('[ThreadsScreen] useEffect, currentGroup:', currentGroup?.id, 'user:', user?.id);
+    if (currentGroup) {
       fetchThreads();
     } else {
-      console.log('[ThreadsScreen] No currentParish, setting loading false');
+      console.log('[ThreadsScreen] No currentGroup, setting loading false');
       setLoading(false);
     }
-  }, [user, currentParish]);
+  }, [user, currentGroup]);
 
   const fetchThreads = async () => {
     console.log('[ThreadsScreen] fetchThreads called');
-    if (!user || !currentParish) {
-      console.log('[ThreadsScreen] Missing user or currentParish, returning');
+    if (!user || !currentGroup) {
+      console.log('[ThreadsScreen] Missing user or currentGroup, returning');
       return;
     }
     
     try {
-      console.log('[ThreadsScreen] Fetching threads for parish:', currentParish.id);
+      console.log('[ThreadsScreen] Fetching threads for group:', currentGroup.id);
       const { data, error } = await supabase
         .from('threads')
         .select('*')
-        .eq('parish_id', currentParish.id)
+        .eq('group_id', currentGroup.id)
         .eq('is_archived', false)
         .order('updated_at', { ascending: false });
 
@@ -92,11 +92,11 @@ export default function ThreadsScreen() {
       <Text style={styles.emptyIcon}>💬</Text>
       <Text style={styles.emptyTitle}>No threads yet</Text>
       <Text style={styles.emptyText}>
-        {isParishLeader 
+        {isGroupLeader 
           ? 'Create a new thread to start a conversation with your group.'
           : 'You\'ll see threads here once you\'re added to one.'}
       </Text>
-      {isParishLeader && (
+      {isGroupLeader && (
         <TouchableOpacity 
           style={styles.emptyButton}
           onPress={() => setShowCreateModal(true)}
@@ -120,9 +120,9 @@ export default function ThreadsScreen() {
       <View style={styles.header}>
         <View>
           <Text style={styles.title}>Threads</Text>
-          <Text style={styles.parishName}>{currentParish?.name}</Text>
+          <Text style={styles.parishName}>{currentGroup?.name}</Text>
         </View>
-        {isParishLeader && (
+        {isGroupLeader && (
           <TouchableOpacity 
             style={styles.newButton}
             onPress={() => setShowCreateModal(true)}

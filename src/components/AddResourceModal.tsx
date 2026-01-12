@@ -15,7 +15,7 @@ import {
 import * as DocumentPicker from 'expo-document-picker';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { useParish } from '../contexts/ParishContext';
+import { useGroup } from '../contexts/GroupContext';
 
 interface Props {
   visible: boolean;
@@ -28,7 +28,7 @@ type ResourceType = 'document' | 'link' | 'video' | 'other';
 
 export default function AddResourceModal({ visible, folderId, onClose, onCreated }: Props) {
   const { user } = useAuth();
-  const { currentParish, isParishLeader } = useParish();
+  const { currentGroup, isGroupLeader } = useGroup();
   const [title, setTitle] = useState('');
   const [type, setType] = useState<ResourceType>('document');
   const [url, setUrl] = useState('');
@@ -67,11 +67,11 @@ export default function AddResourceModal({ visible, folderId, onClose, onCreated
   };
 
   const uploadFile = async (): Promise<string | null> => {
-    if (!selectedFile || !user || !currentParish) return null;
+    if (!selectedFile || !user || !currentGroup) return null;
 
     try {
       const fileExt = selectedFile.name.split('.').pop();
-      const fileName = `${user.id}/${currentParish.id}/${Date.now()}.${fileExt}`;
+      const fileName = `${user.id}/${currentGroup.id}/${Date.now()}.${fileExt}`;
 
       // Read file as blob
       const response = await fetch(selectedFile.uri);
@@ -104,7 +104,7 @@ export default function AddResourceModal({ visible, folderId, onClose, onCreated
       return;
     }
 
-    if (!user || !currentParish) {
+    if (!user || !currentGroup) {
       setError('Not authenticated');
       return;
     }
@@ -129,7 +129,7 @@ export default function AddResourceModal({ visible, folderId, onClose, onCreated
         url: type === 'link' ? url.trim() : null,
         visibility,
         tags: tags.split(',').map(t => t.trim()).filter(Boolean),
-        parish_id: currentParish.id,
+        group_id: currentGroup.id,
         folder_id: folderId,
         file_path: filePath,
         file_size: selectedFile?.size || null,
@@ -272,7 +272,7 @@ export default function AddResourceModal({ visible, folderId, onClose, onCreated
             />
 
             {/* Visibility */}
-            {isParishLeader && (
+            {isGroupLeader && (
               <>
                 <Text style={styles.label}>Visibility</Text>
                 <View style={styles.visibilityRow}>

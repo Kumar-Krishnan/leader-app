@@ -5,15 +5,22 @@ import { Text, View, StyleSheet } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
 import ThreadsScreen from '../screens/main/ThreadsScreen';
 import ThreadDetailScreen from '../screens/main/ThreadDetailScreen';
-import ManageMembersScreen from '../screens/parish/ManageMembersScreen';
+import ManageMembersScreen from '../screens/group/ManageMembersScreen';
 import MeetingsScreen from '../screens/main/MeetingsScreen';
 import ResourcesScreen from '../screens/main/ResourcesScreen';
 import ProfileScreen from '../screens/main/ProfileScreen';
 import LeaderResourcesScreen from '../screens/leader/LeaderResourcesScreen';
-import { MainStackParamList, MainTabParamList } from './types';
+import { MainTabParamList } from './types';
 
-const Stack = createNativeStackNavigator<MainStackParamList>();
+const ThreadsStack = createNativeStackNavigator();
+const ProfileStack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator<MainTabParamList>();
+
+const stackScreenOptions = {
+  headerStyle: { backgroundColor: '#1E293B' },
+  headerTintColor: '#F8FAFC',
+  headerTitleStyle: { fontWeight: '600' as const },
+};
 
 const TabIcon = ({ icon, focused }: { icon: string; focused: boolean }) => (
   <View style={[styles.iconContainer, focused && styles.iconContainerActive]}>
@@ -21,7 +28,43 @@ const TabIcon = ({ icon, focused }: { icon: string; focused: boolean }) => (
   </View>
 );
 
-function MainTabs() {
+// Threads tab with its own stack for thread details
+function ThreadsStackScreen() {
+  return (
+    <ThreadsStack.Navigator screenOptions={stackScreenOptions}>
+      <ThreadsStack.Screen 
+        name="ThreadsList" 
+        component={ThreadsScreen}
+        options={{ headerShown: false }}
+      />
+      <ThreadsStack.Screen
+        name="ThreadDetail"
+        component={ThreadDetailScreen}
+        options={{ title: 'Thread' }}
+      />
+    </ThreadsStack.Navigator>
+  );
+}
+
+// Profile tab with its own stack for manage members
+function ProfileStackScreen() {
+  return (
+    <ProfileStack.Navigator screenOptions={stackScreenOptions}>
+      <ProfileStack.Screen 
+        name="ProfileMain" 
+        component={ProfileScreen}
+        options={{ headerShown: false }}
+      />
+      <ProfileStack.Screen
+        name="ManageMembers"
+        component={ManageMembersScreen}
+        options={{ title: 'Manage Members' }}
+      />
+    </ProfileStack.Navigator>
+  );
+}
+
+export default function MainNavigator() {
   const { isLeader } = useAuth();
 
   return (
@@ -36,7 +79,7 @@ function MainTabs() {
     >
       <Tab.Screen
         name="Threads"
-        component={ThreadsScreen}
+        component={ThreadsStackScreen}
         options={{
           tabBarIcon: ({ focused }) => <TabIcon icon="💬" focused={focused} />,
         }}
@@ -67,40 +110,12 @@ function MainTabs() {
       )}
       <Tab.Screen
         name="Profile"
-        component={ProfileScreen}
+        component={ProfileStackScreen}
         options={{
           tabBarIcon: ({ focused }) => <TabIcon icon="👤" focused={focused} />,
         }}
       />
     </Tab.Navigator>
-  );
-}
-
-export default function MainNavigator() {
-  return (
-    <Stack.Navigator
-      screenOptions={{
-        headerStyle: { backgroundColor: '#1E293B' },
-        headerTintColor: '#F8FAFC',
-        headerTitleStyle: { fontWeight: '600' },
-      }}
-    >
-      <Stack.Screen 
-        name="MainTabs" 
-        component={MainTabs} 
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="ThreadDetail"
-        component={ThreadDetailScreen}
-        options={{ title: 'Thread' }}
-      />
-      <Stack.Screen
-        name="ManageMembers"
-        component={ManageMembersScreen}
-        options={{ title: 'Manage Members' }}
-      />
-    </Stack.Navigator>
   );
 }
 

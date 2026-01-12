@@ -1,30 +1,30 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { useParish } from '../../contexts/ParishContext';
+import { useGroup } from '../../contexts/GroupContext';
 import { supabase } from '../../lib/supabase';
 import { Meeting } from '../../types/database';
 
 export default function MeetingsScreen() {
-  const { currentParish, isParishLeader } = useParish();
+  const { currentGroup, isGroupLeader } = useGroup();
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (currentParish) {
+    if (currentGroup) {
       fetchMeetings();
     } else {
       setLoading(false);
     }
-  }, [currentParish]);
+  }, [currentGroup]);
 
   const fetchMeetings = async () => {
-    if (!currentParish) return;
+    if (!currentGroup) return;
 
     try {
       const { data, error } = await supabase
         .from('meetings')
         .select('*')
-        .eq('parish_id', currentParish.id)
+        .eq('group_id', currentGroup.id)
         .gte('date', new Date().toISOString())
         .order('date', { ascending: true });
 
@@ -69,11 +69,11 @@ export default function MeetingsScreen() {
       <Text style={styles.emptyIcon}>📅</Text>
       <Text style={styles.emptyTitle}>No upcoming meetings</Text>
       <Text style={styles.emptyText}>
-        {isParishLeader 
+        {isGroupLeader 
           ? 'Schedule a meeting to get your group together.'
           : 'Upcoming meetings will appear here.'}
       </Text>
-      {isParishLeader && (
+      {isGroupLeader && (
         <TouchableOpacity style={styles.emptyButton}>
           <Text style={styles.emptyButtonText}>Schedule Meeting</Text>
         </TouchableOpacity>
@@ -94,9 +94,9 @@ export default function MeetingsScreen() {
       <View style={styles.header}>
         <View>
           <Text style={styles.title}>Meetings</Text>
-          <Text style={styles.parishName}>{currentParish?.name}</Text>
+          <Text style={styles.parishName}>{currentGroup?.name}</Text>
         </View>
-        {isParishLeader && (
+        {isGroupLeader && (
           <TouchableOpacity style={styles.newButton}>
             <Text style={styles.newButtonText}>+ New</Text>
           </TouchableOpacity>

@@ -9,25 +9,25 @@ import {
   Alert,
   Modal,
 } from 'react-native';
-import { useParish } from '../../contexts/ParishContext';
+import { useGroup } from '../../contexts/GroupContext';
 import { supabase } from '../../lib/supabase';
-import { ParishMember, Profile, ParishRole } from '../../types/database';
+import { GroupMember, Profile, GroupRole } from '../../types/database';
 
-interface MemberWithProfile extends ParishMember {
+interface MemberWithProfile extends GroupMember {
   user: Profile;
 }
 
 export default function ManageMembersScreen() {
   const { 
-    currentParish, 
+    currentGroup, 
     pendingRequests, 
     approveRequest, 
     rejectRequest,
     updateMemberRole,
     refreshPendingRequests,
-    isParishLeader,
+    isGroupLeader,
     canApproveRequests,
-  } = useParish();
+  } = useGroup();
   
   const [members, setMembers] = useState<MemberWithProfile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -37,19 +37,19 @@ export default function ManageMembersScreen() {
   useEffect(() => {
     fetchMembers();
     refreshPendingRequests();
-  }, [currentParish]);
+  }, [currentGroup]);
 
   const fetchMembers = async () => {
-    if (!currentParish) return;
+    if (!currentGroup) return;
 
     try {
       const { data, error } = await supabase
-        .from('parish_members')
+        .from('group_members')
         .select(`
           *,
           user:profiles!user_id(*)
         `)
-        .eq('parish_id', currentParish.id)
+        .eq('group_id', currentGroup.id)
         .order('role', { ascending: true });
 
       if (error) throw error;
@@ -81,7 +81,7 @@ export default function ManageMembersScreen() {
     setProcessingId(null);
   };
 
-  const handleRoleChange = async (memberId: string, newRole: ParishRole) => {
+  const handleRoleChange = async (memberId: string, newRole: GroupRole) => {
     const { error } = await updateMemberRole(memberId, newRole);
     if (error) {
       Alert.alert('Error', error.message);
@@ -91,7 +91,7 @@ export default function ManageMembersScreen() {
     }
   };
 
-  const getRoleBadgeColor = (role: ParishRole) => {
+  const getRoleBadgeColor = (role: GroupRole) => {
     switch (role) {
       case 'admin': return '#DC2626';
       case 'leader': return '#7C3AED';
@@ -142,8 +142,8 @@ export default function ManageMembersScreen() {
   const renderMember = ({ item }: { item: MemberWithProfile }) => (
     <TouchableOpacity 
       style={styles.memberCard}
-      onPress={() => isParishLeader ? setSelectedMember(item) : null}
-      disabled={!isParishLeader || item.role === 'admin'}
+      onPress={() => isGroupLeader ? setSelectedMember(item) : null}
+      disabled={!isGroupLeader || item.role === 'admin'}
     >
       <View style={styles.avatar}>
         <Text style={styles.avatarText}>
@@ -172,7 +172,7 @@ export default function ManageMembersScreen() {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Manage Members</Text>
-        <Text style={styles.subtitle}>{currentParish?.name}</Text>
+        <Text style={styles.subtitle}>{currentGroup?.name}</Text>
       </View>
 
       {canApproveRequests && pendingRequests.length > 0 && (

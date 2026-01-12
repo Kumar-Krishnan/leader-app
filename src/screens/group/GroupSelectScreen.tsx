@@ -12,45 +12,45 @@ import {
   Platform,
   ScrollView,
 } from 'react-native';
-import { useParish } from '../../contexts/ParishContext';
+import { useGroup } from '../../contexts/GroupContext';
 import { useAuth } from '../../contexts/AuthContext';
 
-export default function ParishSelectScreen() {
+export default function GroupSelectScreen() {
   const { 
-    parishes, 
-    currentParish, 
-    setCurrentParish, 
-    createParish, 
+    groups, 
+    currentGroup, 
+    setCurrentGroup, 
+    createGroup, 
     requestToJoin, 
     myPendingRequests,
     loading 
-  } = useParish();
+  } = useGroup();
   const { isLeader } = useAuth();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(false);
-  const [parishName, setParishName] = useState('');
-  const [parishDescription, setParishDescription] = useState('');
+  const [groupName, setGroupName] = useState('');
+  const [groupDescription, setGroupDescription] = useState('');
   const [joinCode, setJoinCode] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
   const handleCreate = async () => {
-    if (!parishName.trim()) {
-      setError('Please enter a parish name');
+    if (!groupName.trim()) {
+      setError('Please enter a group name');
       return;
     }
 
     setSubmitting(true);
     setError(null);
 
-    const { error } = await createParish(parishName.trim(), parishDescription.trim());
+    const { error } = await createGroup(groupName.trim(), groupDescription.trim());
 
     if (error) {
       setError(error.message);
     } else {
-      setParishName('');
-      setParishDescription('');
+      setGroupName('');
+      setGroupDescription('');
       setShowCreateModal(false);
     }
     setSubmitting(false);
@@ -58,7 +58,7 @@ export default function ParishSelectScreen() {
 
   const handleRequestToJoin = async () => {
     if (!joinCode.trim()) {
-      setError('Please enter a parish code');
+      setError('Please enter a group code');
       return;
     }
 
@@ -80,19 +80,19 @@ export default function ParishSelectScreen() {
     setSubmitting(false);
   };
 
-  const renderParish = ({ item }: { item: typeof parishes[0] }) => (
+  const renderGroup = ({ item }: { item: typeof groups[0] }) => (
     <TouchableOpacity
-      style={[styles.parishCard, currentParish?.id === item.id && styles.parishCardActive]}
-      onPress={() => setCurrentParish(item)}
+      style={[styles.groupCard, currentGroup?.id === item.id && styles.groupCardActive]}
+      onPress={() => setCurrentGroup(item)}
     >
-      <View style={styles.parishIcon}>
-        <Text style={styles.parishIconText}>⛪</Text>
+      <View style={styles.groupIcon}>
+        <Text style={styles.groupIconText}>👥</Text>
       </View>
-      <View style={styles.parishInfo}>
-        <Text style={styles.parishName}>{item.name}</Text>
-        <Text style={styles.parishRole}>{item.role.replace('-', ' ')}</Text>
+      <View style={styles.groupInfo}>
+        <Text style={styles.groupName}>{item.name}</Text>
+        <Text style={styles.groupRole}>{item.role.replace('-', ' ')}</Text>
       </View>
-      {currentParish?.id === item.id && (
+      {currentGroup?.id === item.id && (
         <View style={styles.checkmark}>
           <Text style={styles.checkmarkText}>✓</Text>
         </View>
@@ -111,36 +111,36 @@ export default function ParishSelectScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
       <View style={styles.header}>
-        <Text style={styles.title}>Your Parishes</Text>
+        <Text style={styles.title}>Your Groups</Text>
       </View>
 
-      {parishes.length === 0 && myPendingRequests.length === 0 ? (
+      {groups.length === 0 && myPendingRequests.length === 0 ? (
         <View style={styles.emptyState}>
-          <Text style={styles.emptyIcon}>⛪</Text>
-          <Text style={styles.emptyTitle}>No parishes yet</Text>
+          <Text style={styles.emptyIcon}>👥</Text>
+          <Text style={styles.emptyTitle}>No groups yet</Text>
           <Text style={styles.emptyText}>
-            Request to join a parish with a code{isLeader ? ' or create a new one' : ''}.
+            Request to join a group with a code{isLeader ? ' or create a new one' : ''}.
           </Text>
         </View>
       ) : (
         <>
-          {parishes.length > 0 && (
+          {groups.length > 0 && (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Your Parishes</Text>
-              {parishes.map((parish) => (
+              <Text style={styles.sectionTitle}>Your Groups</Text>
+              {groups.map((group) => (
                 <TouchableOpacity
-                  key={parish.id}
-                  style={[styles.parishCard, currentParish?.id === parish.id && styles.parishCardActive]}
-                  onPress={() => setCurrentParish(parish)}
+                  key={group.id}
+                  style={[styles.groupCard, currentGroup?.id === group.id && styles.groupCardActive]}
+                  onPress={() => setCurrentGroup(group)}
                 >
-                  <View style={styles.parishIcon}>
-                    <Text style={styles.parishIconText}>⛪</Text>
+                  <View style={styles.groupIcon}>
+                    <Text style={styles.groupIconText}>👥</Text>
                   </View>
-                  <View style={styles.parishInfo}>
-                    <Text style={styles.parishName}>{parish.name}</Text>
-                    <Text style={styles.parishRole}>{parish.role.replace('-', ' ')}</Text>
+                  <View style={styles.groupInfo}>
+                    <Text style={styles.groupName}>{group.name}</Text>
+                    <Text style={styles.groupRole}>{group.role.replace('-', ' ')}</Text>
                   </View>
-                  {currentParish?.id === parish.id && (
+                  {currentGroup?.id === group.id && (
                     <View style={styles.checkmark}>
                       <Text style={styles.checkmarkText}>✓</Text>
                     </View>
@@ -180,7 +180,7 @@ export default function ParishSelectScreen() {
             setShowJoinModal(true);
           }}
         >
-          <Text style={styles.joinButtonText}>Request to Join Parish</Text>
+          <Text style={styles.joinButtonText}>Request to Join Group</Text>
         </TouchableOpacity>
 
         {isLeader && (
@@ -191,7 +191,7 @@ export default function ParishSelectScreen() {
               setShowCreateModal(true);
             }}
           >
-            <Text style={styles.createButtonText}>Create Parish</Text>
+            <Text style={styles.createButtonText}>Create Group</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -222,7 +222,7 @@ export default function ParishSelectScreen() {
               </View>
             )}
 
-            <Text style={styles.label}>Parish Code</Text>
+            <Text style={styles.label}>Group Code</Text>
             <TextInput
               style={styles.input}
               placeholder="Enter 6-character code"
@@ -234,7 +234,7 @@ export default function ParishSelectScreen() {
             />
 
             <Text style={styles.hint}>
-              Ask your parish leader for the join code. Your request will need to be approved.
+              Ask your group leader for the join code. Your request will need to be approved.
             </Text>
 
             <TouchableOpacity
@@ -260,7 +260,7 @@ export default function ParishSelectScreen() {
         >
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Create Parish</Text>
+              <Text style={styles.modalTitle}>Create Group</Text>
               <TouchableOpacity onPress={() => setShowCreateModal(false)}>
                 <Text style={styles.closeButton}>✕</Text>
               </TouchableOpacity>
@@ -272,13 +272,13 @@ export default function ParishSelectScreen() {
               </View>
             )}
 
-            <Text style={styles.label}>Parish Name</Text>
+            <Text style={styles.label}>Group Name</Text>
             <TextInput
               style={styles.input}
-              placeholder="e.g., St. Mary's Parish"
+              placeholder="e.g., Youth Leaders Group"
               placeholderTextColor="#64748B"
-              value={parishName}
-              onChangeText={setParishName}
+              value={groupName}
+              onChangeText={setGroupName}
             />
 
             <Text style={styles.label}>Description (optional)</Text>
@@ -286,14 +286,14 @@ export default function ParishSelectScreen() {
               style={[styles.input, styles.textArea]}
               placeholder="A brief description..."
               placeholderTextColor="#64748B"
-              value={parishDescription}
-              onChangeText={setParishDescription}
+              value={groupDescription}
+              onChangeText={setGroupDescription}
               multiline
               numberOfLines={3}
             />
 
             <Text style={styles.hint}>
-              You'll be the admin of this parish. A join code will be generated automatically.
+              You'll be the admin of this group. A join code will be generated automatically.
             </Text>
 
             <TouchableOpacity
@@ -304,7 +304,7 @@ export default function ParishSelectScreen() {
               {submitting ? (
                 <ActivityIndicator color="#fff" />
               ) : (
-                <Text style={styles.submitButtonText}>Create Parish</Text>
+                <Text style={styles.submitButtonText}>Create Group</Text>
               )}
             </TouchableOpacity>
           </View>
@@ -350,7 +350,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
-  parishCard: {
+  groupCard: {
     backgroundColor: '#1E293B',
     borderRadius: 16,
     padding: 16,
@@ -360,10 +360,10 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
     marginBottom: 8,
   },
-  parishCardActive: {
+  groupCardActive: {
     borderColor: '#3B82F6',
   },
-  parishIcon: {
+  groupIcon: {
     width: 50,
     height: 50,
     borderRadius: 12,
@@ -371,19 +371,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  parishIconText: {
+  groupIconText: {
     fontSize: 24,
   },
-  parishInfo: {
+  groupInfo: {
     flex: 1,
     marginLeft: 12,
   },
-  parishName: {
+  groupName: {
     fontSize: 16,
     fontWeight: '600',
     color: '#F8FAFC',
   },
-  parishRole: {
+  groupRole: {
     fontSize: 13,
     color: '#64748B',
     marginTop: 2,

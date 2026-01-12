@@ -13,7 +13,7 @@ import {
   Platform,
 } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
-import { useParish } from '../../contexts/ParishContext';
+import { useGroup } from '../../contexts/GroupContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { storage, RESOURCES_BUCKET, generateFilePath } from '../../lib/storage';
@@ -32,7 +32,7 @@ type ListItem =
   | { type: 'resource'; data: Resource };
 
 export default function ResourcesScreen() {
-  const { currentParish, canApproveRequests } = useParish();
+  const { currentGroup, canApproveRequests } = useGroup();
   const { user } = useAuth();
   const [folders, setFolders] = useState<ResourceFolder[]>([]);
   const [resources, setResources] = useState<Resource[]>([]);
@@ -51,15 +51,15 @@ export default function ResourcesScreen() {
   const [selectedFile, setSelectedFile] = useState<DocumentPicker.DocumentPickerAsset | null>(null);
 
   useEffect(() => {
-    if (currentParish) {
+    if (currentGroup) {
       fetchContents();
     } else {
       setLoading(false);
     }
-  }, [currentParish?.id, currentFolderId]);
+  }, [currentGroup?.id, currentFolderId]);
 
   const fetchContents = async () => {
-    if (!currentParish) return;
+    if (!currentGroup) return;
     setLoading(true);
 
     try {
@@ -67,7 +67,7 @@ export default function ResourcesScreen() {
       let folderQuery = supabase
         .from('resource_folders')
         .select('*')
-        .eq('parish_id', currentParish.id);
+        .eq('group_id', currentGroup.id);
       
       if (currentFolderId === null) {
         folderQuery = folderQuery.is('parent_id', null);
@@ -84,7 +84,7 @@ export default function ResourcesScreen() {
       let resourceQuery = supabase
         .from('resources')
         .select('*')
-        .eq('parish_id', currentParish.id);
+        .eq('group_id', currentGroup.id);
       
       if (currentFolderId === null) {
         resourceQuery = resourceQuery.is('folder_id', null);
@@ -121,12 +121,12 @@ export default function ResourcesScreen() {
   };
 
   const createFolder = async () => {
-    if (!newFolderName.trim() || !currentParish || !user) return;
+    if (!newFolderName.trim() || !currentGroup || !user) return;
 
     try {
       const { error } = await supabase.from('resource_folders').insert({
         name: newFolderName.trim(),
-        parish_id: currentParish.id,
+        group_id: currentGroup.id,
         parent_id: currentFolderId,
         created_by: user.id,
       });
@@ -159,7 +159,7 @@ export default function ResourcesScreen() {
   };
 
   const uploadResource = async () => {
-    if (!currentParish || !user) return;
+    if (!currentGroup || !user) return;
     
     if (newResourceType === 'link' && !newResourceUrl.trim()) {
       Alert.alert('Error', 'Please enter a URL');
@@ -185,7 +185,7 @@ export default function ResourcesScreen() {
 
       // Upload file if document type
       if (newResourceType === 'document' && selectedFile) {
-        const storagePath = generateFilePath(currentParish.id, selectedFile.name);
+        const storagePath = generateFilePath(currentGroup.id, selectedFile.name);
         
         // Use storage abstraction - handles web/native differences
         const uploadResult = await storage.upload(
@@ -211,7 +211,7 @@ export default function ResourcesScreen() {
         title: newResourceTitle.trim(),
         type: newResourceType === 'link' ? 'link' : 'document',
         url: newResourceType === 'link' ? newResourceUrl.trim() : null,
-        parish_id: currentParish.id,
+        group_id: currentGroup.id,
         folder_id: currentFolderId,
         file_path: filePath,
         file_size: fileSize,
@@ -453,7 +453,7 @@ export default function ResourcesScreen() {
       <View style={styles.header}>
         <View>
           <Text style={styles.title}>Resources</Text>
-          <Text style={styles.parishName}>{currentParish?.name}</Text>
+          <Text style={styles.groupName}>{currentGroup?.name}</Text>
         </View>
         {canApproveRequests && (
           <View style={styles.headerButtons}>
@@ -642,7 +642,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#F8FAFC',
   },
-  parishName: {
+  groupName: {
     fontSize: 14,
     color: '#3B82F6',
     marginTop: 4,

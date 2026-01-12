@@ -1,10 +1,10 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuth } from '../contexts/AuthContext';
-import { useParish } from '../contexts/ParishContext';
+import { useGroup } from '../contexts/GroupContext';
 import AuthNavigator from './AuthNavigator';
 import MainNavigator from './MainNavigator';
-import ParishSelectScreen from '../screens/parish/ParishSelectScreen';
+import GroupSelectScreen from '../screens/group/GroupSelectScreen';
 import { RootStackParamList } from './types';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 
@@ -12,9 +12,9 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export default function RootNavigator() {
   const { session, loading: authLoading } = useAuth();
-  const { currentParish, parishes, loading: parishLoading } = useParish();
+  const { currentGroup, groups, loading: groupLoading } = useGroup();
 
-  if (authLoading || (session && parishLoading)) {
+  if (authLoading || (session && groupLoading)) {
     return (
       <View style={styles.loading}>
         <ActivityIndicator size="large" color="#3B82F6" />
@@ -31,16 +31,16 @@ export default function RootNavigator() {
     );
   }
 
-  // Logged in but no parish selected (or no parishes)
-  if (!currentParish) {
+  // Logged in but no group selected (or no groups)
+  if (!currentGroup) {
     return (
       <Stack.Navigator screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="ParishSelect" component={ParishSelectScreen} />
+        <Stack.Screen name="GroupSelect" component={GroupSelectScreen} />
       </Stack.Navigator>
     );
   }
 
-  // Logged in with parish selected
+  // Logged in with group selected
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="Main" component={MainNavigator} />

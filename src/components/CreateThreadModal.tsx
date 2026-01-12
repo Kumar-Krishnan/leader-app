@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { useParish } from '../contexts/ParishContext';
+import { useGroup } from '../contexts/GroupContext';
 
 interface Props {
   visible: boolean;
@@ -22,7 +22,7 @@ interface Props {
 
 export default function CreateThreadModal({ visible, onClose, onCreated }: Props) {
   const { user } = useAuth();
-  const { currentParish } = useParish();
+  const { currentGroup } = useGroup();
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -38,8 +38,8 @@ export default function CreateThreadModal({ visible, onClose, onCreated }: Props
       return;
     }
 
-    if (!currentParish) {
-      setError('No parish selected');
+    if (!currentGroup) {
+      setError('No group selected');
       return;
     }
 
@@ -52,7 +52,7 @@ export default function CreateThreadModal({ visible, onClose, onCreated }: Props
         .from('threads')
         .insert({
           name: name.trim(),
-          parish_id: currentParish.id,
+          group_id: currentGroup.id,
           created_by: user.id,
           is_archived: false,
         })
@@ -126,7 +126,7 @@ export default function CreateThreadModal({ visible, onClose, onCreated }: Props
             />
 
             <Text style={styles.hint}>
-              This thread will be created in {currentParish?.name}.
+              This thread will be created in {currentGroup?.name}.
             </Text>
 
             <TouchableOpacity

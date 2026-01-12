@@ -14,9 +14,9 @@ import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { Message, Profile } from '../../types/database';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { MainStackParamList } from '../../navigation/types';
+import { ThreadsStackParamList } from '../../navigation/types';
 
-type Props = NativeStackScreenProps<MainStackParamList, 'ThreadDetail'>;
+type Props = NativeStackScreenProps<ThreadsStackParamList, 'ThreadDetail'>;
 
 interface MessageWithSender extends Message {
   sender?: Profile;
@@ -29,6 +29,8 @@ export default function ThreadDetailScreen({ route, navigation }: Props) {
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editingText, setEditingText] = useState('');
   const flatListRef = useRef<FlatList>(null);
 
   useEffect(() => {
@@ -97,6 +99,12 @@ export default function ThreadDetailScreen({ route, navigation }: Props) {
       });
 
       if (error) throw error;
+      
+      // Realtime subscription will add the message to the list
+      // Scroll to bottom after a brief delay
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 200);
     } catch (error) {
       console.error('Error sending message:', error);
       setNewMessage(messageText); // Restore message on error
@@ -105,8 +113,84 @@ export default function ThreadDetailScreen({ route, navigation }: Props) {
     }
   };
 
+  const startEdit = (message: MessageWithSender) => {
+    setEditingMessageId(message.id);
+    setEditingText(message.content);
+  };
+
+  const cancelEdit = () => {
+    setEditingMessageId(null);
+    setEditingText('');
+  };
+
+  const saveEdit = async () => {
+    if (!editingText.trim() || !editingMessageId) return;
+
+    try {
+      const { error } = await supabase
+        .from('messages')
+        .update({ content: editingText.trim() })
+        .eq('id', editingMessageId);
+
+      if (error) throw error;
+
+      // Update local state
+      setMessages(prev => prev.map(msg => 
+        msg.id === editingMessageId 
+          ? { ...msg, content: editingText.trim() }
+          : msg
+      ));
+      
+      cancelEdit();
+    } catch (error) {
+      console.error('Error updating message:', error);
+      if (Platform.OS === 'web') {
+        alert('Failed to update message');
+      } else {
+        Alert.alert('Error', 'Failed to update message');
+      }
+    }
+  };
+
+  const deleteMessage = async (messageId: string) => {
+    const confirmDelete = Platform.OS === 'web'
+      ? window.confirm('Are you sure you want to delete this message?')
+      : await new Promise<boolean>(resolve => {
+          Alert.alert(
+            'Delete Message',
+            'Are you sure you want to delete this message?',
+            [
+              { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+              { text: 'Delete', style: 'destructive', onPress: () => resolve(true) },
+            ]
+          );
+        });
+
+    if (!confirmDelete) return;
+
+    try {
+      const { error } = await supabase
+        .from('messages')
+        .delete()
+        .eq('id', messageId);
+
+      if (error) throw error;
+
+      // Update local state
+      setMessages(prev => prev.filter(msg => msg.id !== messageId));
+    } catch (error) {
+      console.error('Error deleting message:', error);
+      if (Platform.OS === 'web') {
+        alert('Failed to delete message');
+      } else {
+        Alert.alert('Error', 'Failed to delete message');
+      }
+    }
+  };
+
   const renderMessage = ({ item }: { item: MessageWithSender }) => {
     const isMe = item.sender_id === user?.id;
+    const isEditing = editingMessageId === item.id;
     
     return (
       <View style={[styles.messageRow, isMe && styles.messageRowMe]}>
@@ -123,15 +207,62 @@ export default function ThreadDetailScreen({ route, navigation }: Props) {
               {item.sender?.full_name || 'Unknown'}
             </Text>
           )}
-          <Text style={[styles.messageText, isMe && styles.messageTextMe]}>
-            {item.content}
-          </Text>
-          <Text style={[styles.messageTime, isMe && styles.messageTimeMe]}>
-            {new Date(item.created_at).toLocaleTimeString([], { 
-              hour: 'numeric', 
-              minute: '2-digit' 
-            })}
-          </Text>
+          
+          {isEditing ? (
+            <View style={styles.editContainer}>
+              <TextInput
+                style={styles.editInput}
+                value={editingText}
+                onChangeText={setEditingText}
+                multiline
+                autoFocus
+              />
+              <View style={styles.editButtons}>
+                <TouchableOpacity 
+                  style={styles.editButtonCancel}
+                  onPress={cancelEdit}
+                >
+                  <Text style={styles.editButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={styles.editButtonSave}
+                  onPress={saveEdit}
+                >
+                  <Text style={styles.editButtonTextSave}>Save</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : (
+            <>
+              <Text style={[styles.messageText, isMe && styles.messageTextMe]}>
+                {item.content}
+              </Text>
+              <View style={styles.messageFooter}>
+                <Text style={[styles.messageTime, isMe && styles.messageTimeMe]}>
+                  {new Date(item.created_at).toLocaleTimeString([], { 
+                    hour: 'numeric', 
+                    minute: '2-digit' 
+                  })}
+                </Text>
+                {isMe && (
+                  <View style={styles.messageActions}>
+                    <TouchableOpacity 
+                      style={styles.messageActionButton}
+                      onPress={() => startEdit(item)}
+                    >
+                      <Text style={styles.messageActionText}>Edit</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={styles.messageActionButton}
+                      onPress={() => deleteMessage(item.id)}
+                    >
+                      <Text style={[styles.messageActionText, styles.messageActionTextDelete]}>Delete</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+            </>
+          )}
         </View>
       </View>
     );
@@ -329,6 +460,68 @@ const styles = StyleSheet.create({
   sendButtonText: {
     color: '#fff',
     fontSize: 20,
+    fontWeight: '600',
+  },
+  messageFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  messageActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  messageActionButton: {
+    paddingVertical: 2,
+    paddingHorizontal: 8,
+  },
+  messageActionText: {
+    fontSize: 11,
+    color: '#94A3B8',
+    fontWeight: '500',
+  },
+  messageActionTextDelete: {
+    color: '#EF4444',
+  },
+  editContainer: {
+    gap: 8,
+  },
+  editInput: {
+    backgroundColor: '#0F172A',
+    borderRadius: 8,
+    padding: 8,
+    color: '#F8FAFC',
+    fontSize: 15,
+    minHeight: 60,
+    borderWidth: 1,
+    borderColor: '#3B82F6',
+  },
+  editButtons: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 8,
+  },
+  editButtonCancel: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    backgroundColor: '#334155',
+  },
+  editButtonSave: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    backgroundColor: '#3B82F6',
+  },
+  editButtonText: {
+    color: '#F8FAFC',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  editButtonTextSave: {
+    color: '#fff',
+    fontSize: 13,
     fontWeight: '600',
   },
 });

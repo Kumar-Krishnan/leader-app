@@ -1,16 +1,16 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Switch, ScrollView, Modal } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
-import { useParish } from '../../contexts/ParishContext';
+import { useGroup } from '../../contexts/GroupContext';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { MainStackParamList } from '../../navigation/types';
+import { ProfileStackParamList } from '../../navigation/types';
 
 export default function ProfileScreen() {
-  const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
+  const navigation = useNavigation<NativeStackNavigationProp<ProfileStackParamList>>();
   const { profile, signOut, isLeader, isAdmin } = useAuth();
-  const { currentParish, parishes, setCurrentParish, isParishAdmin, canApproveRequests, pendingRequests } = useParish();
-  const [showParishPicker, setShowParishPicker] = useState(false);
+  const { currentGroup, groups, setCurrentGroup, isGroupAdmin, canApproveRequests, pendingRequests } = useGroup();
+  const [showGroupPicker, setShowGroupPicker] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = React.useState(
     profile?.notification_preferences?.push_enabled ?? true
   );
@@ -42,27 +42,27 @@ export default function ProfileScreen() {
         </View>
       </View>
 
-      {/* Parish Selection */}
+      {/* Group Selection */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Current Parish</Text>
+        <Text style={styles.sectionTitle}>Current Group</Text>
         <TouchableOpacity 
-          style={styles.parishSelector}
-          onPress={() => setShowParishPicker(true)}
+          style={styles.groupSelector}
+          onPress={() => setShowGroupPicker(true)}
         >
-          <View style={styles.parishIcon}>
-            <Text style={styles.parishIconText}>⛪</Text>
+          <View style={styles.groupIcon}>
+            <Text style={styles.groupIconText}>👥</Text>
           </View>
-          <View style={styles.parishInfo}>
-            <Text style={styles.parishName}>{currentParish?.name}</Text>
-            <Text style={styles.parishRole}>{currentParish?.role}</Text>
+          <View style={styles.groupInfo}>
+            <Text style={styles.groupName}>{currentGroup?.name}</Text>
+            <Text style={styles.groupRole}>{currentGroup?.role}</Text>
           </View>
           <Text style={styles.switchText}>Switch</Text>
         </TouchableOpacity>
 
-        {isParishAdmin && currentParish?.code && (
+        {isGroupAdmin && currentGroup?.code && (
           <View style={styles.codeContainer}>
-            <Text style={styles.codeLabel}>Parish Join Code:</Text>
-            <Text style={styles.codeValue}>{currentParish.code}</Text>
+            <Text style={styles.codeLabel}>Group Join Code:</Text>
+            <Text style={styles.codeValue}>{currentGroup.code}</Text>
           </View>
         )}
 
@@ -128,31 +128,31 @@ export default function ProfileScreen() {
         <Text style={styles.signOutText}>Sign Out</Text>
       </TouchableOpacity>
 
-      {/* Parish Picker Modal */}
-      <Modal visible={showParishPicker} animationType="slide" transparent>
+      {/* Group Picker Modal */}
+      <Modal visible={showGroupPicker} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Switch Parish</Text>
-              <TouchableOpacity onPress={() => setShowParishPicker(false)}>
+              <Text style={styles.modalTitle}>Switch Group</Text>
+              <TouchableOpacity onPress={() => setShowGroupPicker(false)}>
                 <Text style={styles.closeButton}>✕</Text>
               </TouchableOpacity>
             </View>
             
-            {parishes.map((parish) => (
+            {groups.map((group) => (
               <TouchableOpacity
-                key={parish.id}
+                key={group.id}
                 style={[
-                  styles.parishOption,
-                  currentParish?.id === parish.id && styles.parishOptionActive,
+                  styles.groupOption,
+                  currentGroup?.id === group.id && styles.groupOptionActive,
                 ]}
                 onPress={() => {
-                  setCurrentParish(parish);
-                  setShowParishPicker(false);
+                  setCurrentGroup(group);
+                  setShowGroupPicker(false);
                 }}
               >
-                <Text style={styles.parishOptionName}>{parish.name}</Text>
-                <Text style={styles.parishOptionRole}>{parish.role}</Text>
+                <Text style={styles.groupOptionName}>{group.name}</Text>
+                <Text style={styles.groupOptionRole}>{group.role}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -237,14 +237,14 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
-  parishSelector: {
+  groupSelector: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#0F172A',
     borderRadius: 12,
     padding: 12,
   },
-  parishIcon: {
+  groupIcon: {
     width: 40,
     height: 40,
     borderRadius: 10,
@@ -252,19 +252,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  parishIconText: {
+  groupIconText: {
     fontSize: 20,
   },
-  parishInfo: {
+  groupInfo: {
     flex: 1,
     marginLeft: 12,
   },
-  parishName: {
+  groupName: {
     fontSize: 16,
     fontWeight: '600',
     color: '#F8FAFC',
   },
-  parishRole: {
+  groupRole: {
     fontSize: 13,
     color: '#64748B',
     textTransform: 'capitalize',
@@ -377,7 +377,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
     color: '#94A3B8',
   },
-  parishOption: {
+  groupOption: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -388,15 +388,15 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: 'transparent',
   },
-  parishOptionActive: {
+  groupOptionActive: {
     borderColor: '#3B82F6',
   },
-  parishOptionName: {
+  groupOptionName: {
     fontSize: 16,
     fontWeight: '600',
     color: '#F8FAFC',
   },
-  parishOptionRole: {
+  groupOptionRole: {
     fontSize: 14,
     color: '#64748B',
     textTransform: 'capitalize',

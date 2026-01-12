@@ -1,57 +1,57 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
-import { Parish, ParishRole, ParishJoinRequest, ParishJoinRequestWithDetails } from '../types/database';
+import { Group, GroupRole, GroupJoinRequest, GroupJoinRequestWithDetails } from '../types/database';
 import { useAuth } from './AuthContext';
 
-interface ParishWithMembership extends Parish {
-  role: ParishRole;
+interface GroupWithMembership extends Group {
+  role: GroupRole;
   memberId: string;
 }
 
-interface ParishContextType {
-  parishes: ParishWithMembership[];
-  currentParish: ParishWithMembership | null;
-  setCurrentParish: (parish: ParishWithMembership | null) => void;
+interface GroupContextType {
+  groups: GroupWithMembership[];
+  currentGroup: GroupWithMembership | null;
+  setCurrentGroup: (group: GroupWithMembership | null) => void;
   loading: boolean;
-  isParishLeader: boolean;
-  isParishAdmin: boolean;
+  isGroupLeader: boolean;
+  isGroupAdmin: boolean;
   canApproveRequests: boolean;
-  pendingRequests: ParishJoinRequestWithDetails[];
-  myPendingRequests: ParishJoinRequest[];
-  refreshParishes: () => Promise<void>;
+  pendingRequests: GroupJoinRequestWithDetails[];
+  myPendingRequests: GroupJoinRequest[];
+  refreshGroups: () => Promise<void>;
   refreshPendingRequests: () => Promise<void>;
-  createParish: (name: string, description?: string) => Promise<{ parish: Parish | null; error: Error | null }>;
+  createGroup: (name: string, description?: string) => Promise<{ group: Group | null; error: Error | null }>;
   requestToJoin: (code: string) => Promise<{ error: Error | null }>;
   approveRequest: (requestId: string) => Promise<{ error: Error | null }>;
   rejectRequest: (requestId: string) => Promise<{ error: Error | null }>;
-  updateMemberRole: (memberId: string, newRole: ParishRole) => Promise<{ error: Error | null }>;
+  updateMemberRole: (memberId: string, newRole: GroupRole) => Promise<{ error: Error | null }>;
 }
 
-const ParishContext = createContext<ParishContextType | undefined>(undefined);
+const GroupContext = createContext<GroupContextType | undefined>(undefined);
 
-export function ParishProvider({ children }: { children: React.ReactNode }) {
+export function GroupProvider({ children }: { children: React.ReactNode }) {
   const { user, isLeader, loading: authLoading } = useAuth();
-  const [parishes, setParishes] = useState<ParishWithMembership[]>([]);
-  const [currentParish, setCurrentParish] = useState<ParishWithMembership | null>(null);
-  const [pendingRequests, setPendingRequests] = useState<ParishJoinRequestWithDetails[]>([]);
-  const [myPendingRequests, setMyPendingRequests] = useState<ParishJoinRequest[]>([]);
+  const [groups, setGroups] = useState<GroupWithMembership[]>([]);
+  const [currentGroup, setCurrentGroup] = useState<GroupWithMembership | null>(null);
+  const [pendingRequests, setPendingRequests] = useState<GroupJoinRequestWithDetails[]>([]);
+  const [myPendingRequests, setMyPendingRequests] = useState<GroupJoinRequest[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    console.log('[ParishContext] useEffect, authLoading:', authLoading, 'user:', user?.id);
+    console.log('[GroupContext] useEffect, authLoading:', authLoading, 'user:', user?.id);
     
     // Wait for auth to finish loading before making queries
     if (authLoading) {
-      console.log('[ParishContext] Auth still loading, waiting...');
+      console.log('[GroupContext] Auth still loading, waiting...');
       return;
     }
     
     if (user) {
       loadData();
     } else {
-      setParishes([]);
-      setCurrentParish(null);
+      setGroups([]);
+      setCurrentGroup(null);
       setPendingRequests([]);
       setMyPendingRequests([]);
       setLoading(false);
@@ -59,51 +59,51 @@ export function ParishProvider({ children }: { children: React.ReactNode }) {
   }, [user, authLoading]);
 
   useEffect(() => {
-    if (currentParish && canApproveRequests) {
+    if (currentGroup && canApproveRequests) {
       fetchPendingRequests();
     }
-  }, [currentParish]);
+  }, [currentGroup]);
 
-  // Persist selected parish to storage
+  // Persist selected group to storage
   useEffect(() => {
-    if (currentParish) {
-      AsyncStorage.setItem('selectedParishId', currentParish.id).catch(err => {
-        console.warn('[ParishContext] Failed to save parish to storage:', err);
+    if (currentGroup) {
+      AsyncStorage.setItem('selectedGroupId', currentGroup.id).catch(err => {
+        console.warn('[GroupContext] Failed to save group to storage:', err);
       });
     }
-  }, [currentParish?.id]);
+  }, [currentGroup?.id]);
 
   const loadData = async () => {
-    console.log('[ParishContext] loadData starting...');
+    console.log('[GroupContext] loadData starting...');
     setLoading(true);
     try {
-      // Fetch parishes first (essential)
-      await fetchParishes();
+      // Fetch groups first (essential)
+      await fetchGroups();
       
       // Fetch pending requests in background (non-blocking)
       // This can fail without breaking the app
       fetchMyPendingRequests().catch(err => {
-        console.warn('[ParishContext] Failed to fetch pending requests:', err);
+        console.warn('[GroupContext] Failed to fetch pending requests:', err);
       });
       
-      console.log('[ParishContext] loadData complete');
+      console.log('[GroupContext] loadData complete');
     } catch (error) {
-      console.error('[ParishContext] loadData error:', error);
+      console.error('[GroupContext] loadData error:', error);
     } finally {
       setLoading(false);
-      console.log('[ParishContext] loading set to false');
+      console.log('[GroupContext] loading set to false');
     }
   };
 
-  const fetchParishes = async () => {
-    console.log('[ParishContext] fetchParishes called, user:', user?.id);
+  const fetchGroups = async () => {
+    console.log('[GroupContext] fetchGroups called, user:', user?.id);
     if (!user) {
-      console.log('[ParishContext] No user, returning from fetchParishes');
+      console.log('[GroupContext] No user, returning from fetchGroups');
       return;
     }
 
     try {
-      console.log('[ParishContext] Querying parish_members...');
+      console.log('[GroupContext] Querying group_members...');
       
       // Add timeout to prevent hanging
       const timeoutPromise = new Promise((_, reject) => 
@@ -111,69 +111,69 @@ export function ParishProvider({ children }: { children: React.ReactNode }) {
       );
       
       const queryPromise = supabase
-        .from('parish_members')
+        .from('group_members')
         .select(`
           id,
           role,
-          parish:parishes(*)
+          group:groups(*)
         `)
         .eq('user_id', user.id);
 
       const { data, error } = await Promise.race([queryPromise, timeoutPromise]) as any;
 
-      console.log('[ParishContext] parish_members query complete, error:', error, 'data:', data?.length);
+      console.log('[GroupContext] group_members query complete, error:', error, 'data:', data?.length);
       if (error) {
-        console.error('Error fetching parishes:', error);
-        setParishes([]);
+        console.error('Error fetching groups:', error);
+        setGroups([]);
         return;
       }
 
-      const parishList: ParishWithMembership[] = (data || [])
-        .filter((item: any) => item.parish)
+      const groupList: GroupWithMembership[] = (data || [])
+        .filter((item: any) => item.group)
         .map((item: any) => ({
-          ...item.parish,
-          role: item.role as ParishRole,
+          ...item.group,
+          role: item.role as GroupRole,
           memberId: item.id,
         }));
 
-      setParishes(parishList);
+      setGroups(groupList);
 
-      // Try to restore last selected parish from storage
+      // Try to restore last selected group from storage
       try {
-        const savedParishId = await AsyncStorage.getItem('selectedParishId');
-        if (savedParishId && parishList.length > 0) {
-          const savedParish = parishList.find(p => p.id === savedParishId);
-          if (savedParish) {
-            console.log('[ParishContext] Restored parish from storage:', savedParish.name);
-            setCurrentParish(savedParish);
+        const savedGroupId = await AsyncStorage.getItem('selectedGroupId');
+        if (savedGroupId && groupList.length > 0) {
+          const savedGroup = groupList.find(p => p.id === savedGroupId);
+          if (savedGroup) {
+            console.log('[GroupContext] Restored group from storage:', savedGroup.name);
+            setCurrentGroup(savedGroup);
             return;
           }
         }
       } catch (error) {
-        console.warn('[ParishContext] Failed to restore parish from storage:', error);
+        console.warn('[GroupContext] Failed to restore group from storage:', error);
       }
 
-      // Auto-select first parish if none selected and none saved
-      if (parishList.length > 0 && !currentParish) {
-        setCurrentParish(parishList[0]);
-      } else if (parishList.length === 0) {
-        setCurrentParish(null);
+      // Auto-select first group if none selected and none saved
+      if (groupList.length > 0 && !currentGroup) {
+        setCurrentGroup(groupList[0]);
+      } else if (groupList.length === 0) {
+        setCurrentGroup(null);
       }
     } catch (error) {
-      console.error('Error fetching parishes:', error);
-      setParishes([]);
+      console.error('Error fetching groups:', error);
+      setGroups([]);
     }
   };
 
   const fetchMyPendingRequests = async () => {
-    console.log('[ParishContext] fetchMyPendingRequests called, user:', user?.id);
+    console.log('[GroupContext] fetchMyPendingRequests called, user:', user?.id);
     if (!user) {
-      console.log('[ParishContext] No user, returning from fetchMyPendingRequests');
+      console.log('[GroupContext] No user, returning from fetchMyPendingRequests');
       return;
     }
 
     try {
-      console.log('[ParishContext] Querying parish_join_requests...');
+      console.log('[GroupContext] Querying group_join_requests...');
       
       // Add timeout to prevent hanging
       const timeoutPromise = new Promise((_, reject) => 
@@ -181,14 +181,14 @@ export function ParishProvider({ children }: { children: React.ReactNode }) {
       );
       
       const queryPromise = supabase
-        .from('parish_join_requests')
+        .from('group_join_requests')
         .select('*')
         .eq('user_id', user.id)
         .eq('status', 'pending');
 
       const { data, error } = await Promise.race([queryPromise, timeoutPromise]) as any;
 
-      console.log('[ParishContext] parish_join_requests query complete, error:', error, 'data:', data?.length);
+      console.log('[GroupContext] group_join_requests query complete, error:', error, 'data:', data?.length);
       if (error) {
         console.error('Error fetching pending requests:', error);
         setMyPendingRequests([]);
@@ -203,16 +203,16 @@ export function ParishProvider({ children }: { children: React.ReactNode }) {
   };
 
   const fetchPendingRequests = async () => {
-    if (!currentParish) return;
+    if (!currentGroup) return;
 
     try {
       const { data, error } = await supabase
-        .from('parish_join_requests')
+        .from('group_join_requests')
         .select(`
           *,
           user:profiles!user_id(*)
         `)
-        .eq('parish_id', currentParish.id)
+        .eq('group_id', currentGroup.id)
         .eq('status', 'pending')
         .order('created_at', { ascending: true });
 
@@ -233,16 +233,16 @@ export function ParishProvider({ children }: { children: React.ReactNode }) {
     await fetchPendingRequests();
   };
 
-  const createParish = async (name: string, description?: string) => {
-    if (!user) return { parish: null, error: new Error('Not authenticated') };
-    if (!isLeader) return { parish: null, error: new Error('Only leaders can create parishes') };
+  const createGroup = async (name: string, description?: string) => {
+    if (!user) return { group: null, error: new Error('Not authenticated') };
+    if (!isLeader) return { group: null, error: new Error('Only leaders can create groups') };
 
     try {
       // Generate a random 6-character code
       const code = Math.random().toString(36).substring(2, 8).toUpperCase();
 
-      const { data: parish, error: parishError } = await supabase
-        .from('parishes')
+      const { data: group, error: groupError } = await supabase
+        .from('groups')
         .insert({
           name,
           description: description || null,
@@ -252,30 +252,30 @@ export function ParishProvider({ children }: { children: React.ReactNode }) {
         .select()
         .single();
 
-      if (parishError) throw parishError;
+      if (groupError) throw groupError;
 
       // Add creator as admin
       const { error: memberError } = await supabase
-        .from('parish_members')
+        .from('group_members')
         .insert({
-          parish_id: parish.id,
+          group_id: group.id,
           user_id: user.id,
           role: 'admin',
         });
 
       if (memberError) throw memberError;
 
-      await fetchParishes();
-      return { parish, error: null };
+      await fetchGroups();
+      return { group, error: null };
     } catch (error) {
-      return { parish: null, error: error as Error };
+      return { group: null, error: error as Error };
     }
   };
 
   const requestToJoin = async (code: string) => {
     try {
-      const { error } = await supabase.rpc('request_to_join_parish', {
-        parish_code: code.toUpperCase(),
+      const { error } = await supabase.rpc('request_to_join_group', {
+        group_code: code.toUpperCase(),
       });
 
       if (error) throw error;
@@ -317,7 +317,7 @@ export function ParishProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const updateMemberRole = async (memberId: string, newRole: ParishRole) => {
+  const updateMemberRole = async (memberId: string, newRole: GroupRole) => {
     try {
       const { error } = await supabase.rpc('update_member_role', {
         member_id: memberId,
@@ -326,32 +326,32 @@ export function ParishProvider({ children }: { children: React.ReactNode }) {
 
       if (error) throw error;
 
-      await fetchParishes();
+      await fetchGroups();
       return { error: null };
     } catch (error) {
       return { error: error as Error };
     }
   };
 
-  const isParishLeader = currentParish?.role === 'leader' || currentParish?.role === 'admin';
-  const isParishAdmin = currentParish?.role === 'admin';
-  const canApproveRequests = currentParish?.role === 'leader-helper' || currentParish?.role === 'leader' || currentParish?.role === 'admin';
+  const isGroupLeader = currentGroup?.role === 'leader' || currentGroup?.role === 'admin';
+  const isGroupAdmin = currentGroup?.role === 'admin';
+  const canApproveRequests = currentGroup?.role === 'leader-helper' || currentGroup?.role === 'leader' || currentGroup?.role === 'admin';
 
   return (
-    <ParishContext.Provider
+    <GroupContext.Provider
       value={{
-        parishes,
-        currentParish,
-        setCurrentParish,
+        groups,
+        currentGroup,
+        setCurrentGroup,
         loading,
-        isParishLeader,
-        isParishAdmin,
+        isGroupLeader,
+        isGroupAdmin,
         canApproveRequests,
         pendingRequests,
         myPendingRequests,
-        refreshParishes: fetchParishes,
+        refreshGroups: fetchGroups,
         refreshPendingRequests,
-        createParish,
+        createGroup,
         requestToJoin,
         approveRequest,
         rejectRequest,
@@ -359,14 +359,14 @@ export function ParishProvider({ children }: { children: React.ReactNode }) {
       }}
     >
       {children}
-    </ParishContext.Provider>
+    </GroupContext.Provider>
   );
 }
 
-export function useParish() {
-  const context = useContext(ParishContext);
+export function useGroup() {
+  const context = useContext(GroupContext);
   if (context === undefined) {
-    throw new Error('useParish must be used within a ParishProvider');
+    throw new Error('useGroup must be used within a GroupProvider');
   }
   return context;
 }

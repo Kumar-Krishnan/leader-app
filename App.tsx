@@ -2,7 +2,7 @@ import React from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer } from '@react-navigation/native';
 import { AuthProvider } from './src/contexts/AuthContext';
-import { ParishProvider } from './src/contexts/ParishContext';
+import { GroupProvider } from './src/contexts/GroupContext';
 import RootNavigator from './src/navigation/RootNavigator';
 import { Platform } from 'react-native';
 
@@ -37,7 +37,7 @@ const linking = {
 export default function App() {
   return (
     <AuthProvider>
-      <ParishProvider>
+      <GroupProvider>
         <NavigationContainer 
           linking={Platform.OS === 'web' ? linking : undefined}
           documentTitle={{
@@ -47,7 +47,7 @@ export default function App() {
           <StatusBar style="light" />
           <RootNavigator />
         </NavigationContainer>
-      </ParishProvider>
+      </GroupProvider>
     </AuthProvider>
   );
 }
