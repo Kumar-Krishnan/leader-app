@@ -1,23 +1,27 @@
 # Leader App
 
-A mobile app for community leaders to manage threads, meetings, resources, and team communication.
+A mobile/web app for community leaders to manage groups, threads, meetings, resources, and team communication.
 
 ## Features
 
-- 💬 **Cohesive Threads** - Group messaging with ability to add new members
-- 📅 **Meetings** - Display meeting info with passages and relevant details
-- 📚 **Resources** - Shared resource library with visibility controls
-- 👥 **User/Leader Roles** - Role-based access and features
-- ⭐ **Leader Hub** - Private resources and leader-to-leader sharing
-- 🔔 **Push Notifications** - Configurable notifications for messages, meetings, etc.
+- 💬 **Cohesive Threads** - Real-time group messaging with member management
+- 📅 **Meetings** - Schedule meetings with passages and resources
+- 📚 **Resources** - Shared resource library with folders, file uploads, and links
+- 👥 **Groups** - Multi-group support with join codes and approval workflow
+- ⭐ **Leader Hub** - Private leader-only resources
+- 🔔 **Push Notifications** - Configurable notifications (coming soon)
 - 🔗 **HubSpot Integration** - Connect with HubSpot CRM (coming soon)
 
 ## Tech Stack
 
 - **Frontend**: React Native + Expo
-- **Backend**: Supabase (PostgreSQL, Auth, Realtime)
-- **Notifications**: Expo Push Notifications
-- **Navigation**: React Navigation
+- **Backend**: Supabase (PostgreSQL, Auth, Realtime, Storage)
+- **Hosting**: Netlify (web)
+- **Navigation**: React Navigation (nested stacks + tabs)
+
+## Live Demo
+
+Deployed at: [Your Netlify URL]
 
 ## Getting Started
 
@@ -25,7 +29,6 @@ A mobile app for community leaders to manage threads, meetings, resources, and t
 
 - Node.js 20.x or higher
 - npm or yarn
-- Expo CLI (`npm install -g expo-cli`)
 - Supabase account (free tier works)
 
 ### 1. Clone and Install
@@ -39,7 +42,7 @@ npm install
 
 1. Create a new project at [supabase.com](https://supabase.com)
 2. Go to the SQL Editor in your Supabase dashboard
-3. Copy and run the contents of `supabase-schema.sql`
+3. Run the contents of `supabase-fresh-start.sql`
 4. Go to Settings > API to get your project URL and anon key
 
 ### 3. Configure Environment
@@ -67,64 +70,92 @@ npm run android  # Android Emulator
 npm run web      # Web browser
 ```
 
-### 5. Preview on Your Phone
-
-1. Download "Expo Go" from the App Store or Play Store
-2. Scan the QR code shown in terminal
-3. The app will load on your device
-
 ## Project Structure
 
 ```
 leader_app/
 ├── App.tsx                    # App entry point
+├── netlify.toml               # Netlify deployment config
 ├── src/
-│   ├── components/           # Reusable UI components
+│   ├── components/            # Reusable UI components
+│   │   ├── CreateThreadModal.tsx
+│   │   └── AddResourceModal.tsx
 │   ├── contexts/
-│   │   └── AuthContext.tsx   # Authentication state
-│   ├── hooks/                # Custom React hooks
+│   │   ├── AuthContext.tsx    # Authentication state
+│   │   └── GroupContext.tsx   # Group membership state
 │   ├── lib/
-│   │   └── supabase.ts       # Supabase client config
+│   │   ├── supabase.ts        # Supabase client config
+│   │   └── storage/           # Storage abstraction layer
 │   ├── navigation/
-│   │   ├── AuthNavigator.tsx # Sign in/up flow
-│   │   ├── MainNavigator.tsx # Main tab navigation
-│   │   └── RootNavigator.tsx # Root navigation logic
+│   │   ├── types.ts           # Navigation type definitions
+│   │   ├── AuthNavigator.tsx  # Sign in/up flow
+│   │   ├── MainNavigator.tsx  # Tabs with nested stacks
+│   │   └── RootNavigator.tsx  # Root navigation logic
 │   ├── screens/
-│   │   ├── auth/             # Authentication screens
-│   │   ├── main/             # Main app screens
-│   │   └── leader/           # Leader-only screens
+│   │   ├── auth/              # Authentication screens
+│   │   ├── main/              # Main app screens
+│   │   ├── group/             # Group selection/management
+│   │   └── leader/            # Leader-only screens
 │   └── types/
-│       └── database.ts       # TypeScript types
-├── supabase-schema.sql       # Database schema
-└── .env.example              # Environment template
+│       └── database.ts        # TypeScript types
+├── supabase-fresh-start.sql   # Complete database schema
+└── AI_CONTEXT/                # Documentation for AI agents
 ```
 
-## Development Roadmap
+## Development Status
 
-- [x] Phase 1: Project setup, auth, navigation
-- [ ] Phase 2: Real-time messaging in threads
-- [ ] Phase 3: Push notifications
-- [ ] Phase 4: Meetings & Resources CRUD
-- [ ] Phase 5: Leader resource sharing
-- [ ] Phase 6: HubSpot integration
-- [ ] Phase 7: TestFlight & App Store
+- [x] Authentication (email/password)
+- [x] User roles (user/leader/admin)
+- [x] Group system with join codes
+- [x] Real-time messaging in threads
+- [x] Message edit/delete
+- [x] Resources with folders & file uploads
+- [x] Netlify deployment
+- [ ] Push notifications
+- [ ] Meetings CRUD
+- [ ] Leader resource sharing
+- [ ] HubSpot integration
+
+## Deployment
+
+### Netlify (Web)
+
+The app auto-deploys to Netlify on push to `main`. Configuration is in `netlify.toml`.
+
+Environment variables needed in Netlify:
+- `EXPO_PUBLIC_SUPABASE_URL`
+- `EXPO_PUBLIC_SUPABASE_ANON_KEY`
+
+### iOS (Future)
+
+```bash
+npx eas build --platform ios
+npx eas submit --platform ios
+```
 
 ## Testing User Roles
 
-To test leader features, update a user's role in Supabase:
-
 ```sql
+-- Make a user a leader
 UPDATE profiles SET role = 'leader' WHERE email = 'your@email.com';
+
+-- Make a user an admin
+UPDATE profiles SET role = 'admin' WHERE email = 'your@email.com';
 ```
 
-## Deploying to iOS
+## Development Access Control
 
-1. Create an Apple Developer account
-2. Run `npx expo prebuild` to generate native projects
-3. Run `npx expo run:ios --configuration Release`
-4. Or use EAS Build: `npx eas build --platform ios`
+Currently restricted to specific emails for development:
+- joshirby@gmail.com
+- gkrishnan803@gmail.com
+- josh.irby@cru.org
+
+To remove this restriction:
+```sql
+DROP TRIGGER IF EXISTS check_email_before_signup ON auth.users;
+DROP FUNCTION IF EXISTS check_allowed_email();
+```
 
 ## License
 
 Private - All rights reserved
-

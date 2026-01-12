@@ -1,0 +1,13 @@
+[build]
+  command = "npx expo export --platform web && cp public/_redirects dist/_redirects"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# Handle client-side routing (SPA)
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+

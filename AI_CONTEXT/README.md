@@ -9,7 +9,7 @@ This folder contains documentation for AI coding assistants working on this proj
 | `PROJECT_OVERVIEW.md` | High-level overview, features, tech stack |
 | `ARCHITECTURE.md` | Code structure, navigation flow, patterns |
 | `DATABASE.md` | Supabase schema, RLS policies, relationships |
-| `SUPABASE_SETUP.md` | Current Supabase state, fixes applied, how to export |
+| `SUPABASE_SETUP.md` | Current Supabase state, deployment config |
 | `NEXT_STEPS.md` | TODO list, priorities, deployment info |
 | `COMMON_TASKS.md` | How-to guides for common development tasks |
 
@@ -23,13 +23,28 @@ This folder contains documentation for AI coding assistants working on this proj
 
 ## Key Points
 
-- **React Native + Expo** - Cross-platform mobile app
-- **Supabase** - Backend (PostgreSQL + Auth + Realtime)
+- **React Native + Expo** - Cross-platform mobile/web app
+- **Supabase** - Backend (PostgreSQL + Auth + Realtime + Storage)
 - **TypeScript** - Strict typing throughout
 - **Dark theme** - Primary background `#0F172A`
 - **Role-based** - user/leader/admin roles affect UI and permissions
+- **Group system** - Users belong to groups, content is scoped per group
 
-## Current State
+## Current State (January 2026)
 
-The app has basic authentication and navigation working. List views for threads, meetings, and resources are implemented but pull from real Supabase data (currently empty). The next major work is adding CRUD operations and real-time messaging.
+The app is deployed on Netlify with:
+- ✅ Full authentication flow
+- ✅ Group system with join codes and approval
+- ✅ Real-time messaging in threads
+- ✅ Resource management with folders and file uploads
+- ✅ Navigation with persistent bottom tabs
+- ⏳ Push notifications (not started)
+- ⏳ Meetings CRUD (list view only)
+- ⏳ HubSpot integration (not started)
 
+## Terminology
+
+- **Group** - A community/organization users belong to (formerly "Parish")
+- **Thread** - A group messaging conversation
+- **Leader** - User who can create content and manage members
+- **Leader-helper** - Can approve join requests but not create content

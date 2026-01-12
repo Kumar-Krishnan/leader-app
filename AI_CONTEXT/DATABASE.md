@@ -1,16 +1,24 @@
 # Database Schema & Supabase
 
+## Schema File
+
+The complete schema is in `/supabase-fresh-start.sql`. Run this in Supabase SQL Editor for a fresh setup.
+
 ## Tables Overview
 
-| Table | Purpose | RLS |
-|-------|---------|-----|
-| `profiles` | User profiles, extends auth.users | Yes |
-| `threads` | Group chat threads | Yes |
-| `thread_members` | Many-to-many: users in threads | Yes |
-| `messages` | Messages within threads | Yes |
-| `meetings` | Scheduled meetings with details | Yes |
-| `resources` | Shared documents/links/videos | Yes |
-| `resource_shares` | Leader-to-leader resource sharing | Yes |
+| Table | Purpose |
+|-------|---------|
+| `profiles` | User profiles, extends auth.users |
+| `groups` | Groups/communities users belong to |
+| `group_members` | User membership in groups with roles |
+| `group_join_requests` | Pending requests to join groups |
+| `threads` | Group chat threads (scoped to group) |
+| `thread_members` | Users in threads |
+| `messages` | Messages within threads |
+| `meetings` | Scheduled meetings (scoped to group) |
+| `resources` | Shared documents/links (scoped to group) |
+| `resource_folders` | Folder organization for resources |
+| `resource_shares` | Leader-to-leader resource sharing |
 
 ## Key Relationships
 
@@ -19,95 +27,105 @@ auth.users (Supabase built-in)
     │
     └──> profiles (1:1, created by trigger)
             │
-            ├──> thread_members ──> threads
+            ├──> group_members ──> groups
+            │       │
+            │       └──> group_join_requests
+            │
+            ├──> thread_members ──> threads (scoped to group)
             │
             ├──> messages
             │
-            ├──> meetings (created_by)
+            ├──> meetings (scoped to group)
             │
-            └──> resources (shared_by)
+            └──> resources (scoped to group)
                     │
+                    ├──> resource_folders
                     └──> resource_shares
 ```
 
 ## Profile Creation
 
-Profiles are created automatically via database trigger when a user signs up:
+Profiles are created automatically via database trigger:
 
 ```sql
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
-  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+  FOR EACH ROW EXECUTE FUNCTION handle_new_user();
 ```
 
 The app does NOT insert profiles directly.
 
-## Important RLS Policies
+## Group Roles
 
-### Threads
-- Users can only see threads they're members of
-- Only leaders can create threads
+Stored in `group_members.role`:
+- `member` - Regular member
+- `leader-helper` - Can approve join requests
+- `leader` - Can create content, manage members
+- `admin` - Full control, sees join code
 
-### Resources
-- `visibility = 'all'`: Everyone can see
-- `visibility = 'leaders_only'`: Only leaders/admins can see
+## RLS Status
 
-### Messages
-- Users can only see messages in threads they belong to
-- Users can only send messages to threads they belong to
+**Currently DISABLED for development.** All authenticated users have full access to all tables.
 
-## Realtime Subscriptions
-
-Enabled for:
-- `messages` - for live chat
-- `threads` - for thread updates
-- `thread_members` - for membership changes
-
-To subscribe:
-```tsx
-const channel = supabase
-  .channel('messages')
-  .on('postgres_changes', { 
-    event: 'INSERT', 
-    schema: 'public', 
-    table: 'messages',
-    filter: `thread_id=eq.${threadId}`
-  }, handleNewMessage)
-  .subscribe();
+To re-enable with proper policies:
+```sql
+ALTER TABLE table_name ENABLE ROW LEVEL SECURITY;
+-- Then add appropriate policies
 ```
 
-## Changing User Roles
+## Realtime
 
-To promote a user to leader (run in Supabase SQL Editor):
+Enabled via publication for live updates:
+```sql
+ALTER PUBLICATION supabase_realtime ADD TABLE messages;
+ALTER PUBLICATION supabase_realtime ADD TABLE threads;
+ALTER PUBLICATION supabase_realtime ADD TABLE group_members;
+-- etc.
+```
 
+## Storage
+
+Supabase Storage bucket `resources` for file uploads:
+- Files stored at: `{group_id}/{filename}`
+- Public URL accessible to authenticated users
+
+## Email Restriction
+
+Signup restricted to specific emails during development:
+
+```sql
+CREATE TRIGGER check_email_before_signup
+  BEFORE INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION check_allowed_email();
+```
+
+Allowed emails defined in `check_allowed_email()` function.
+
+## Common Queries
+
+### Promote user to leader
 ```sql
 UPDATE profiles SET role = 'leader' WHERE email = 'user@example.com';
 ```
 
-## Schema File
-
-The complete schema is in `/supabase-schema.sql`. Run this in the Supabase SQL Editor to set up the database.
-
-**Note:** After running the main schema, also run the trigger fix:
-
+### View all users
 ```sql
--- This was added later to fix profile creation
-CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS TRIGGER AS $$
-BEGIN
-  INSERT INTO public.profiles (id, email, full_name, role, notification_preferences)
-  VALUES (
-    NEW.id,
-    NEW.email,
-    COALESCE(NEW.raw_user_meta_data->>'full_name', ''),
-    'user',
-    '{"messages": true, "meetings": true, "resources": true, "push_enabled": true}'::jsonb
-  );
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
-CREATE POLICY "Service role can insert profiles" ON profiles
-  FOR INSERT WITH CHECK (true);
+SELECT id, email, full_name, role FROM profiles;
 ```
 
+### View group memberships
+```sql
+SELECT 
+  p.email,
+  g.name as group_name,
+  gm.role as group_role
+FROM group_members gm
+JOIN profiles p ON p.id = gm.user_id
+JOIN groups g ON g.id = gm.group_id;
+```
+
+### Remove email restriction
+```sql
+DROP TRIGGER IF EXISTS check_email_before_signup ON auth.users;
+DROP FUNCTION IF EXISTS check_allowed_email();
+```

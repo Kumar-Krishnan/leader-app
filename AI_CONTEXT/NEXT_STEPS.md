@@ -1,53 +1,47 @@
 # Next Steps & TODO
 
+## Current State (January 2026)
+
+The app is deployed on Netlify with core features working:
+- ✅ Authentication
+- ✅ Group system with join codes
+- ✅ Real-time messaging
+- ✅ Resources with folders/uploads
+- ✅ Role-based access
+
 ## Immediate Priorities
 
-### 1. CRUD Operations (High Priority)
-The list views are done but users can't create/edit content yet.
+### 1. Meetings CRUD (High Priority)
+The list view exists but needs full functionality.
 
-**Threads:**
-- [ ] Create thread modal/screen
-- [ ] Add members to thread
-- [ ] Thread detail screen with messages
-- [ ] Real-time message updates
-- [ ] Send message functionality
-
-**Meetings:**
-- [ ] Create meeting form
+- [ ] Create meeting form (title, date, location, passages)
 - [ ] Edit meeting
 - [ ] Delete meeting
-- [ ] Add passages to meeting
 - [ ] Meeting detail view
+- [ ] Link meeting to thread for discussion
 
-**Resources:**
-- [ ] Add resource form (title, type, URL/content, tags, visibility)
-- [ ] Edit resource
-- [ ] Delete resource
-- [ ] Resource detail/preview
-
-### 2. Real-time Messaging (High Priority)
-- [ ] Subscribe to new messages in thread
-- [ ] Typing indicators (optional)
-- [ ] Read receipts (optional)
-- [ ] Message notifications
-
-### 3. Push Notifications (Medium Priority)
-- [ ] Register for push tokens (expo-notifications already installed)
+### 2. Push Notifications (High Priority)
+- [ ] Register for push tokens (expo-notifications installed)
 - [ ] Store push tokens in profiles table
-- [ ] Send notifications on new message
-- [ ] Notification preferences (already in profile)
-- [ ] Supabase Edge Function or webhook for sending
+- [ ] Supabase Edge Function to send on new message
+- [ ] Notification preferences UI (already in profile type)
 
-### 4. Leader Features (Medium Priority)
+### 3. Leader Features (Medium Priority)
 - [ ] Share resource with specific leaders
 - [ ] Leader-to-leader messaging
-- [ ] Member management (add/remove from threads)
+- [ ] Member management improvements
 
-### 5. HubSpot Integration (Lower Priority)
+### 4. HubSpot Integration (Lower Priority)
 - [ ] HubSpot API connection
 - [ ] Sync contacts
 - [ ] Store hubspot_contact_id in profiles
 - [ ] Activity tracking
+
+### 5. Polish & UX
+- [ ] Loading skeletons instead of spinners
+- [ ] Error handling improvements
+- [ ] Empty state illustrations
+- [ ] Pull-to-refresh everywhere
 
 ## iOS Deployment
 
@@ -73,13 +67,13 @@ eas submit --platform ios
 
 ## Known Issues / Tech Debt
 
-1. **Node version warnings**: React Native wants Node 20.19.4+, currently using 20.18.3. Works but shows warnings.
+1. **RLS Disabled**: Row Level Security is currently disabled for development. Need to re-enable with proper policies before production.
 
-2. **Package version mismatches**: Some Expo packages have version warnings. Run `npx expo install --fix` to resolve.
+2. **Email Restriction**: Signup limited to 3 emails. Remove before public launch.
 
-3. **Web SecureStore**: Using localStorage fallback for web since SecureStore is native-only.
+3. **No Offline Support**: App requires network connection.
 
-4. **No offline support**: App requires network connection. Could add offline caching later.
+4. **Web-only Deployment**: iOS/Android builds not yet configured.
 
 ## Feature Ideas (Future)
 
@@ -87,8 +81,23 @@ eas submit --platform ios
 - [ ] Profile photo upload
 - [ ] File attachments in messages
 - [ ] Meeting reminders (local notifications)
-- [ ] Calendar integration
+- [ ] Calendar integration (Google/Apple)
 - [ ] Search functionality
 - [ ] Message reactions
 - [ ] Polls in threads
+- [ ] Read receipts
+- [ ] Typing indicators
+- [ ] Export group data
+- [ ] Archive old threads/meetings
 
+## Deployment Checklist
+
+Before going public:
+1. [ ] Enable RLS with proper policies
+2. [ ] Remove email restriction trigger
+3. [ ] Set up proper Supabase backups
+4. [ ] Configure custom domain on Netlify
+5. [ ] Set up error monitoring (Sentry)
+6. [ ] Add analytics (optional)
+7. [ ] Test on multiple devices/browsers
+8. [ ] Write user documentation

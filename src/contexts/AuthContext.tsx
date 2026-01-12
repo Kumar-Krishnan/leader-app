@@ -34,83 +34,84 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    // Check what's in localStorage for debugging
-    if (typeof localStorage !== 'undefined') {
-      const authKeys = Object.keys(localStorage).filter(k => k.includes('supabase') || k.includes('auth'));
-      console.log('[AuthContext] Auth keys in localStorage:', authKeys);
-      authKeys.forEach(key => {
-        try {
-          const value = localStorage.getItem(key);
-          console.log(`[AuthContext] ${key}:`, value?.substring(0, 100) + '...');
-        } catch (e) {
-          console.error(`[AuthContext] Error reading ${key}:`, e);
-        }
-      });
-    }
+    // Track current user ID to avoid unnecessary updates
+    let currentUserId: string | null = null;
 
-    // Get initial session with timeout (handles corrupted cache)
-    console.log('[AuthContext] Calling getSession()...');
-    const timeoutId = setTimeout(async () => {
-      console.warn('[AuthContext] getSession timed out after 3s');
-      
-      // Check if we already tried to recover (prevent infinite loop)
-      const recoveryAttempted = sessionStorage.getItem('auth_recovery_attempted');
-      
-      if (typeof localStorage !== 'undefined' && !recoveryAttempted) {
-        console.log('[AuthContext] Clearing corrupted session and reloading...');
-        // Mark that we attempted recovery
-        sessionStorage.setItem('auth_recovery_attempted', 'true');
-        
-        // Clear corrupted auth data
-        Object.keys(localStorage).forEach(key => {
-          if (key.includes('supabase') || key.includes('auth')) {
-            console.log('[AuthContext] Removing:', key);
-            localStorage.removeItem(key);
-          }
-        });
-        
-        // Reload to get fresh client
-        window.location.reload();
-        return;
-      }
-      
-      // Already tried recovery, just show login
-      console.log('[AuthContext] Recovery already attempted, showing login');
-      sessionStorage.removeItem('auth_recovery_attempted');
-      setLoading(false);
-    }, 3000);
-
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      clearTimeout(timeoutId);
-      console.log('[AuthContext] Got session:', !!session, session?.user?.email);
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchProfile(session.user.id);
-      } else {
-        setLoading(false);
-      }
-    }).catch((err) => {
-      clearTimeout(timeoutId);
-      console.error('[AuthContext] getSession error:', err);
-      setLoading(false);
-    });
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
+    const initSession = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        console.log('[AuthContext] Got session:', !!session, session?.user?.email);
+        currentUserId = session?.user?.id ?? null;
+        console.log('[AuthContext] Set currentUserId to:', currentUserId);
         setSession(session);
         setUser(session?.user ?? null);
         if (session?.user) {
           await fetchProfile(session.user.id);
         } else {
+          setLoading(false);
+        }
+      } catch (err) {
+        console.error('[AuthContext] getSession error:', err);
+        setLoading(false);
+      }
+    };
+
+    initSession();
+    
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, newSession) => {
+        const newUserId = newSession?.user?.id ?? null;
+        console.log('[AuthContext] onAuthStateChange event:', event, 'currentUserId:', currentUserId, 'newUserId:', newUserId);
+        
+        // Ignore token refreshes entirely
+        if (event === 'TOKEN_REFRESHED') {
+          console.log('[AuthContext] Token refreshed, ignoring');
+          return;
+        }
+        
+        // For SIGNED_IN, only update if user actually changed
+        if (event === 'SIGNED_IN' && currentUserId === newUserId) {
+          console.log('[AuthContext] SIGNED_IN but same user, ignoring');
+          return;
+        }
+        
+        // For INITIAL_SESSION, skip if we already have this user
+        if (event === 'INITIAL_SESSION' && currentUserId === newUserId) {
+          console.log('[AuthContext] INITIAL_SESSION but same user, ignoring');
+          return;
+        }
+        
+        console.log('[AuthContext] Auth state changed, updating from', currentUserId, 'to', newUserId);
+        currentUserId = newUserId;
+        
+        if (event === 'SIGNED_OUT') {
+          setSession(null);
+          setUser(null);
           setProfile(null);
           setLoading(false);
+        } else if (newSession?.user) {
+          setSession(newSession);
+          setUser(newSession.user);
+          await fetchProfile(newSession.user.id);
         }
       }
     );
 
-    return () => subscription.unsubscribe();
+    // Log visibility changes for debugging
+    const handleVisibility = () => {
+      console.log('[AuthContext] Visibility changed to:', document.visibilityState);
+    };
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleVisibility);
+    }
+
+    return () => {
+      subscription.unsubscribe();
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', handleVisibility);
+      }
+    };
   }, []);
 
   const fetchProfile = async (userId: string) => {

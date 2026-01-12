@@ -38,8 +38,11 @@ export function GroupProvider({ children }: { children: React.ReactNode }) {
   const [myPendingRequests, setMyPendingRequests] = useState<GroupJoinRequest[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Track if we've already loaded data for this user to prevent duplicate loads
+  const [loadedUserId, setLoadedUserId] = useState<string | null>(null);
+
   useEffect(() => {
-    console.log('[GroupContext] useEffect, authLoading:', authLoading, 'user:', user?.id);
+    console.log('[GroupContext] useEffect triggered, authLoading:', authLoading, 'user:', user?.id, 'loadedUserId:', loadedUserId);
     
     // Wait for auth to finish loading before making queries
     if (authLoading) {
@@ -48,15 +51,24 @@ export function GroupProvider({ children }: { children: React.ReactNode }) {
     }
     
     if (user) {
-      loadData();
+      // Only load if user changed (not just object reference)
+      if (loadedUserId !== user.id) {
+        console.log('[GroupContext] User changed from', loadedUserId, 'to', user.id, '- loading data...');
+        setLoadedUserId(user.id);
+        loadData();
+      } else {
+        console.log('[GroupContext] Same user, skipping reload');
+      }
     } else {
+      console.log('[GroupContext] No user, clearing state');
+      setLoadedUserId(null);
       setGroups([]);
       setCurrentGroup(null);
       setPendingRequests([]);
       setMyPendingRequests([]);
       setLoading(false);
     }
-  }, [user, authLoading]);
+  }, [user?.id, authLoading]);
 
   useEffect(() => {
     if (currentGroup && canApproveRequests) {
@@ -105,12 +117,7 @@ export function GroupProvider({ children }: { children: React.ReactNode }) {
     try {
       console.log('[GroupContext] Querying group_members...');
       
-      // Add timeout to prevent hanging
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Query timeout')), 5000)
-      );
-      
-      const queryPromise = supabase
+      const { data, error } = await supabase
         .from('group_members')
         .select(`
           id,
@@ -118,8 +125,6 @@ export function GroupProvider({ children }: { children: React.ReactNode }) {
           group:groups(*)
         `)
         .eq('user_id', user.id);
-
-      const { data, error } = await Promise.race([queryPromise, timeoutPromise]) as any;
 
       console.log('[GroupContext] group_members query complete, error:', error, 'data:', data?.length);
       if (error) {
@@ -175,18 +180,11 @@ export function GroupProvider({ children }: { children: React.ReactNode }) {
     try {
       console.log('[GroupContext] Querying group_join_requests...');
       
-      // Add timeout to prevent hanging
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Query timeout')), 5000)
-      );
-      
-      const queryPromise = supabase
+      const { data, error } = await supabase
         .from('group_join_requests')
         .select('*')
         .eq('user_id', user.id)
         .eq('status', 'pending');
-
-      const { data, error } = await Promise.race([queryPromise, timeoutPromise]) as any;
 
       console.log('[GroupContext] group_join_requests query complete, error:', error, 'data:', data?.length);
       if (error) {

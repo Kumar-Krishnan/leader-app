@@ -34,10 +34,12 @@ export default function ThreadDetailScreen({ route, navigation }: Props) {
   const flatListRef = useRef<FlatList>(null);
 
   useEffect(() => {
+    console.log('[ThreadDetail] useEffect, threadId:', threadId);
     navigation.setOptions({ title: threadName });
     fetchMessages();
     
     // Subscribe to new messages
+    console.log('[ThreadDetail] Setting up realtime subscription...');
     const channel = supabase
       .channel(`messages:${threadId}`)
       .on('postgres_changes', {
@@ -46,6 +48,7 @@ export default function ThreadDetailScreen({ route, navigation }: Props) {
         table: 'messages',
         filter: `thread_id=eq.${threadId}`,
       }, async (payload) => {
+        console.log('[ThreadDetail] Received new message via realtime');
         // Fetch the sender info for the new message
         const newMsg = payload.new as Message;
         const { data: sender } = await supabase
@@ -56,14 +59,18 @@ export default function ThreadDetailScreen({ route, navigation }: Props) {
         
         setMessages(prev => [...prev, { ...newMsg, sender: sender || undefined }]);
       })
-      .subscribe();
+      .subscribe((status) => {
+        console.log('[ThreadDetail] Realtime subscription status:', status);
+      });
 
     return () => {
+      console.log('[ThreadDetail] Cleaning up realtime subscription');
       supabase.removeChannel(channel);
     };
   }, [threadId]);
 
   const fetchMessages = async () => {
+    console.log('[ThreadDetail] fetchMessages starting for thread:', threadId);
     try {
       const { data, error } = await supabase
         .from('messages')
@@ -74,11 +81,13 @@ export default function ThreadDetailScreen({ route, navigation }: Props) {
         .eq('thread_id', threadId)
         .order('created_at', { ascending: true });
 
+      console.log('[ThreadDetail] fetchMessages complete, count:', data?.length, 'error:', error);
       if (error) throw error;
       setMessages(data || []);
     } catch (error) {
-      console.error('Error fetching messages:', error);
+      console.error('[ThreadDetail] Error fetching messages:', error);
     } finally {
+      console.log('[ThreadDetail] Setting loading to false');
       setLoading(false);
     }
   };
