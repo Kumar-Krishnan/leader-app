@@ -130,9 +130,15 @@ CREATE TABLE meetings (
   thread_id UUID REFERENCES threads(id) ON DELETE SET NULL,
   attachments TEXT[] DEFAULT '{}',
   created_by UUID REFERENCES profiles(id) ON DELETE SET NULL,
+  -- Series support for recurring events
+  series_id UUID,
+  series_index INTEGER,  -- 1, 2, 3... for display like "Event (1/4)"
+  series_total INTEGER,  -- Total events in series
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+CREATE INDEX idx_meetings_series_id ON meetings(series_id);
 
 ALTER TABLE meetings ENABLE ROW LEVEL SECURITY;
 
@@ -417,6 +423,14 @@ CREATE POLICY "Leaders create meetings" ON meetings
 
 CREATE POLICY "Leaders update meetings" ON meetings
   FOR UPDATE USING (
+    group_id IN (
+      SELECT group_id FROM group_members 
+      WHERE user_id = auth.uid() AND role IN ('leader', 'admin')
+    )
+  );
+
+CREATE POLICY "Leaders delete meetings" ON meetings
+  FOR DELETE USING (
     group_id IN (
       SELECT group_id FROM group_members 
       WHERE user_id = auth.uid() AND role IN ('leader', 'admin')

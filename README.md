@@ -133,6 +133,31 @@ npx eas build --platform ios
 npx eas submit --platform ios
 ```
 
+## Testing
+
+### Run Unit Tests
+
+```bash
+npm test              # Run all tests
+npm test:watch        # Watch mode for development
+npm test:coverage     # Generate coverage report
+```
+
+**Current Status**: 141 tests passing across 11 test suites
+- AuthContext (9 tests)
+- GroupContext (9 tests)
+- Supabase Config (5 tests)
+- CreateThreadModal (9 tests)
+- AddResourceModal (5 tests)
+- SignInScreen (17 tests)
+- SignUpScreen (17 tests)
+- ProfileScreen (22 tests)
+- MeetingsScreen (9 tests)
+- ThreadsScreen (21 tests)
+- ThreadDetailScreen (19 tests)
+
+See `AI_CONTEXT/TESTING.md` for detailed testing documentation.
+
 ## Testing User Roles
 
 ```sql

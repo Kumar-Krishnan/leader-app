@@ -288,7 +288,7 @@ export default function ThreadDetailScreen({ route, navigation }: Props) {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#3B82F6" />
+        <ActivityIndicator testID="activity-indicator" size="large" color="#3B82F6" />
       </View>
     );
   }

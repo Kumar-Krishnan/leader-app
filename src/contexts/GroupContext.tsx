@@ -41,6 +41,11 @@ export function GroupProvider({ children }: { children: React.ReactNode }) {
   // Track if we've already loaded data for this user to prevent duplicate loads
   const [loadedUserId, setLoadedUserId] = useState<string | null>(null);
 
+  // Computed values - must be defined before useEffects that use them
+  const isGroupLeader = currentGroup?.role === 'leader' || currentGroup?.role === 'admin';
+  const isGroupAdmin = currentGroup?.role === 'admin';
+  const canApproveRequests = currentGroup?.role === 'leader-helper' || currentGroup?.role === 'leader' || currentGroup?.role === 'admin';
+
   useEffect(() => {
     console.log('[GroupContext] useEffect triggered, authLoading:', authLoading, 'user:', user?.id, 'loadedUserId:', loadedUserId);
     
@@ -71,10 +76,14 @@ export function GroupProvider({ children }: { children: React.ReactNode }) {
   }, [user?.id, authLoading]);
 
   useEffect(() => {
+    console.log('[GroupContext] Pending requests effect, currentGroup:', currentGroup?.id, 'canApprove:', canApproveRequests);
     if (currentGroup && canApproveRequests) {
+      console.log('[GroupContext] Fetching pending requests for group:', currentGroup.name);
       fetchPendingRequests();
+    } else {
+      setPendingRequests([]);
     }
-  }, [currentGroup]);
+  }, [currentGroup?.id, canApproveRequests]);
 
   // Persist selected group to storage
   useEffect(() => {
@@ -201,9 +210,14 @@ export function GroupProvider({ children }: { children: React.ReactNode }) {
   };
 
   const fetchPendingRequests = async () => {
-    if (!currentGroup) return;
+    console.log('[GroupContext] fetchPendingRequests called, currentGroup:', currentGroup?.id, currentGroup?.name);
+    if (!currentGroup) {
+      console.log('[GroupContext] No current group, skipping fetchPendingRequests');
+      return;
+    }
 
     try {
+      console.log('[GroupContext] Querying group_join_requests for group:', currentGroup.id);
       const { data, error } = await supabase
         .from('group_join_requests')
         .select(`
@@ -214,15 +228,18 @@ export function GroupProvider({ children }: { children: React.ReactNode }) {
         .eq('status', 'pending')
         .order('created_at', { ascending: true });
 
+      console.log('[GroupContext] fetchPendingRequests result - error:', error, 'data:', data);
+      
       if (error) {
-        console.error('Error fetching pending requests:', error);
+        console.error('[GroupContext] Error fetching pending requests:', error);
         setPendingRequests([]);
         return;
       }
       
+      console.log('[GroupContext] Setting pending requests:', data?.length || 0, 'requests');
       setPendingRequests(data || []);
     } catch (error) {
-      console.error('Error fetching pending requests:', error);
+      console.error('[GroupContext] Exception fetching pending requests:', error);
       setPendingRequests([]);
     }
   };
@@ -330,10 +347,6 @@ export function GroupProvider({ children }: { children: React.ReactNode }) {
       return { error: error as Error };
     }
   };
-
-  const isGroupLeader = currentGroup?.role === 'leader' || currentGroup?.role === 'admin';
-  const isGroupAdmin = currentGroup?.role === 'admin';
-  const canApproveRequests = currentGroup?.role === 'leader-helper' || currentGroup?.role === 'leader' || currentGroup?.role === 'admin';
 
   return (
     <GroupContext.Provider

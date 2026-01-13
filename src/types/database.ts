@@ -81,8 +81,32 @@ export interface Meeting {
   thread_id: string | null;
   attachments: string[];
   created_by: string;
+  // Series support for recurring events
+  series_id: string | null;
+  series_index: number | null;  // 1, 2, 3... for display like "Event (1/4)"
+  series_total: number | null;  // Total events in series
   created_at: string;
   updated_at: string;
+}
+
+export type AttendeeStatus = 'invited' | 'accepted' | 'declined' | 'maybe';
+
+export interface MeetingAttendee {
+  id: string;
+  meeting_id: string;
+  user_id: string;
+  status: AttendeeStatus;
+  invited_at: string;
+  responded_at: string | null;
+  is_series_rsvp: boolean;  // True if this was set via series-level RSVP
+}
+
+export interface MeetingAttendeeWithProfile extends MeetingAttendee {
+  user?: Profile;
+}
+
+export interface MeetingWithAttendees extends Meeting {
+  attendees?: MeetingAttendeeWithProfile[];
 }
 
 export interface ResourceFolder {
@@ -173,6 +197,11 @@ export interface Database {
         Row: Meeting;
         Insert: Omit<Meeting, 'id' | 'created_at' | 'updated_at'>;
         Update: Partial<Omit<Meeting, 'id' | 'created_at'>>;
+      };
+      meeting_attendees: {
+        Row: MeetingAttendee;
+        Insert: Omit<MeetingAttendee, 'id' | 'invited_at'>;
+        Update: Partial<Omit<MeetingAttendee, 'id'>>;
       };
       resources: {
         Row: Resource;

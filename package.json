@@ -6,10 +6,14 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "test": "npx jest",
+    "test:watch": "npx jest --watch",
+    "test:coverage": "npx jest --coverage --coverageReporters=html --coverageReporters=text --coverageReporters=lcov"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "^2.2.0",
+    "@react-native-community/datetimepicker": "^8.6.0",
     "@react-navigation/bottom-tabs": "^7.9.0",
     "@react-navigation/native": "^7.1.26",
     "@react-navigation/native-stack": "^7.9.0",
@@ -30,7 +34,12 @@
     "react-native-web": "^0.21.0"
   },
   "devDependencies": {
+    "@jest/test-sequencer": "^29.7.0",
+    "@testing-library/react-native": "^13.3.3",
+    "@types/jest": "^29.5.0",
     "@types/react": "~19.1.0",
+    "jest": "^29.7.0",
+    "jest-expo": "^54.0.16",
     "typescript": "~5.9.2"
   },
   "private": true

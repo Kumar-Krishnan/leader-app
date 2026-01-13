@@ -12,6 +12,9 @@ This folder contains documentation for AI coding assistants working on this proj
 | `SUPABASE_SETUP.md` | Current Supabase state, deployment config |
 | `NEXT_STEPS.md` | TODO list, priorities, deployment info |
 | `COMMON_TASKS.md` | How-to guides for common development tasks |
+| `TESTING.md` | Testing plan, status, and coverage goals |
+| `TESTING_LESSONS_LEARNED.md` | **Read this before writing tests!** Patterns, pitfalls, debugging |
+| `ARCHITECTURE_IMPROVEMENTS.md` | **Long-term roadmap** - Interfaces, patterns, refactoring guide |
 
 ## Quick Start for AI Agents
 

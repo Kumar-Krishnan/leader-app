@@ -1,15 +1,26 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Switch, ScrollView, Modal } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { useGroup } from '../../contexts/GroupContext';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { ProfileStackParamList } from '../../navigation/types';
 
 export default function ProfileScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<ProfileStackParamList>>();
   const { profile, signOut, isLeader, isAdmin } = useAuth();
-  const { currentGroup, groups, setCurrentGroup, isGroupAdmin, canApproveRequests, pendingRequests } = useGroup();
+  const { currentGroup, groups, setCurrentGroup, isGroupAdmin, canApproveRequests, pendingRequests, refreshPendingRequests } = useGroup();
+
+  // Refresh pending requests when screen is focused
+  useFocusEffect(
+    useCallback(() => {
+      console.log('[ProfileScreen] Focus effect - canApproveRequests:', canApproveRequests, 'currentGroup role:', currentGroup?.role, 'pendingRequests:', pendingRequests.length);
+      if (canApproveRequests) {
+        console.log('[ProfileScreen] Refreshing pending requests on focus');
+        refreshPendingRequests();
+      }
+    }, [canApproveRequests, refreshPendingRequests, currentGroup?.role, pendingRequests.length])
+  );
   const [showGroupPicker, setShowGroupPicker] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = React.useState(
     profile?.notification_preferences?.push_enabled ?? true
