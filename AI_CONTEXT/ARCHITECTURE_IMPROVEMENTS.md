@@ -572,27 +572,131 @@ src/
 
 ## 🎯 Implementation Priority
 
-| Priority | Improvement | Impact | Effort |
-|----------|-------------|--------|--------|
-| 1 | Custom Hooks Layer | High | Low |
-| 2 | Service Interfaces | High | Medium |
-| 3 | Repository Pattern | High | Medium |
-| 4 | Error Handling | Medium | Low |
-| 5 | API Response Wrapper | Medium | Low |
-| 6 | Notification Interface | Medium | Low |
-| 7 | DI Container | Medium | Medium |
-| 8 | Feature Flags | Low | Low |
-| 9 | State Machines | Low | High |
-| 10 | Offline Support | Low | High |
+| Priority | Improvement | Impact | Effort | Status |
+|----------|-------------|--------|--------|--------|
+| 1 | Custom Hooks Layer | High | Low | ✅ DONE |
+| 2 | Service Interfaces | High | Medium | Pending |
+| 3 | Repository Pattern | High | Medium | Pending |
+| 4 | Error Handling | Medium | Low | Pending |
+| 5 | API Response Wrapper | Medium | Low | Pending |
+| 6 | Notification Interface | Medium | Low | Pending |
+| 7 | DI Container | Medium | Medium | Pending |
+| 8 | Feature Flags | Low | Low | Pending |
+| 9 | State Machines | Low | High | Pending |
+| 10 | Offline Support | Low | High | Pending |
 
 ---
 
 ## Quick Wins to Start
 
-1. **Extract `useThreads`, `useMeetings`, `useMessages` hooks** - immediate testability improvement
+1. ✅ **Extract `useThreads`, `useMeetings`, `useMessages` hooks** - DONE! See `src/hooks/`
 2. **Create service interfaces** - define contracts before implementation
 3. **Add `safeQuery` wrapper** - standardize error handling today
 4. **Create `NotificationService` interface** - ready for when you implement push
+
+---
+
+## ✅ IMPLEMENTED: Custom Hooks Pattern
+
+The hooks layer has been implemented! Here's what was created:
+
+### `src/hooks/useThreads.ts`
+```typescript
+const { threads, loading, error, refetch, createThread, archiveThread } = useThreads();
+```
+- Fetches threads for current group
+- Create/archive thread with optimistic updates
+- Full error handling
+
+### `src/hooks/useMeetings.ts`
+```typescript
+const { meetings, loading, error, refetch, rsvpToMeeting, rsvpToSeries, deleteMeeting, deleteSeries } = useMeetings();
+```
+- Fetches upcoming meetings with attendees
+- RSVP to single meeting or entire series
+- Delete single or series with optimistic updates
+
+### `src/hooks/useMessages.ts`
+```typescript
+const { messages, loading, sending, error, refetch, sendMessage, editMessage, deleteMessage } = useMessages(threadId);
+```
+- Fetches messages with sender info
+- Real-time subscription for new/updated/deleted messages
+- Send/edit/delete with optimistic updates
+
+### `src/hooks/useResources.ts`
+```typescript
+const { folders, resources, currentFolderId, folderPath, loading, uploading, openFolder, goBack, createFolder, uploadFileResource, createLinkResource, deleteFolder, deleteResource, getResourceUrl } = useResources();
+```
+- Folder/resource fetching with navigation
+- Folder navigation (open, back, root)
+- File upload and link creation
+- Delete operations with storage cleanup
+- Download URL generation
+
+### `src/hooks/useGroupMembers.ts`
+```typescript
+const { members, loading, error, processingId, refetch, updateRole, removeMember } = useGroupMembers();
+```
+- Fetches members with profile info
+- Role updates with optimistic UI
+- Member removal
+
+### Usage Pattern
+```tsx
+// Before (in component)
+const [threads, setThreads] = useState([]);
+const [loading, setLoading] = useState(true);
+useEffect(() => { /* fetch logic */ }, []);
+const fetchThreads = async () => { /* supabase calls */ };
+
+// After (with hook)
+const { threads, loading, refetch } = useThreads();
+// That's it! Component is now purely presentational
+```
+
+### Benefits Achieved
+- **Testability**: 30 hook tests covering all operations
+- **Reusability**: Same logic can be used in multiple screens
+- **Separation**: Components are thin, focused on presentation
+- **Type Safety**: Full TypeScript interfaces for all returns
+
+### Screens Refactored to Use Hooks
+- ✅ `ThreadsScreen` → uses `useThreads`
+- ✅ `MeetingsScreen` → uses `useMeetings`
+- ✅ `ThreadDetailScreen` → uses `useMessages`
+- ✅ `ResourcesScreen` → uses `useResources`
+- ✅ `ManageMembersScreen` → uses `useGroupMembers`
+
+### Services Layer
+- ✅ `locationAnalytics.ts` → Anonymous location events for analytics
+
+### Test Strategy Update
+The screen tests now mock the hooks instead of mocking Supabase directly:
+
+```typescript
+// OLD (mocking Supabase)
+jest.mock('../../../src/lib/supabase');
+(supabase.from as jest.Mock).mockReturnValue(createMockChain([mockData]));
+
+// NEW (mocking hooks)
+jest.mock('../../../src/hooks/useMeetings', () => ({
+  useMeetings: () => mockUseMeetingsResult,
+}));
+
+mockUseMeetingsResult = {
+  meetings: [mockMeeting],
+  loading: false,
+  error: null,
+  rsvpToMeeting: jest.fn().mockResolvedValue(true),
+  // ...
+};
+```
+
+This approach is:
+- **Simpler** - No need to recreate Supabase query chains
+- **Focused** - Tests screen behavior, not Supabase implementation
+- **Decoupled** - Changing Supabase calls in hooks doesn't break screen tests
 
 ---
 

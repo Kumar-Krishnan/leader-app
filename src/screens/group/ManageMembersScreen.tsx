@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -10,12 +10,9 @@ import {
   Modal,
 } from 'react-native';
 import { useGroup } from '../../contexts/GroupContext';
-import { supabase } from '../../lib/supabase';
-import { GroupMember, Profile, GroupRole } from '../../types/database';
-
-interface MemberWithProfile extends GroupMember {
-  user: Profile;
-}
+import { useGroupMembers, MemberWithProfile } from '../../hooks/useGroupMembers';
+import { GroupRole } from '../../types/database';
+import Avatar from '../../components/Avatar';
 
 export default function ManageMembersScreen() {
   const { 
@@ -23,70 +20,48 @@ export default function ManageMembersScreen() {
     pendingRequests, 
     approveRequest, 
     rejectRequest,
-    updateMemberRole,
     refreshPendingRequests,
     isGroupLeader,
     canApproveRequests,
   } = useGroup();
   
-  const [members, setMembers] = useState<MemberWithProfile[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [processingId, setProcessingId] = useState<string | null>(null);
+  // Use the useGroupMembers hook for member data and operations
+  const {
+    members,
+    loading,
+    processingId,
+    updateRole,
+    refetch,
+  } = useGroupMembers();
+  
   const [selectedMember, setSelectedMember] = useState<MemberWithProfile | null>(null);
-
-  useEffect(() => {
-    fetchMembers();
-    refreshPendingRequests();
-  }, [currentGroup]);
-
-  const fetchMembers = async () => {
-    if (!currentGroup) return;
-
-    try {
-      const { data, error } = await supabase
-        .from('group_members')
-        .select(`
-          *,
-          user:profiles!user_id(*)
-        `)
-        .eq('group_id', currentGroup.id)
-        .order('role', { ascending: true });
-
-      if (error) throw error;
-      setMembers(data || []);
-    } catch (error) {
-      console.error('Error fetching members:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [localProcessingId, setLocalProcessingId] = useState<string | null>(null);
 
   const handleApprove = async (requestId: string) => {
-    setProcessingId(requestId);
+    setLocalProcessingId(requestId);
     const { error } = await approveRequest(requestId);
     if (error) {
       Alert.alert('Error', error.message);
     } else {
-      fetchMembers();
+      refetch();
     }
-    setProcessingId(null);
+    setLocalProcessingId(null);
   };
 
   const handleReject = async (requestId: string) => {
-    setProcessingId(requestId);
+    setLocalProcessingId(requestId);
     const { error } = await rejectRequest(requestId);
     if (error) {
       Alert.alert('Error', error.message);
     }
-    setProcessingId(null);
+    setLocalProcessingId(null);
   };
 
   const handleRoleChange = async (memberId: string, newRole: GroupRole) => {
-    const { error } = await updateMemberRole(memberId, newRole);
-    if (error) {
-      Alert.alert('Error', error.message);
+    const success = await updateRole(memberId, newRole);
+    if (!success) {
+      Alert.alert('Error', 'Failed to update role');
     } else {
-      fetchMembers();
       setSelectedMember(null);
     }
   };
@@ -103,11 +78,11 @@ export default function ManageMembersScreen() {
   const renderRequest = ({ item }: { item: typeof pendingRequests[0] }) => (
     <View style={styles.requestCard}>
       <View style={styles.requestInfo}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>
-            {item.user?.full_name?.[0] || '?'}
-          </Text>
-        </View>
+        <Avatar 
+          uri={item.user?.avatar_url} 
+          name={item.user?.full_name} 
+          size={44}
+        />
         <View style={styles.userInfo}>
           <Text style={styles.userName}>{item.user?.full_name || 'Unknown'}</Text>
           <Text style={styles.userEmail}>{item.user?.email}</Text>
@@ -120,9 +95,9 @@ export default function ManageMembersScreen() {
         <TouchableOpacity
           style={styles.approveButton}
           onPress={() => handleApprove(item.id)}
-          disabled={processingId === item.id}
+          disabled={localProcessingId === item.id}
         >
-          {processingId === item.id ? (
+          {localProcessingId === item.id ? (
             <ActivityIndicator size="small" color="#fff" />
           ) : (
             <Text style={styles.approveButtonText}>✓</Text>
@@ -131,7 +106,7 @@ export default function ManageMembersScreen() {
         <TouchableOpacity
           style={styles.rejectButton}
           onPress={() => handleReject(item.id)}
-          disabled={processingId === item.id}
+          disabled={localProcessingId === item.id}
         >
           <Text style={styles.rejectButtonText}>✕</Text>
         </TouchableOpacity>
@@ -145,11 +120,11 @@ export default function ManageMembersScreen() {
       onPress={() => isGroupLeader ? setSelectedMember(item) : null}
       disabled={!isGroupLeader || item.role === 'admin'}
     >
-      <View style={styles.avatar}>
-        <Text style={styles.avatarText}>
-          {item.user?.full_name?.[0] || '?'}
-        </Text>
-      </View>
+      <Avatar 
+        uri={item.user?.avatar_url} 
+        name={item.user?.full_name} 
+        size={44}
+      />
       <View style={styles.memberInfo}>
         <Text style={styles.memberName}>{item.user?.full_name || 'Unknown'}</Text>
         <Text style={styles.memberEmail}>{item.user?.email}</Text>
@@ -224,6 +199,7 @@ export default function ManageMembersScreen() {
                   selectedMember?.role === 'member' && styles.roleOptionActive,
                 ]}
                 onPress={() => handleRoleChange(selectedMember!.id, 'member')}
+                disabled={processingId === selectedMember?.id}
               >
                 <Text style={styles.roleOptionTitle}>Member</Text>
                 <Text style={styles.roleOptionDesc}>Can view and participate</Text>
@@ -235,6 +211,7 @@ export default function ManageMembersScreen() {
                   selectedMember?.role === 'leader-helper' && styles.roleOptionActive,
                 ]}
                 onPress={() => handleRoleChange(selectedMember!.id, 'leader-helper')}
+                disabled={processingId === selectedMember?.id}
               >
                 <Text style={styles.roleOptionTitle}>Leader Helper</Text>
                 <Text style={styles.roleOptionDesc}>Can approve join requests</Text>
@@ -246,11 +223,16 @@ export default function ManageMembersScreen() {
                   selectedMember?.role === 'leader' && styles.roleOptionActive,
                 ]}
                 onPress={() => handleRoleChange(selectedMember!.id, 'leader')}
+                disabled={processingId === selectedMember?.id}
               >
                 <Text style={styles.roleOptionTitle}>Leader</Text>
                 <Text style={styles.roleOptionDesc}>Full access, can manage roles</Text>
               </TouchableOpacity>
             </View>
+
+            {processingId === selectedMember?.id && (
+              <ActivityIndicator style={{ marginTop: 16 }} color="#3B82F6" />
+            )}
           </View>
         </View>
       </Modal>
@@ -365,19 +347,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 8,
   },
-  avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#3B82F6',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  avatarText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '600',
-  },
   userInfo: {
     flex: 1,
     marginLeft: 12,
@@ -478,4 +447,3 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
 });
-

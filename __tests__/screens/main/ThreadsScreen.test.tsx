@@ -306,7 +306,7 @@ describe('ThreadsScreen', () => {
 
     await waitFor(() => {
       expect(consoleSpy).toHaveBeenCalledWith(
-        '[ThreadsScreen] Error fetching threads:',
+        '[useThreads] Error fetching threads:',
         expect.any(Error)
       );
     });

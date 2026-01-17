@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -15,9 +15,10 @@ import {
 import * as DocumentPicker from 'expo-document-picker';
 import { useGroup } from '../../contexts/GroupContext';
 import { useAuth } from '../../contexts/AuthContext';
-import { supabase } from '../../lib/supabase';
-import { storage, RESOURCES_BUCKET, generateFilePath } from '../../lib/storage';
+import { useResources } from '../../hooks/useResources';
+import { useResourceUpvotes } from '../../hooks/useResourceUpvotes';
 import { Resource, ResourceFolder } from '../../types/database';
+import ResourceCommentsModal from '../../components/ResourceCommentsModal';
 
 const TYPE_ICONS: Record<string, string> = {
   document: '📄',
@@ -32,14 +33,38 @@ type ListItem =
   | { type: 'resource'; data: Resource };
 
 export default function ResourcesScreen() {
-  const { currentGroup, canApproveRequests } = useGroup();
-  const { user } = useAuth();
-  const [folders, setFolders] = useState<ResourceFolder[]>([]);
-  const [resources, setResources] = useState<Resource[]>([]);
-  const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
-  const [folderPath, setFolderPath] = useState<ResourceFolder[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [uploading, setUploading] = useState(false);
+  const { currentGroup, canApproveRequests, isGroupLeader } = useGroup();
+  const { isLeader } = useAuth();
+  
+  // Use the useResources hook for all data and operations
+  const {
+    folders,
+    resources,
+    currentFolderId,
+    folderPath,
+    loading,
+    uploading,
+    openFolder,
+    goBack,
+    goToRoot,
+    createFolder: createFolderAction,
+    uploadFileResource,
+    createLinkResource,
+    deleteFolder: deleteFolderAction,
+    deleteResource: deleteResourceAction,
+    getResourceUrl,
+  } = useResources();
+  
+  // Upvotes hook
+  const { upvotes, toggleUpvote, fetchUpvotes } = useResourceUpvotes();
+  
+  // Fetch upvotes when resources change
+  useEffect(() => {
+    if (resources.length > 0) {
+      const resourceIds = resources.map(r => r.id);
+      fetchUpvotes(resourceIds);
+    }
+  }, [resources, fetchUpvotes]);
   
   // Modals
   const [showAddModal, setShowAddModal] = useState(false);
@@ -49,95 +74,24 @@ export default function ResourcesScreen() {
   const [newResourceUrl, setNewResourceUrl] = useState('');
   const [newResourceType, setNewResourceType] = useState<'link' | 'document'>('link');
   const [selectedFile, setSelectedFile] = useState<DocumentPicker.DocumentPickerAsset | null>(null);
+  
+  // Comments modal
+  const [commentsModal, setCommentsModal] = useState<{
+    visible: boolean;
+    resourceId?: string;
+    folderId?: string;
+    title: string;
+  }>({ visible: false, title: '' });
 
-  useEffect(() => {
-    if (currentGroup) {
-      fetchContents();
-    } else {
-      setLoading(false);
-    }
-  }, [currentGroup?.id, currentFolderId]);
+  const handleCreateFolder = async () => {
+    if (!newFolderName.trim()) return;
 
-  const fetchContents = async () => {
-    if (!currentGroup) return;
-    setLoading(true);
-
-    try {
-      // Fetch folders - use .is() for null, .eq() for UUID
-      let folderQuery = supabase
-        .from('resource_folders')
-        .select('*')
-        .eq('group_id', currentGroup.id);
-      
-      if (currentFolderId === null) {
-        folderQuery = folderQuery.is('parent_id', null);
-      } else {
-        folderQuery = folderQuery.eq('parent_id', currentFolderId);
-      }
-      
-      const { data: folderData, error: folderError } = await folderQuery.order('name');
-
-      if (folderError) throw folderError;
-      setFolders(folderData || []);
-
-      // Fetch resources - same logic
-      let resourceQuery = supabase
-        .from('resources')
-        .select('*')
-        .eq('group_id', currentGroup.id);
-      
-      if (currentFolderId === null) {
-        resourceQuery = resourceQuery.is('folder_id', null);
-      } else {
-        resourceQuery = resourceQuery.eq('folder_id', currentFolderId);
-      }
-      
-      const { data: resourceData, error: resourceError } = await resourceQuery.order('created_at', { ascending: false });
-
-      if (resourceError) throw resourceError;
-      setResources(resourceData || []);
-    } catch (error) {
-      console.error('Error fetching contents:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const openFolder = (folder: ResourceFolder) => {
-    setFolderPath([...folderPath, folder]);
-    setCurrentFolderId(folder.id);
-  };
-
-  const goBack = () => {
-    const newPath = [...folderPath];
-    newPath.pop();
-    setFolderPath(newPath);
-    setCurrentFolderId(newPath.length > 0 ? newPath[newPath.length - 1].id : null);
-  };
-
-  const goToRoot = () => {
-    setFolderPath([]);
-    setCurrentFolderId(null);
-  };
-
-  const createFolder = async () => {
-    if (!newFolderName.trim() || !currentGroup || !user) return;
-
-    try {
-      const { error } = await supabase.from('resource_folders').insert({
-        name: newFolderName.trim(),
-        group_id: currentGroup.id,
-        parent_id: currentFolderId,
-        created_by: user.id,
-      });
-
-      if (error) throw error;
-      
+    const success = await createFolderAction(newFolderName.trim());
+    if (success) {
       setNewFolderName('');
       setShowFolderModal(false);
-      fetchContents();
-    } catch (error: any) {
-      Alert.alert('Error', error.message);
+    } else {
+      Alert.alert('Error', 'Failed to create folder');
     }
   };
 
@@ -158,103 +112,65 @@ export default function ResourcesScreen() {
     }
   };
 
-  const uploadResource = async () => {
-    if (!currentGroup || !user) return;
-    
-    if (newResourceType === 'link' && !newResourceUrl.trim()) {
-      Alert.alert('Error', 'Please enter a URL');
-      return;
-    }
-    
-    if (newResourceType === 'document' && !selectedFile) {
-      Alert.alert('Error', 'Please select a file');
-      return;
-    }
-
-    if (!newResourceTitle.trim()) {
-      Alert.alert('Error', 'Please enter a title');
-      return;
-    }
-
-    setUploading(true);
-
-    try {
-      let filePath = null;
-      let fileSize = null;
-      let mimeType = null;
-
-      // Upload file if document type
-      if (newResourceType === 'document' && selectedFile) {
-        const storagePath = generateFilePath(currentGroup.id, selectedFile.name);
-        
-        // Use storage abstraction - handles web/native differences
-        const uploadResult = await storage.upload(
-          RESOURCES_BUCKET,
-          storagePath,
-          {
-            uri: selectedFile.uri,
-            name: selectedFile.name,
-            type: selectedFile.mimeType || 'application/octet-stream',
-          },
-          { contentType: selectedFile.mimeType || 'application/octet-stream' }
-        );
-
-        if (uploadResult.error) throw uploadResult.error;
-
-        filePath = storagePath;
-        fileSize = selectedFile.size;
-        mimeType = selectedFile.mimeType;
+  const handleUploadResource = async () => {
+    if (newResourceType === 'link') {
+      if (!newResourceUrl.trim()) {
+        Alert.alert('Error', 'Please enter a URL');
+        return;
+      }
+      if (!newResourceTitle.trim()) {
+        Alert.alert('Error', 'Please enter a title');
+        return;
       }
 
-      // Create resource record
-      const { error } = await supabase.from('resources').insert({
-        title: newResourceTitle.trim(),
-        type: newResourceType === 'link' ? 'link' : 'document',
-        url: newResourceType === 'link' ? newResourceUrl.trim() : null,
-        group_id: currentGroup.id,
-        folder_id: currentFolderId,
-        file_path: filePath,
-        file_size: fileSize,
-        mime_type: mimeType,
-        visibility: 'all',
-        shared_by: user.id,
-        tags: [],
-      });
+      const success = await createLinkResource(newResourceTitle.trim(), newResourceUrl.trim());
+      if (success) {
+        resetAddForm();
+      } else {
+        Alert.alert('Error', 'Failed to create link');
+      }
+    } else {
+      if (!selectedFile) {
+        Alert.alert('Error', 'Please select a file');
+        return;
+      }
+      if (!newResourceTitle.trim()) {
+        Alert.alert('Error', 'Please enter a title');
+        return;
+      }
 
-      if (error) throw error;
+      const success = await uploadFileResource(
+        {
+          uri: selectedFile.uri,
+          name: selectedFile.name,
+          type: selectedFile.mimeType || 'application/octet-stream',
+          size: selectedFile.size,
+        },
+        newResourceTitle.trim()
+      );
 
-      // Reset form
-      setNewResourceTitle('');
-      setNewResourceUrl('');
-      setSelectedFile(null);
-      setShowAddModal(false);
-      fetchContents();
-    } catch (error: any) {
-      console.error('Upload error:', error);
-      Alert.alert('Error', error.message);
-    } finally {
-      setUploading(false);
+      if (success) {
+        resetAddForm();
+      } else {
+        Alert.alert('Error', 'Failed to upload file');
+      }
     }
+  };
+
+  const resetAddForm = () => {
+    setNewResourceTitle('');
+    setNewResourceUrl('');
+    setSelectedFile(null);
+    setShowAddModal(false);
   };
 
   const openResource = async (resource: Resource) => {
     if (resource.type === 'link' && resource.url) {
       Linking.openURL(resource.url);
     } else if (resource.file_path) {
-      try {
-        const result = await storage.getDownloadUrl(
-          RESOURCES_BUCKET,
-          resource.file_path,
-          3600
-        );
-        
-        if (result.url) {
-          Linking.openURL(result.url);
-        } else if (result.error) {
-          console.error('Error getting file URL:', result.error);
-        }
-      } catch (error) {
-        console.error('Error getting file URL:', error);
+      const url = await getResourceUrl(resource.file_path);
+      if (url) {
+        Linking.openURL(url);
       }
     }
   };
@@ -267,12 +183,16 @@ export default function ResourcesScreen() {
   };
 
   const confirmDeleteFolder = (folder: ResourceFolder) => {
+    const performDelete = async () => {
+      const success = await deleteFolderAction(folder.id);
+      if (!success) {
+        Alert.alert('Error', 'Failed to delete folder');
+      }
+    };
+
     if (Platform.OS === 'web') {
-      const confirmed = window.confirm(
-        `Are you sure you want to delete "${folder.name}"? This will also delete all contents inside.`
-      );
-      if (confirmed) {
-        deleteFolder(folder);
+      if (window.confirm(`Are you sure you want to delete "${folder.name}"? This will also delete all contents inside.`)) {
+        performDelete();
       }
     } else {
       Alert.alert(
@@ -280,33 +200,23 @@ export default function ResourcesScreen() {
         `Are you sure you want to delete "${folder.name}"? This will also delete all contents inside.`,
         [
           { text: 'Cancel', style: 'cancel' },
-          { text: 'Delete', style: 'destructive', onPress: () => deleteFolder(folder) },
+          { text: 'Delete', style: 'destructive', onPress: performDelete },
         ]
       );
     }
   };
 
-  const deleteFolder = async (folder: ResourceFolder) => {
-    try {
-      const { error } = await supabase
-        .from('resource_folders')
-        .delete()
-        .eq('id', folder.id);
-
-      if (error) throw error;
-      fetchContents();
-    } catch (error: any) {
-      Alert.alert('Error', error.message);
-    }
-  };
-
   const confirmDeleteResource = (resource: Resource) => {
+    const performDelete = async () => {
+      const success = await deleteResourceAction(resource.id, resource.file_path);
+      if (!success) {
+        Alert.alert('Error', 'Failed to delete resource');
+      }
+    };
+
     if (Platform.OS === 'web') {
-      const confirmed = window.confirm(
-        `Are you sure you want to delete "${resource.title}"?`
-      );
-      if (confirmed) {
-        deleteResource(resource);
+      if (window.confirm(`Are you sure you want to delete "${resource.title}"?`)) {
+        performDelete();
       }
     } else {
       Alert.alert(
@@ -314,33 +224,9 @@ export default function ResourcesScreen() {
         `Are you sure you want to delete "${resource.title}"?`,
         [
           { text: 'Cancel', style: 'cancel' },
-          { text: 'Delete', style: 'destructive', onPress: () => deleteResource(resource) },
+          { text: 'Delete', style: 'destructive', onPress: performDelete },
         ]
       );
-    }
-  };
-
-  const deleteResource = async (resource: Resource) => {
-    try {
-      // Delete file from storage if exists
-      if (resource.file_path) {
-        const result = await storage.delete(RESOURCES_BUCKET, resource.file_path);
-        if (result.error) {
-          console.warn('Error deleting file from storage:', result.error);
-          // Continue anyway - file might already be deleted
-        }
-      }
-
-      // Delete database record
-      const { error } = await supabase
-        .from('resources')
-        .delete()
-        .eq('id', resource.id);
-
-      if (error) throw error;
-      fetchContents();
-    } catch (error: any) {
-      Alert.alert('Error', error.message);
     }
   };
 
@@ -369,6 +255,18 @@ export default function ResourcesScreen() {
               <Text style={styles.itemMeta}>Folder</Text>
             </View>
             {!canApproveRequests && <Text style={styles.chevron}>→</Text>}
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.commentButton}
+            onPress={() => setCommentsModal({
+              visible: true,
+              folderId: item.data.id,
+              title: item.data.name,
+            })}
+            activeOpacity={0.6}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Text style={styles.commentButtonText}>💬</Text>
           </TouchableOpacity>
           {canApproveRequests && (
             <TouchableOpacity 
@@ -412,6 +310,43 @@ export default function ResourcesScreen() {
             </Text>
           </View>
         </TouchableOpacity>
+        {/* Upvote Button */}
+        {(() => {
+          const upvoteData = upvotes.get(resource.id);
+          const hasUpvoted = upvoteData?.hasUpvoted || false;
+          const total = upvoteData?.totalUpvotes || 0;
+          const leaderCount = upvoteData?.leaderUpvotes || 0;
+          const userCount = upvoteData?.userUpvotes || 0;
+          
+          return (
+            <TouchableOpacity 
+              style={[styles.upvoteButton, hasUpvoted && styles.upvoteButtonActive]}
+              onPress={() => toggleUpvote(resource.id)}
+              activeOpacity={0.6}
+            >
+              <Text style={[styles.upvoteIcon, hasUpvoted && styles.upvoteIconActive]}>
+                {hasUpvoted ? '▲' : '△'}
+              </Text>
+              {total > 0 && (
+                <Text style={[styles.upvoteCount, hasUpvoted && styles.upvoteCountActive]}>
+                  {isLeader || isGroupLeader ? `${leaderCount}/${userCount}` : total}
+                </Text>
+              )}
+            </TouchableOpacity>
+          );
+        })()}
+        <TouchableOpacity 
+          style={styles.commentButton}
+          onPress={() => setCommentsModal({
+            visible: true,
+            resourceId: resource.id,
+            title: resource.title,
+          })}
+          activeOpacity={0.6}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Text style={styles.commentButtonText}>💬</Text>
+        </TouchableOpacity>
         {canApproveRequests && (
           <TouchableOpacity 
             style={styles.deleteButton}
@@ -439,6 +374,16 @@ export default function ResourcesScreen() {
       </Text>
     </View>
   );
+
+  // Handle breadcrumb click to navigate to specific folder in path
+  const navigateToPathFolder = (folder: ResourceFolder, index: number) => {
+    // This is a workaround since we can't directly set folderPath from outside
+    // We need to go back to that folder level
+    const stepsBack = folderPath.length - index - 1;
+    for (let i = 0; i < stepsBack; i++) {
+      goBack();
+    }
+  };
 
   if (loading) {
     return (
@@ -485,11 +430,7 @@ export default function ResourcesScreen() {
               {index === folderPath.length - 1 ? (
                 <Text style={styles.breadcrumbCurrent}>{folder.name}</Text>
               ) : (
-                <TouchableOpacity onPress={() => {
-                  const newPath = folderPath.slice(0, index + 1);
-                  setFolderPath(newPath);
-                  setCurrentFolderId(folder.id);
-                }}>
+                <TouchableOpacity onPress={() => navigateToPathFolder(folder, index)}>
                   <Text style={styles.breadcrumbLink}>{folder.name}</Text>
                 </TouchableOpacity>
               )}
@@ -526,7 +467,7 @@ export default function ResourcesScreen() {
               onChangeText={setNewFolderName}
             />
 
-            <TouchableOpacity style={styles.submitButton} onPress={createFolder}>
+            <TouchableOpacity style={styles.submitButton} onPress={handleCreateFolder}>
               <Text style={styles.submitButtonText}>Create Folder</Text>
             </TouchableOpacity>
           </View>
@@ -539,12 +480,7 @@ export default function ResourcesScreen() {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Add Resource</Text>
-              <TouchableOpacity onPress={() => {
-                setShowAddModal(false);
-                setSelectedFile(null);
-                setNewResourceTitle('');
-                setNewResourceUrl('');
-              }}>
+              <TouchableOpacity onPress={resetAddForm}>
                 <Text style={styles.closeButton}>✕</Text>
               </TouchableOpacity>
             </View>
@@ -602,7 +538,7 @@ export default function ResourcesScreen() {
 
             <TouchableOpacity 
               style={[styles.submitButton, uploading && styles.submitButtonDisabled]} 
-              onPress={uploadResource}
+              onPress={handleUploadResource}
               disabled={uploading}
             >
               {uploading ? (
@@ -614,6 +550,15 @@ export default function ResourcesScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Comments Modal */}
+      <ResourceCommentsModal
+        visible={commentsModal.visible}
+        onClose={() => setCommentsModal({ visible: false, title: '' })}
+        resourceId={commentsModal.resourceId}
+        folderId={commentsModal.folderId}
+        title={commentsModal.title}
+      />
     </View>
   );
 }
@@ -743,6 +688,41 @@ const styles = StyleSheet.create({
   },
   chevron: {
     color: '#64748B',
+    fontSize: 16,
+  },
+  upvoteButton: {
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    minWidth: 40,
+  },
+  upvoteButtonActive: {
+    backgroundColor: 'rgba(34, 197, 94, 0.1)',
+    borderRadius: 8,
+  },
+  upvoteIcon: {
+    fontSize: 14,
+    color: '#64748B',
+  },
+  upvoteIconActive: {
+    color: '#22C55E',
+  },
+  upvoteCount: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  upvoteCountActive: {
+    color: '#22C55E',
+    fontWeight: '600',
+  },
+  commentButton: {
+    padding: 14,
+    paddingLeft: 8,
+  },
+  commentButtonText: {
     fontSize: 16,
   },
   deleteButton: {

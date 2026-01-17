@@ -1,10 +1,6 @@
 import React from 'react';
 import { render, fireEvent, waitFor } from '@testing-library/react-native';
 import ThreadDetailScreen from '../../../src/screens/main/ThreadDetailScreen';
-import { supabase } from '../../../src/lib/supabase';
-
-// Mock Supabase
-jest.mock('../../../src/lib/supabase');
 
 // Mock navigation
 const mockSetOptions = jest.fn();
@@ -70,25 +66,21 @@ jest.mock('../../../src/contexts/AuthContext', () => ({
   useAuth: () => mockAuthContext,
 }));
 
-// Mock realtime channel
-const mockChannel = {
-  on: jest.fn().mockReturnThis(),
-  subscribe: jest.fn((callback) => {
-    callback('SUBSCRIBED');
-    return mockChannel;
-  }),
+// Mock useMessages hook
+let mockUseMessagesResult: any = {
+  messages: [],
+  loading: false,
+  sending: false,
+  error: null,
+  refetch: jest.fn(),
+  sendMessage: jest.fn().mockResolvedValue(true),
+  editMessage: jest.fn().mockResolvedValue(true),
+  deleteMessage: jest.fn().mockResolvedValue(true),
 };
 
-// Helper to create mock chain
-const createMockChain = (data: any, error: any = null) => ({
-  select: jest.fn().mockReturnThis(),
-  eq: jest.fn().mockReturnThis(),
-  order: jest.fn().mockResolvedValue({ data, error }),
-  insert: jest.fn().mockResolvedValue({ data, error }),
-  update: jest.fn().mockReturnThis(),
-  delete: jest.fn().mockReturnThis(),
-  single: jest.fn().mockResolvedValue({ data, error }),
-});
+jest.mock('../../../src/hooks/useMessages', () => ({
+  useMessages: () => mockUseMessagesResult,
+}));
 
 describe('ThreadDetailScreen', () => {
   beforeEach(() => {
@@ -102,13 +94,21 @@ describe('ThreadDetailScreen', () => {
       isAdmin: false,
     };
 
-    // Default Supabase mocks
-    (supabase.from as jest.Mock).mockReturnValue(createMockChain([mockMessage, mockMyMessage]));
-    (supabase.channel as jest.Mock).mockReturnValue(mockChannel);
-    (supabase.removeChannel as jest.Mock).mockReturnValue(undefined);
+    mockUseMessagesResult = {
+      messages: [],
+      loading: false,
+      sending: false,
+      error: null,
+      refetch: jest.fn(),
+      sendMessage: jest.fn().mockResolvedValue(true),
+      editMessage: jest.fn().mockResolvedValue(true),
+      deleteMessage: jest.fn().mockResolvedValue(true),
+    };
   });
 
-  it('should render loading state initially', () => {
+  it('should render loading state when loading', () => {
+    mockUseMessagesResult.loading = true;
+
     const { getByTestId } = render(
       <ThreadDetailScreen route={mockRoute} navigation={mockNavigation} />
     );
@@ -122,116 +122,82 @@ describe('ThreadDetailScreen', () => {
     expect(mockSetOptions).toHaveBeenCalledWith({ title: 'General Discussion' });
   });
 
-  it('should display messages after loading', async () => {
-    const { getByText, queryByTestId } = render(
+  it('should display messages after loading', () => {
+    mockUseMessagesResult.messages = [mockMessage, mockMyMessage];
+
+    const { getByText } = render(
       <ThreadDetailScreen route={mockRoute} navigation={mockNavigation} />
     );
-
-    await waitFor(() => {
-      expect(queryByTestId('activity-indicator')).toBeNull();
-    });
 
     expect(getByText('Hello everyone!')).toBeTruthy();
     expect(getByText('Hi there!')).toBeTruthy();
   });
 
-  it('should display sender name for other users messages', async () => {
-    const { getByText, queryByTestId } = render(
+  it('should display sender name for other users messages', () => {
+    mockUseMessagesResult.messages = [mockMessage];
+
+    const { getByText } = render(
       <ThreadDetailScreen route={mockRoute} navigation={mockNavigation} />
     );
-
-    await waitFor(() => {
-      expect(queryByTestId('activity-indicator')).toBeNull();
-    });
 
     expect(getByText('John Doe')).toBeTruthy();
   });
 
-  it('should display sender avatar with first letter', async () => {
-    const { getByText, queryByTestId } = render(
+  it('should display sender avatar with initials', () => {
+    mockUseMessagesResult.messages = [mockMessage];
+
+    const { getByText } = render(
       <ThreadDetailScreen route={mockRoute} navigation={mockNavigation} />
     );
 
-    await waitFor(() => {
-      expect(queryByTestId('activity-indicator')).toBeNull();
-    });
-
-    expect(getByText('J')).toBeTruthy(); // First letter of "John Doe"
+    expect(getByText('JD')).toBeTruthy(); // Initials of "John Doe"
   });
 
-  it('should show message input field', async () => {
-    const { getByPlaceholderText, queryByTestId } = render(
+  it('should show message input field', () => {
+    const { getByPlaceholderText } = render(
       <ThreadDetailScreen route={mockRoute} navigation={mockNavigation} />
     );
-
-    await waitFor(() => {
-      expect(queryByTestId('activity-indicator')).toBeNull();
-    });
 
     expect(getByPlaceholderText('Type a message...')).toBeTruthy();
   });
 
-  it('should enable send button when message is typed', async () => {
-    const { getByPlaceholderText, getByText, queryByTestId } = render(
+  it('should show send button when message is typed', () => {
+    const { getByPlaceholderText, getByTestId } = render(
       <ThreadDetailScreen route={mockRoute} navigation={mockNavigation} />
     );
-
-    await waitFor(() => {
-      expect(queryByTestId('activity-indicator')).toBeNull();
-    });
 
     const input = getByPlaceholderText('Type a message...');
     fireEvent.changeText(input, 'New message');
 
-    const sendButton = getByText('↑'); // Send button uses arrow icon
-    expect(sendButton).toBeTruthy();
+    expect(getByTestId('send-button-text')).toBeTruthy();
   });
 
-  it('should send message when send button is pressed', async () => {
-    const mockInsert = jest.fn().mockResolvedValue({ data: {}, error: null });
-    (supabase.from as jest.Mock).mockReturnValue({
-      ...createMockChain([mockMessage]),
-      insert: mockInsert,
-    });
-
-    const { getByPlaceholderText, getByText, queryByTestId } = render(
+  it('should call sendMessage when send button is pressed', async () => {
+    const { getByPlaceholderText, getByTestId } = render(
       <ThreadDetailScreen route={mockRoute} navigation={mockNavigation} />
     );
-
-    await waitFor(() => {
-      expect(queryByTestId('activity-indicator')).toBeNull();
-    });
 
     const input = getByPlaceholderText('Type a message...');
     fireEvent.changeText(input, 'New message');
 
-    const sendButton = getByText('↑');
-    fireEvent.press(sendButton);
+    const sendButton = getByTestId('send-button-text');
+    fireEvent.press(sendButton.parent!);
 
     await waitFor(() => {
-      expect(mockInsert).toHaveBeenCalledWith({
-        thread_id: 'thread-1',
-        sender_id: 'user-id',
-        content: 'New message',
-        attachments: [],
-      });
+      expect(mockUseMessagesResult.sendMessage).toHaveBeenCalledWith('New message');
     });
   });
 
   it('should clear input after sending message', async () => {
-    const { getByPlaceholderText, getByText, queryByTestId } = render(
+    const { getByPlaceholderText, getByTestId } = render(
       <ThreadDetailScreen route={mockRoute} navigation={mockNavigation} />
     );
-
-    await waitFor(() => {
-      expect(queryByTestId('activity-indicator')).toBeNull();
-    });
 
     const input = getByPlaceholderText('Type a message...');
     fireEvent.changeText(input, 'New message');
 
-    const sendButton = getByText('↑');
-    fireEvent.press(sendButton);
+    const sendButton = getByTestId('send-button-text');
+    fireEvent.press(sendButton.parent!);
 
     await waitFor(() => {
       expect(input.props.value).toBe('');
@@ -239,164 +205,147 @@ describe('ThreadDetailScreen', () => {
   });
 
   it('should not send empty message', async () => {
-    const mockInsert = jest.fn();
-    (supabase.from as jest.Mock).mockReturnValue({
-      ...createMockChain([mockMessage]),
-      insert: mockInsert,
-    });
-
-    const { getByPlaceholderText, getByText, queryByTestId } = render(
+    const { getByPlaceholderText, getByTestId } = render(
       <ThreadDetailScreen route={mockRoute} navigation={mockNavigation} />
     );
-
-    await waitFor(() => {
-      expect(queryByTestId('activity-indicator')).toBeNull();
-    });
 
     const input = getByPlaceholderText('Type a message...');
     fireEvent.changeText(input, '   '); // Only whitespace
 
-    const sendButton = getByText('↑');
-    fireEvent.press(sendButton);
+    // The send button should be disabled, but let's test the handler
+    const sendButton = getByTestId('send-button-text');
+    fireEvent.press(sendButton.parent!);
 
-    expect(mockInsert).not.toHaveBeenCalled();
+    expect(mockUseMessagesResult.sendMessage).not.toHaveBeenCalled();
   });
 
-  it('should show edit and delete buttons for own messages', async () => {
-    const { getByText, queryByTestId } = render(
+  it('should show edit and delete buttons for own messages', () => {
+    mockUseMessagesResult.messages = [mockMyMessage];
+
+    const { getByText } = render(
       <ThreadDetailScreen route={mockRoute} navigation={mockNavigation} />
     );
 
-    await waitFor(() => {
-      expect(queryByTestId('activity-indicator')).toBeNull();
-    });
-
-    // Find the message card with "Hi there!" (our message)
-    const myMessage = getByText('Hi there!');
-    expect(myMessage).toBeTruthy();
-
-    // Should have edit and delete options (these appear as text or icons)
-    // The actual implementation uses icons, but we can test the functionality
+    expect(getByText('Edit')).toBeTruthy();
+    expect(getByText('Delete')).toBeTruthy();
   });
 
-  it('should not show edit and delete buttons for other users messages', async () => {
-    const { queryByText, queryByTestId } = render(
+  it('should not show edit and delete buttons for other users messages', () => {
+    mockUseMessagesResult.messages = [mockMessage];
+
+    const { queryByText, getByText } = render(
       <ThreadDetailScreen route={mockRoute} navigation={mockNavigation} />
     );
 
-    await waitFor(() => {
-      expect(queryByTestId('activity-indicator')).toBeNull();
-    });
-
-    // For other user's message, edit/delete should not be visible
-    // This is tested by the absence of edit/delete UI elements
-    expect(queryByText('Hello everyone!')).toBeTruthy();
+    expect(getByText('Hello everyone!')).toBeTruthy();
+    expect(queryByText('Edit')).toBeNull();
+    expect(queryByText('Delete')).toBeNull();
   });
 
-  it('should handle fetch error gracefully', async () => {
-    const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
-    (supabase.from as jest.Mock).mockReturnValue(
-      createMockChain(null, new Error('Network error'))
-    );
+  it('should display empty state when no messages', () => {
+    mockUseMessagesResult.messages = [];
 
-    render(<ThreadDetailScreen route={mockRoute} navigation={mockNavigation} />);
-
-    await waitFor(() => {
-      expect(consoleSpy).toHaveBeenCalledWith(
-        '[ThreadDetail] Error fetching messages:',
-        expect.any(Error)
-      );
-    });
-
-    consoleSpy.mockRestore();
-  });
-
-  it('should filter messages by thread_id', async () => {
-    const mockChain = createMockChain([mockMessage]);
-    (supabase.from as jest.Mock).mockReturnValue(mockChain);
-
-    render(<ThreadDetailScreen route={mockRoute} navigation={mockNavigation} />);
-
-    await waitFor(() => {
-      expect(mockChain.eq).toHaveBeenCalledWith('thread_id', 'thread-1');
-    });
-  });
-
-  it('should order messages by created_at ascending', async () => {
-    const mockChain = createMockChain([mockMessage]);
-    (supabase.from as jest.Mock).mockReturnValue(mockChain);
-
-    render(<ThreadDetailScreen route={mockRoute} navigation={mockNavigation} />);
-
-    await waitFor(() => {
-      expect(mockChain.order).toHaveBeenCalledWith('created_at', { ascending: true });
-    });
-  });
-
-  it('should setup realtime subscription', () => {
-    render(<ThreadDetailScreen route={mockRoute} navigation={mockNavigation} />);
-
-    expect(supabase.channel).toHaveBeenCalledWith('messages:thread-1');
-    expect(mockChannel.on).toHaveBeenCalled();
-    expect(mockChannel.subscribe).toHaveBeenCalled();
-  });
-
-  it('should cleanup realtime subscription on unmount', () => {
-    const { unmount } = render(
+    const { getByText } = render(
       <ThreadDetailScreen route={mockRoute} navigation={mockNavigation} />
     );
-
-    unmount();
-
-    expect(supabase.removeChannel).toHaveBeenCalledWith(mockChannel);
-  });
-
-  it('should display empty state when no messages', async () => {
-    (supabase.from as jest.Mock).mockReturnValue(createMockChain([]));
-
-    const { getByText, queryByTestId } = render(
-      <ThreadDetailScreen route={mockRoute} navigation={mockNavigation} />
-    );
-
-    await waitFor(() => {
-      expect(queryByTestId('activity-indicator')).toBeNull();
-    });
 
     expect(getByText('No messages yet')).toBeTruthy();
+    expect(getByText('Send the first message to start the conversation!')).toBeTruthy();
   });
 
-  it('should handle send error and restore message', async () => {
-    const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
-    const mockInsert = jest.fn().mockResolvedValue({ 
-      data: null, 
-      error: new Error('Send failed') 
-    });
-    
-    (supabase.from as jest.Mock).mockReturnValue({
-      ...createMockChain([mockMessage]),
-      insert: mockInsert,
-    });
+  it('should show edit input when Edit is pressed', async () => {
+    mockUseMessagesResult.messages = [mockMyMessage];
 
-    const { getByPlaceholderText, getByText, queryByTestId } = render(
+    const { getByText, getByDisplayValue } = render(
       <ThreadDetailScreen route={mockRoute} navigation={mockNavigation} />
     );
 
+    fireEvent.press(getByText('Edit'));
+
     await waitFor(() => {
-      expect(queryByTestId('activity-indicator')).toBeNull();
+      expect(getByDisplayValue('Hi there!')).toBeTruthy();
+      expect(getByText('Cancel')).toBeTruthy();
+      expect(getByText('Save')).toBeTruthy();
     });
+  });
+
+  it('should call editMessage when Save is pressed', async () => {
+    mockUseMessagesResult.messages = [mockMyMessage];
+
+    const { getByText, getByDisplayValue } = render(
+      <ThreadDetailScreen route={mockRoute} navigation={mockNavigation} />
+    );
+
+    fireEvent.press(getByText('Edit'));
+
+    await waitFor(() => {
+      expect(getByDisplayValue('Hi there!')).toBeTruthy();
+    });
+
+    const editInput = getByDisplayValue('Hi there!');
+    fireEvent.changeText(editInput, 'Updated message');
+    fireEvent.press(getByText('Save'));
+
+    await waitFor(() => {
+      expect(mockUseMessagesResult.editMessage).toHaveBeenCalledWith(
+        'message-2',
+        'Updated message'
+      );
+    });
+  });
+
+  it('should cancel edit when Cancel is pressed', async () => {
+    mockUseMessagesResult.messages = [mockMyMessage];
+
+    const { getByText, getByDisplayValue, queryByDisplayValue } = render(
+      <ThreadDetailScreen route={mockRoute} navigation={mockNavigation} />
+    );
+
+    fireEvent.press(getByText('Edit'));
+
+    await waitFor(() => {
+      expect(getByDisplayValue('Hi there!')).toBeTruthy();
+    });
+
+    fireEvent.press(getByText('Cancel'));
+
+    await waitFor(() => {
+      // Edit input should be gone
+      expect(queryByDisplayValue('Hi there!')).toBeNull();
+      // Original message should be visible
+      expect(getByText('Hi there!')).toBeTruthy();
+    });
+  });
+
+  it('should restore message if send fails', async () => {
+    mockUseMessagesResult.sendMessage = jest.fn().mockResolvedValue(false);
+
+    const { getByPlaceholderText, getByTestId } = render(
+      <ThreadDetailScreen route={mockRoute} navigation={mockNavigation} />
+    );
 
     const input = getByPlaceholderText('Type a message...');
     fireEvent.changeText(input, 'Failed message');
 
-    const sendButton = getByText('↑');
-    fireEvent.press(sendButton);
+    const sendButton = getByTestId('send-button-text');
+    fireEvent.press(sendButton.parent!);
 
     await waitFor(() => {
-      // Message should be restored in input after error
       expect(input.props.value).toBe('Failed message');
     });
+  });
 
-    consoleSpy.mockRestore();
+  it('should show sending indicator when sending', () => {
+    mockUseMessagesResult.sending = true;
+
+    const { getByPlaceholderText, queryByTestId } = render(
+      <ThreadDetailScreen route={mockRoute} navigation={mockNavigation} />
+    );
+
+    const input = getByPlaceholderText('Type a message...');
+    fireEvent.changeText(input, 'Test');
+
+    // When sending, send button text should not be visible (replaced by ActivityIndicator)
+    expect(queryByTestId('send-button-text')).toBeNull();
   });
 });
-

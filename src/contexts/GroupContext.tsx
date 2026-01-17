@@ -94,7 +94,7 @@ export function GroupProvider({ children }: { children: React.ReactNode }) {
     }
   }, [currentGroup?.id]);
 
-  const loadData = async () => {
+  const loadData = async (retryCount = 0) => {
     console.log('[GroupContext] loadData starting...');
     setLoading(true);
     try {
@@ -108,15 +108,21 @@ export function GroupProvider({ children }: { children: React.ReactNode }) {
       });
       
       console.log('[GroupContext] loadData complete');
-    } catch (error) {
+    } catch (error: any) {
       console.error('[GroupContext] loadData error:', error);
+      // Retry on AbortError
+      if (error?.message?.includes('AbortError') && retryCount < 2) {
+        console.log('[GroupContext] Retrying loadData after AbortError...');
+        setTimeout(() => loadData(retryCount + 1), 500);
+        return;
+      }
     } finally {
       setLoading(false);
       console.log('[GroupContext] loading set to false');
     }
   };
 
-  const fetchGroups = async () => {
+  const fetchGroups = async (retryCount = 0) => {
     console.log('[GroupContext] fetchGroups called, user:', user?.id);
     if (!user) {
       console.log('[GroupContext] No user, returning from fetchGroups');
@@ -137,6 +143,12 @@ export function GroupProvider({ children }: { children: React.ReactNode }) {
 
       console.log('[GroupContext] group_members query complete, error:', error, 'data:', data?.length);
       if (error) {
+        // Retry on AbortError
+        if (error.message?.includes('AbortError') && retryCount < 2) {
+          console.log('[GroupContext] Retrying fetchGroups after AbortError...');
+          await new Promise(resolve => setTimeout(resolve, 500));
+          return fetchGroups(retryCount + 1);
+        }
         console.error('Error fetching groups:', error);
         setGroups([]);
         return;

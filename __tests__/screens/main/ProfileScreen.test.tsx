@@ -105,10 +105,10 @@ describe('ProfileScreen', () => {
     expect(getByText('test@example.com')).toBeTruthy();
   });
 
-  it('should display avatar initial', () => {
+  it('should display avatar initials', () => {
     const { getByText } = render(<ProfileScreen />);
 
-    expect(getByText('J')).toBeTruthy(); // First letter of "John"
+    expect(getByText('JD')).toBeTruthy(); // Initials of "John Doe"
   });
 
   it('should show Member badge for regular users', () => {

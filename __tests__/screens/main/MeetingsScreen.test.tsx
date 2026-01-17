@@ -1,10 +1,6 @@
 import React from 'react';
-import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
+import { render, fireEvent, waitFor } from '@testing-library/react-native';
 import MeetingsScreen from '../../../src/screens/main/MeetingsScreen';
-import { supabase } from '../../../src/lib/supabase';
-
-// Mock Supabase
-jest.mock('../../../src/lib/supabase');
 
 // Mock data
 const mockUser = {
@@ -26,7 +22,7 @@ const mockMeeting = {
   date: new Date(Date.now() + 86400000).toISOString(), // Tomorrow
   time: '19:00',
   location: 'Church Hall',
-  passages: 'John 3:16',
+  passages: ['John 3:16'],
   series_id: null,
   series_index: null,
   series_total: null,
@@ -70,17 +66,22 @@ jest.mock('../../../src/contexts/GroupContext', () => ({
   useGroup: () => mockGroupContext,
 }));
 
-// Helper to create mock chain
-const createMockChain = (data: any, error: any = null) => ({
-  select: jest.fn().mockReturnThis(),
-  eq: jest.fn().mockReturnThis(),
-  gte: jest.fn().mockReturnThis(),
-  in: jest.fn().mockReturnThis(),
-  order: jest.fn().mockResolvedValue({ data, error }),
-  update: jest.fn().mockReturnThis(),
-  delete: jest.fn().mockReturnThis(),
-  insert: jest.fn().mockResolvedValue({ data, error }),
-});
+// Mock useMeetings hook
+let mockUseMeetingsResult: any = {
+  meetings: [],
+  loading: false,
+  error: null,
+  refetch: jest.fn(),
+  rsvpToMeeting: jest.fn().mockResolvedValue(true),
+  rsvpToSeries: jest.fn().mockResolvedValue(true),
+  deleteMeeting: jest.fn().mockResolvedValue(true),
+  deleteSeries: jest.fn().mockResolvedValue(true),
+};
+
+jest.mock('../../../src/hooks/useMeetings', () => ({
+  useMeetings: () => mockUseMeetingsResult,
+  RSVPStatus: {},
+}));
 
 describe('MeetingsScreen', () => {
   beforeEach(() => {
@@ -99,116 +100,179 @@ describe('MeetingsScreen', () => {
       isGroupLeader: false,
     };
 
-    // Default Supabase mock
-    (supabase.from as jest.Mock).mockReturnValue(createMockChain([mockMeeting]));
+    mockUseMeetingsResult = {
+      meetings: [],
+      loading: false,
+      error: null,
+      refetch: jest.fn(),
+      rsvpToMeeting: jest.fn().mockResolvedValue(true),
+      rsvpToSeries: jest.fn().mockResolvedValue(true),
+      deleteMeeting: jest.fn().mockResolvedValue(true),
+      deleteSeries: jest.fn().mockResolvedValue(true),
+    };
   });
 
-  it('should render without crashing', async () => {
-    (supabase.from as jest.Mock).mockReturnValue(createMockChain([]));
-    
-    const { getByText, queryByTestId } = render(<MeetingsScreen />);
-
-    // Wait for loading to complete
-    await waitFor(() => {
-      expect(queryByTestId('activity-indicator')).toBeNull();
-    }, { timeout: 3000 });
-
+  it('should render without crashing', () => {
+    const { getByText } = render(<MeetingsScreen />);
     expect(getByText('Events')).toBeTruthy();
   });
 
-  it('should display empty state when no meetings', async () => {
-    (supabase.from as jest.Mock).mockReturnValue(createMockChain([]));
+  it('should show loading indicator when loading', () => {
+    mockUseMeetingsResult.loading = true;
 
-    const { getByText } = render(<MeetingsScreen />);
-
-    await waitFor(() => {
-      expect(getByText('No upcoming events')).toBeTruthy();
-    });
+    const { getByTestId } = render(<MeetingsScreen />);
+    expect(getByTestId('activity-indicator')).toBeTruthy();
   });
 
-  it('should show Create Event button for leaders after loading', async () => {
+  it('should display empty state when no meetings', () => {
+    mockUseMeetingsResult.meetings = [];
+
+    const { getByText } = render(<MeetingsScreen />);
+    expect(getByText('No upcoming events')).toBeTruthy();
+  });
+
+  it('should display meetings when available', () => {
+    mockUseMeetingsResult.meetings = [mockMeeting];
+
+    const { getByText } = render(<MeetingsScreen />);
+    expect(getByText('Bible Study')).toBeTruthy();
+  });
+
+  it('should show Create Event button for leaders', () => {
     mockGroupContext.isGroupLeader = true;
-    (supabase.from as jest.Mock).mockReturnValue(createMockChain([]));
+    mockUseMeetingsResult.meetings = [];
 
-    const { getByText, queryByTestId } = render(<MeetingsScreen />);
-
-    // Wait for loading to complete
-    await waitFor(() => {
-      expect(queryByTestId('activity-indicator')).toBeNull();
-    }, { timeout: 3000 });
-
+    const { getByText } = render(<MeetingsScreen />);
     expect(getByText('Create Event')).toBeTruthy();
   });
 
-  it('should not show Create Event button for regular members after loading', async () => {
+  it('should not show Create Event button for regular members', () => {
     mockGroupContext.isGroupLeader = false;
-    (supabase.from as jest.Mock).mockReturnValue(createMockChain([]));
+    mockUseMeetingsResult.meetings = [];
 
-    const { queryByText, queryByTestId } = render(<MeetingsScreen />);
-
-    // Wait for loading to complete
-    await waitFor(() => {
-      expect(queryByTestId('activity-indicator')).toBeNull();
-    }, { timeout: 3000 });
-
+    const { queryByText } = render(<MeetingsScreen />);
     expect(queryByText('Create Event')).toBeNull();
   });
 
-  it('should handle no current group gracefully', async () => {
-    mockGroupContext.currentGroup = null;
+  it('should show + New button in header for leaders', () => {
+    mockGroupContext.isGroupLeader = true;
+    mockUseMeetingsResult.meetings = [mockMeeting];
 
-    const { queryByText } = render(<MeetingsScreen />);
-
-    await waitFor(() => {
-      expect(queryByText('Bible Study')).toBeNull();
-    });
+    const { getByText } = render(<MeetingsScreen />);
+    expect(getByText('+ New')).toBeTruthy();
   });
 
-  it('should handle fetch error gracefully', async () => {
-    const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
-    (supabase.from as jest.Mock).mockReturnValue(
-      createMockChain(null, new Error('Network error'))
-    );
+  it('should display group name', () => {
+    const { getByText } = render(<MeetingsScreen />);
+    expect(getByText('Test Group')).toBeTruthy();
+  });
 
-    render(<MeetingsScreen />);
+  it('should show RSVP buttons for invited attendee', () => {
+    mockUseMeetingsResult.meetings = [mockMeeting];
+
+    const { getByText } = render(<MeetingsScreen />);
+    expect(getByText('✓ Yes')).toBeTruthy();
+    expect(getByText('? Maybe')).toBeTruthy();
+    expect(getByText('✗ No')).toBeTruthy();
+  });
+
+  it('should call rsvpToMeeting when RSVP button pressed for non-series meeting', async () => {
+    mockUseMeetingsResult.meetings = [mockMeeting];
+
+    const { getByText } = render(<MeetingsScreen />);
+    
+    fireEvent.press(getByText('✓ Yes'));
 
     await waitFor(() => {
-      expect(consoleSpy).toHaveBeenCalledWith(
-        'Error fetching meetings:',
-        expect.any(Error)
+      expect(mockUseMeetingsResult.rsvpToMeeting).toHaveBeenCalledWith(
+        'meeting-1',
+        'attendee-1',
+        'accepted'
       );
     });
-
-    consoleSpy.mockRestore();
   });
 
-  it('should call supabase.from with meetings table', async () => {
-    render(<MeetingsScreen />);
+  it('should show delete button for leaders', () => {
+    mockGroupContext.isGroupLeader = true;
+    mockUseMeetingsResult.meetings = [mockMeeting];
+
+    const { getByText } = render(<MeetingsScreen />);
+    expect(getByText('🗑️')).toBeTruthy();
+  });
+
+  it('should not show delete button for members', () => {
+    mockGroupContext.isGroupLeader = false;
+    mockUseMeetingsResult.meetings = [mockMeeting];
+
+    const { queryByText } = render(<MeetingsScreen />);
+    expect(queryByText('🗑️')).toBeNull();
+  });
+
+  it('should display attendee count', () => {
+    mockUseMeetingsResult.meetings = [mockMeeting];
+
+    const { getByText } = render(<MeetingsScreen />);
+    expect(getByText('1 invited')).toBeTruthy();
+  });
+
+  it('should display location when provided', () => {
+    mockUseMeetingsResult.meetings = [mockMeeting];
+
+    const { getByText } = render(<MeetingsScreen />);
+    expect(getByText(/Church Hall/)).toBeTruthy();
+  });
+
+  it('should display series badge for recurring meetings', () => {
+    const seriesMeeting = {
+      ...mockMeeting,
+      series_id: 'series-1',
+      series_index: 1,
+      series_total: 4,
+    };
+    mockUseMeetingsResult.meetings = [seriesMeeting];
+
+    const { getByText } = render(<MeetingsScreen />);
+    expect(getByText('1/4')).toBeTruthy();
+  });
+
+  it('should show series RSVP modal for recurring meetings', async () => {
+    const seriesMeeting = {
+      ...mockMeeting,
+      series_id: 'series-1',
+    };
+    mockUseMeetingsResult.meetings = [seriesMeeting];
+
+    const { getByText } = render(<MeetingsScreen />);
+    
+    fireEvent.press(getByText('✓ Yes'));
 
     await waitFor(() => {
-      expect(supabase.from).toHaveBeenCalledWith('meetings');
+      expect(getByText('Apply to all events?')).toBeTruthy();
     });
   });
 
-  it('should filter meetings by group_id', async () => {
-    const mockChain = createMockChain([mockMeeting]);
-    (supabase.from as jest.Mock).mockReturnValue(mockChain);
+  it('should call rsvpToSeries when "All in series" is pressed', async () => {
+    const seriesMeeting = {
+      ...mockMeeting,
+      series_id: 'series-1',
+    };
+    mockUseMeetingsResult.meetings = [seriesMeeting];
 
-    render(<MeetingsScreen />);
+    const { getByText } = render(<MeetingsScreen />);
+    
+    fireEvent.press(getByText('✓ Yes'));
 
     await waitFor(() => {
-      expect(mockChain.eq).toHaveBeenCalledWith('group_id', 'group-id');
+      expect(getByText('All in series')).toBeTruthy();
     });
-  });
 
-  it('should order meetings by date ascending', async () => {
-    const mockChain = createMockChain([mockMeeting]);
-    (supabase.from as jest.Mock).mockReturnValue(mockChain);
-
-    render(<MeetingsScreen />);
+    fireEvent.press(getByText('All in series'));
 
     await waitFor(() => {
-      expect(mockChain.order).toHaveBeenCalledWith('date', { ascending: true });
+      expect(mockUseMeetingsResult.rsvpToSeries).toHaveBeenCalledWith(
+        'series-1',
+        'accepted'
+      );
     });
   });
 });

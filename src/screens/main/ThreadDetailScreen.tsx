@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,116 +9,55 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
-import { supabase } from '../../lib/supabase';
-import { Message, Profile } from '../../types/database';
+import { useMessages, MessageWithSender } from '../../hooks/useMessages';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ThreadsStackParamList } from '../../navigation/types';
+import Avatar from '../../components/Avatar';
 
 type Props = NativeStackScreenProps<ThreadsStackParamList, 'ThreadDetail'>;
-
-interface MessageWithSender extends Message {
-  sender?: Profile;
-}
 
 export default function ThreadDetailScreen({ route, navigation }: Props) {
   const { threadId, threadName } = route.params;
   const { user } = useAuth();
-  const [messages, setMessages] = useState<MessageWithSender[]>([]);
+  
+  // Use the useMessages hook for all data and operations
+  const { 
+    messages, 
+    loading, 
+    sending, 
+    sendMessage, 
+    editMessage, 
+    deleteMessage 
+  } = useMessages(threadId);
+  
   const [newMessage, setNewMessage] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [sending, setSending] = useState(false);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState('');
   const flatListRef = useRef<FlatList>(null);
 
-  useEffect(() => {
-    console.log('[ThreadDetail] useEffect, threadId:', threadId);
+  // Set navigation title
+  React.useEffect(() => {
     navigation.setOptions({ title: threadName });
-    fetchMessages();
+  }, [threadName, navigation]);
+
+  const handleSendMessage = async () => {
+    if (!newMessage.trim()) return;
     
-    // Subscribe to new messages
-    console.log('[ThreadDetail] Setting up realtime subscription...');
-    const channel = supabase
-      .channel(`messages:${threadId}`)
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'messages',
-        filter: `thread_id=eq.${threadId}`,
-      }, async (payload) => {
-        console.log('[ThreadDetail] Received new message via realtime');
-        // Fetch the sender info for the new message
-        const newMsg = payload.new as Message;
-        const { data: sender } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', newMsg.sender_id)
-          .single();
-        
-        setMessages(prev => [...prev, { ...newMsg, sender: sender || undefined }]);
-      })
-      .subscribe((status) => {
-        console.log('[ThreadDetail] Realtime subscription status:', status);
-      });
-
-    return () => {
-      console.log('[ThreadDetail] Cleaning up realtime subscription');
-      supabase.removeChannel(channel);
-    };
-  }, [threadId]);
-
-  const fetchMessages = async () => {
-    console.log('[ThreadDetail] fetchMessages starting for thread:', threadId);
-    try {
-      const { data, error } = await supabase
-        .from('messages')
-        .select(`
-          *,
-          sender:profiles!sender_id(*)
-        `)
-        .eq('thread_id', threadId)
-        .order('created_at', { ascending: true });
-
-      console.log('[ThreadDetail] fetchMessages complete, count:', data?.length, 'error:', error);
-      if (error) throw error;
-      setMessages(data || []);
-    } catch (error) {
-      console.error('[ThreadDetail] Error fetching messages:', error);
-    } finally {
-      console.log('[ThreadDetail] Setting loading to false');
-      setLoading(false);
-    }
-  };
-
-  const sendMessage = async () => {
-    if (!newMessage.trim() || !user) return;
-
-    setSending(true);
     const messageText = newMessage.trim();
     setNewMessage('');
-
-    try {
-      const { error } = await supabase.from('messages').insert({
-        thread_id: threadId,
-        sender_id: user.id,
-        content: messageText,
-        attachments: [],
-      });
-
-      if (error) throw error;
-      
-      // Realtime subscription will add the message to the list
+    
+    const success = await sendMessage(messageText);
+    
+    if (success) {
       // Scroll to bottom after a brief delay
       setTimeout(() => {
         flatListRef.current?.scrollToEnd({ animated: true });
       }, 200);
-    } catch (error) {
-      console.error('Error sending message:', error);
+    } else {
       setNewMessage(messageText); // Restore message on error
-    } finally {
-      setSending(false);
     }
   };
 
@@ -135,24 +74,11 @@ export default function ThreadDetailScreen({ route, navigation }: Props) {
   const saveEdit = async () => {
     if (!editingText.trim() || !editingMessageId) return;
 
-    try {
-      const { error } = await supabase
-        .from('messages')
-        .update({ content: editingText.trim() })
-        .eq('id', editingMessageId);
-
-      if (error) throw error;
-
-      // Update local state
-      setMessages(prev => prev.map(msg => 
-        msg.id === editingMessageId 
-          ? { ...msg, content: editingText.trim() }
-          : msg
-      ));
-      
+    const success = await editMessage(editingMessageId, editingText.trim());
+    
+    if (success) {
       cancelEdit();
-    } catch (error) {
-      console.error('Error updating message:', error);
+    } else {
       if (Platform.OS === 'web') {
         alert('Failed to update message');
       } else {
@@ -161,7 +87,7 @@ export default function ThreadDetailScreen({ route, navigation }: Props) {
     }
   };
 
-  const deleteMessage = async (messageId: string) => {
+  const handleDeleteMessage = async (messageId: string) => {
     const confirmDelete = Platform.OS === 'web'
       ? window.confirm('Are you sure you want to delete this message?')
       : await new Promise<boolean>(resolve => {
@@ -177,18 +103,9 @@ export default function ThreadDetailScreen({ route, navigation }: Props) {
 
     if (!confirmDelete) return;
 
-    try {
-      const { error } = await supabase
-        .from('messages')
-        .delete()
-        .eq('id', messageId);
-
-      if (error) throw error;
-
-      // Update local state
-      setMessages(prev => prev.filter(msg => msg.id !== messageId));
-    } catch (error) {
-      console.error('Error deleting message:', error);
+    const success = await deleteMessage(messageId);
+    
+    if (!success) {
       if (Platform.OS === 'web') {
         alert('Failed to delete message');
       } else {
@@ -204,13 +121,22 @@ export default function ThreadDetailScreen({ route, navigation }: Props) {
     return (
       <View style={[styles.messageRow, isMe && styles.messageRowMe]}>
         {!isMe && (
-          <View style={styles.messageAvatar}>
-            <Text style={styles.messageAvatarText}>
-              {item.sender?.full_name?.[0] || '?'}
-            </Text>
-          </View>
+          <Avatar 
+            uri={item.sender?.avatar_url} 
+            name={item.sender?.full_name} 
+            size={32}
+            style={styles.messageAvatar}
+          />
         )}
         <View style={[styles.messageBubble, isMe && styles.messageBubbleMe]}>
+          {isMe && (
+            <Avatar 
+              uri={item.sender?.avatar_url} 
+              name={item.sender?.full_name} 
+              size={24}
+              style={styles.messageAvatarMe}
+            />
+          )}
           {!isMe && (
             <Text style={styles.messageSender}>
               {item.sender?.full_name || 'Unknown'}
@@ -263,7 +189,7 @@ export default function ThreadDetailScreen({ route, navigation }: Props) {
                     </TouchableOpacity>
                     <TouchableOpacity 
                       style={styles.messageActionButton}
-                      onPress={() => deleteMessage(item.id)}
+                      onPress={() => handleDeleteMessage(item.id)}
                     >
                       <Text style={[styles.messageActionText, styles.messageActionTextDelete]}>Delete</Text>
                     </TouchableOpacity>
@@ -325,13 +251,13 @@ export default function ThreadDetailScreen({ route, navigation }: Props) {
         />
         <TouchableOpacity
           style={[styles.sendButton, (!newMessage.trim() || sending) && styles.sendButtonDisabled]}
-          onPress={sendMessage}
+          onPress={handleSendMessage}
           disabled={!newMessage.trim() || sending}
         >
           {sending ? (
             <ActivityIndicator size="small" color="#fff" />
           ) : (
-            <Text style={styles.sendButtonText}>↑</Text>
+            <Text testID="send-button-text" style={styles.sendButtonText}>↑</Text>
           )}
         </TouchableOpacity>
       </View>
@@ -366,18 +292,15 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   messageAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#3B82F6',
-    justifyContent: 'center',
-    alignItems: 'center',
     marginRight: 8,
   },
-  messageAvatarText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
+  messageAvatarMe: {
+    position: 'absolute',
+    top: -12,
+    right: -12,
+    borderWidth: 2,
+    borderColor: '#0F172A',
+    borderRadius: 12,
   },
   messageBubble: {
     backgroundColor: '#1E293B',
@@ -390,6 +313,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#3B82F6',
     borderBottomLeftRadius: 16,
     borderBottomRightRadius: 4,
+    position: 'relative',
+    overflow: 'visible',
   },
   messageSender: {
     fontSize: 12,
@@ -534,4 +459,3 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
-

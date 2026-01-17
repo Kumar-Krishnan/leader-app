@@ -1,9 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { useAuth } from '../../contexts/AuthContext';
 import { useGroup } from '../../contexts/GroupContext';
-import { supabase } from '../../lib/supabase';
-import { Thread } from '../../types/database';
+import { useThreads, ThreadWithDetails } from '../../hooks/useThreads';
 import CreateThreadModal from '../../components/CreateThreadModal';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -11,55 +9,11 @@ import { ThreadsStackParamList } from '../../navigation/types';
 
 type NavigationProp = NativeStackNavigationProp<ThreadsStackParamList>;
 
-interface ThreadWithDetails extends Thread {
-  lastMessage?: string;
-  unreadCount?: number;
-}
-
 export default function ThreadsScreen() {
   const navigation = useNavigation<NavigationProp>();
-  const { user } = useAuth();
   const { currentGroup, isGroupLeader } = useGroup();
-  const [threads, setThreads] = useState<ThreadWithDetails[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { threads, loading, refetch } = useThreads();
   const [showCreateModal, setShowCreateModal] = useState(false);
-
-  useEffect(() => {
-    console.log('[ThreadsScreen] useEffect, currentGroup:', currentGroup?.id, 'user:', user?.id);
-    if (currentGroup) {
-      fetchThreads();
-    } else {
-      console.log('[ThreadsScreen] No currentGroup, setting loading false');
-      setLoading(false);
-    }
-  }, [user, currentGroup]);
-
-  const fetchThreads = async () => {
-    console.log('[ThreadsScreen] fetchThreads called');
-    if (!user || !currentGroup) {
-      console.log('[ThreadsScreen] Missing user or currentGroup, returning');
-      return;
-    }
-    
-    try {
-      console.log('[ThreadsScreen] Fetching threads for group:', currentGroup.id);
-      const { data, error } = await supabase
-        .from('threads')
-        .select('*')
-        .eq('group_id', currentGroup.id)
-        .eq('is_archived', false)
-        .order('updated_at', { ascending: false });
-
-      if (error) throw error;
-      console.log('[ThreadsScreen] Got threads:', data?.length);
-      setThreads(data || []);
-    } catch (error) {
-      console.error('[ThreadsScreen] Error fetching threads:', error);
-    } finally {
-      console.log('[ThreadsScreen] Setting loading false');
-      setLoading(false);
-    }
-  };
 
   const openThread = (thread: ThreadWithDetails) => {
     navigation.navigate('ThreadDetail', {
@@ -120,7 +74,7 @@ export default function ThreadsScreen() {
       <View style={styles.header}>
         <View>
           <Text style={styles.title}>Threads</Text>
-          <Text style={styles.parishName}>{currentGroup?.name}</Text>
+          <Text style={styles.groupName}>{currentGroup?.name}</Text>
         </View>
         {isGroupLeader && (
           <TouchableOpacity 
@@ -143,7 +97,7 @@ export default function ThreadsScreen() {
       <CreateThreadModal
         visible={showCreateModal}
         onClose={() => setShowCreateModal(false)}
-        onCreated={fetchThreads}
+        onCreated={refetch}
       />
     </View>
   );
@@ -173,7 +127,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#F8FAFC',
   },
-  parishName: {
+  groupName: {
     fontSize: 14,
     color: '#3B82F6',
     marginTop: 4,

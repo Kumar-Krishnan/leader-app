@@ -1,14 +1,17 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Switch, ScrollView, Modal } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Switch, ScrollView, Modal, Platform, ActivityIndicator } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { useGroup } from '../../contexts/GroupContext';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { ProfileStackParamList } from '../../navigation/types';
+import * as ImagePicker from 'expo-image-picker';
+import { supabase } from '../../lib/supabase';
+import Avatar from '../../components/Avatar';
 
 export default function ProfileScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<ProfileStackParamList>>();
-  const { profile, signOut, isLeader, isAdmin } = useAuth();
+  const { profile, signOut, isLeader, isAdmin, refreshProfile } = useAuth();
   const { currentGroup, groups, setCurrentGroup, isGroupAdmin, canApproveRequests, pendingRequests, refreshPendingRequests } = useGroup();
 
   // Refresh pending requests when screen is focused
@@ -25,6 +28,7 @@ export default function ProfileScreen() {
   const [notificationsEnabled, setNotificationsEnabled] = React.useState(
     profile?.notification_preferences?.push_enabled ?? true
   );
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   const getRoleBadge = () => {
     if (isAdmin) return { text: 'Admin', color: '#DC2626' };
@@ -34,6 +38,105 @@ export default function ProfileScreen() {
 
   const roleBadge = getRoleBadge();
 
+  const pickAndUploadAvatar = async () => {
+    try {
+      // Request permission
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        if (Platform.OS === 'web') {
+          alert('Permission to access photos is required!');
+        } else {
+          const { Alert } = require('react-native');
+          Alert.alert('Permission Required', 'Permission to access photos is required!');
+        }
+        return;
+      }
+
+      // Pick image
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (result.canceled || !result.assets[0]) return;
+
+      setUploadingAvatar(true);
+      const asset = result.assets[0];
+      
+      // Fetch the image data first
+      const response = await fetch(asset.uri);
+      const blob = await response.blob();
+      
+      // Determine extension from MIME type (more reliable than URL parsing)
+      let ext = 'jpg';
+      const mimeType = blob.type || asset.mimeType || 'image/jpeg';
+      if (mimeType.includes('png')) ext = 'png';
+      else if (mimeType.includes('gif')) ext = 'gif';
+      else if (mimeType.includes('webp')) ext = 'webp';
+      
+      const fileName = `${profile?.id}/avatar.${ext}`;
+
+      // Prepare upload data
+      let uploadData: ArrayBuffer | Blob;
+      if (Platform.OS === 'web') {
+        uploadData = blob;
+      } else {
+        uploadData = await blob.arrayBuffer();
+      }
+
+      // Upload to Supabase Storage
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(fileName, uploadData, {
+          contentType: mimeType,
+          upsert: true,
+        });
+
+      if (uploadError) {
+        console.error('[ProfileScreen] Upload error:', uploadError);
+        throw uploadError;
+      }
+
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(fileName);
+
+      // Add cache buster to force reload
+      const avatarUrl = `${urlData.publicUrl}?t=${Date.now()}`;
+
+      // Update profile with new avatar URL
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ avatar_url: avatarUrl })
+        .eq('id', profile?.id);
+
+      if (updateError) {
+        console.error('[ProfileScreen] Profile update error:', updateError);
+        throw updateError;
+      }
+
+      // Refresh profile to show new avatar
+      if (refreshProfile) {
+        await refreshProfile();
+      }
+
+      console.log('[ProfileScreen] Avatar uploaded successfully:', avatarUrl);
+    } catch (error) {
+      console.error('[ProfileScreen] Error uploading avatar:', error);
+      if (Platform.OS === 'web') {
+        alert('Failed to upload avatar. Please try again.');
+      } else {
+        const { Alert } = require('react-native');
+        Alert.alert('Error', 'Failed to upload avatar. Please try again.');
+      }
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.header}>
@@ -41,11 +144,28 @@ export default function ProfileScreen() {
       </View>
 
       <View style={styles.profileSection}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>
-            {profile?.full_name?.[0]?.toUpperCase() || '?'}
-          </Text>
-        </View>
+        <TouchableOpacity 
+          style={styles.avatarContainer}
+          onPress={pickAndUploadAvatar}
+          disabled={uploadingAvatar}
+        >
+          {uploadingAvatar ? (
+            <View style={styles.avatarLoading}>
+              <ActivityIndicator size="small" color="#fff" />
+            </View>
+          ) : (
+            <>
+              <Avatar 
+                uri={profile?.avatar_url} 
+                name={profile?.full_name} 
+                size={80}
+              />
+              <View style={styles.editBadge}>
+                <Text style={styles.editBadgeText}>✏️</Text>
+              </View>
+            </>
+          )}
+        </TouchableOpacity>
         <Text style={styles.name}>{profile?.full_name || 'Unknown User'}</Text>
         <Text style={styles.email}>{profile?.email}</Text>
         <View style={[styles.roleBadge, { backgroundColor: roleBadge.color }]}>
@@ -198,19 +318,33 @@ const styles = StyleSheet.create({
     backgroundColor: '#1E293B',
     borderRadius: 20,
   },
-  avatar: {
+  avatarContainer: {
+    position: 'relative',
+    marginBottom: 16,
+  },
+  avatarLoading: {
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#334155',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
   },
-  avatarText: {
-    color: '#fff',
-    fontSize: 32,
-    fontWeight: '600',
+  editBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    backgroundColor: '#1E293B',
+    borderRadius: 12,
+    width: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#0F172A',
+  },
+  editBadgeText: {
+    fontSize: 12,
   },
   name: {
     fontSize: 22,

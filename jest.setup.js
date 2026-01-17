@@ -16,6 +16,41 @@ jest.mock('expo-secure-store', () => ({
   deleteItemAsync: jest.fn(() => Promise.resolve()),
 }));
 
+// Mock expo-location
+jest.mock('expo-location', () => ({
+  requestForegroundPermissionsAsync: jest.fn(() => 
+    Promise.resolve({ status: 'granted' })
+  ),
+  getForegroundPermissionsAsync: jest.fn(() => 
+    Promise.resolve({ status: 'granted' })
+  ),
+  getCurrentPositionAsync: jest.fn(() => 
+    Promise.resolve({
+      coords: {
+        latitude: 33.7489,
+        longitude: -84.388,
+        accuracy: 3000,
+      },
+    })
+  ),
+  Accuracy: {
+    Lowest: 1,
+    Low: 2,
+    Balanced: 3,
+    High: 4,
+    Highest: 5,
+  },
+}));
+
+// Mock location analytics service (silent in tests)
+jest.mock('./src/services/locationAnalytics', () => ({
+  recordLogin: jest.fn(),
+  recordSignup: jest.fn(),
+  recordAppOpen: jest.fn(),
+  recordLocationEvent: jest.fn(),
+  hasLocationPermission: jest.fn(() => Promise.resolve(true)),
+}));
+
 // Silence console warnings in tests
 const originalWarn = console.warn;
 console.warn = (...args) => {

@@ -144,6 +144,35 @@ export interface ResourceShare {
   shared_at: string;
 }
 
+export interface ResourceComment {
+  id: string;
+  resource_id: string | null;
+  folder_id: string | null;
+  user_id: string;
+  content: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ResourceCommentWithUser extends ResourceComment {
+  user?: Profile;
+}
+
+export interface ResourceUpvote {
+  id: string;
+  resource_id: string;
+  user_id: string;
+  is_leader_upvote: boolean;
+  created_at: string;
+}
+
+export interface ResourceUpvoteCounts {
+  resource_id: string;
+  total_upvotes: number;
+  leader_upvotes: number;
+  user_upvotes: number;
+}
+
 export interface GroupJoinRequest {
   id: string;
   group_id: string;

@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { Profile } from '../types/database';
+import { recordLogin, recordSignup } from '../services/locationAnalytics';
 
 interface AuthContextType {
   session: Session | null;
@@ -11,6 +12,7 @@ interface AuthContextType {
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
+  refreshProfile: () => Promise<void>;
   isLeader: boolean;
   isAdmin: boolean;
   isConfigured: boolean;
@@ -37,7 +39,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Track current user ID to avoid unnecessary updates
     let currentUserId: string | null = null;
 
-    const initSession = async () => {
+    const initSession = async (retryCount = 0) => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         console.log('[AuthContext] Got session:', !!session, session?.user?.email);
@@ -50,8 +52,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } else {
           setLoading(false);
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error('[AuthContext] getSession error:', err);
+        // Retry on AbortError (common in dev with StrictMode)
+        if (err?.name === 'AbortError' && retryCount < 2) {
+          console.log('[AuthContext] Retrying after AbortError...');
+          setTimeout(() => initSession(retryCount + 1), 500);
+          return;
+        }
         setLoading(false);
       }
     };
@@ -114,7 +122,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  const fetchProfile = async (userId: string) => {
+  const fetchProfile = async (userId: string, retryCount = 0) => {
     console.log('[AuthContext] fetchProfile starting for:', userId);
     try {
       const { data, error } = await supabase
@@ -126,10 +134,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (error) throw error;
       console.log('[AuthContext] fetchProfile got data:', !!data);
       setProfile(data);
-    } catch (error) {
+      setLoading(false);
+    } catch (error: any) {
       console.error('[AuthContext] fetchProfile error:', error);
-    } finally {
-      console.log('[AuthContext] fetchProfile complete, setting loading false');
+      // Retry on AbortError
+      if (error?.message?.includes('AbortError') && retryCount < 2) {
+        console.log('[AuthContext] Retrying fetchProfile after AbortError...');
+        setTimeout(() => fetchProfile(userId, retryCount + 1), 500);
+        return;
+      }
       setLoading(false);
     }
   };
@@ -153,6 +166,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (error) throw error;
 
       // Profile is created automatically by database trigger
+      
+      // Record anonymous location event for analytics
+      recordSignup();
+      
       return { error: null };
     } catch (error) {
       return { error: error as Error };
@@ -171,6 +188,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
 
       if (error) throw error;
+      
+      // Record anonymous location event for analytics
+      recordLogin();
+      
       return { error: null };
     } catch (error) {
       return { error: error as Error };
@@ -186,6 +207,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
   };
 
+  const refreshProfile = async () => {
+    if (user?.id) {
+      await fetchProfile(user.id);
+    }
+  };
+
   const isLeader = profile?.role === 'leader' || profile?.role === 'admin';
   const isAdmin = profile?.role === 'admin';
 
@@ -199,6 +226,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         signUp,
         signIn,
         signOut,
+        refreshProfile,
         isLeader,
         isAdmin,
         isConfigured: isSupabaseConfigured,

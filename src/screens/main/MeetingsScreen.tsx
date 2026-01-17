@@ -1,12 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, Platform, Modal } from 'react-native';
 import { useGroup } from '../../contexts/GroupContext';
 import { useAuth } from '../../contexts/AuthContext';
-import { supabase } from '../../lib/supabase';
+import { useMeetings, RSVPStatus } from '../../hooks/useMeetings';
 import { MeetingWithAttendees } from '../../types/database';
 import CreateMeetingModal from '../../components/CreateMeetingModal';
-
-type RSVPStatus = 'invited' | 'accepted' | 'declined' | 'maybe';
+import Avatar from '../../components/Avatar';
 
 interface RSVPModalState {
   visible: boolean;
@@ -25,8 +24,18 @@ interface DeleteModalState {
 export default function MeetingsScreen() {
   const { currentGroup, isGroupLeader } = useGroup();
   const { user } = useAuth();
-  const [meetings, setMeetings] = useState<MeetingWithAttendees[]>([]);
-  const [loading, setLoading] = useState(true);
+  
+  // Use the useMeetings hook for all data and operations
+  const { 
+    meetings, 
+    loading, 
+    refetch, 
+    rsvpToMeeting, 
+    rsvpToSeries, 
+    deleteMeeting, 
+    deleteSeries 
+  } = useMeetings();
+  
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [rsvpModal, setRsvpModal] = useState<RSVPModalState>({
     visible: false,
@@ -41,42 +50,6 @@ export default function MeetingsScreen() {
     seriesId: null,
   });
 
-  useEffect(() => {
-    if (currentGroup) {
-      fetchMeetings();
-    } else {
-      setLoading(false);
-    }
-  }, [currentGroup?.id]);
-
-  const fetchMeetings = async () => {
-    if (!currentGroup) return;
-
-    try {
-      const { data, error } = await supabase
-        .from('meetings')
-        .select(`
-          *,
-          attendees:meeting_attendees(
-            id,
-            user_id,
-            status,
-            user:profiles(id, full_name, email)
-          )
-        `)
-        .eq('group_id', currentGroup.id)
-        .gte('date', new Date().toISOString())
-        .order('date', { ascending: true });
-
-      if (error) throw error;
-      setMeetings(data || []);
-    } catch (error) {
-      console.error('Error fetching meetings:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   // Check if meeting is part of a series and show modal if so
   const initiateRSVP = (meeting: MeetingWithAttendees, attendeeId: string, status: RSVPStatus) => {
     if (meeting.series_id) {
@@ -90,78 +63,7 @@ export default function MeetingsScreen() {
       });
     } else {
       // No series, just RSVP to this event
-      handleSingleRSVP(meeting.id, attendeeId, status);
-    }
-  };
-
-  // RSVP to a single event only
-  const handleSingleRSVP = async (meetingId: string, attendeeId: string, status: RSVPStatus) => {
-    try {
-      const { error } = await supabase
-        .from('meeting_attendees')
-        .update({ 
-          status, 
-          responded_at: new Date().toISOString(),
-          is_series_rsvp: false,
-        })
-        .eq('id', attendeeId);
-
-      if (error) throw error;
-
-      // Update local state
-      setMeetings(prev => prev.map(meeting => {
-        if (meeting.id === meetingId) {
-          return {
-            ...meeting,
-            attendees: meeting.attendees?.map(a => 
-              a.id === attendeeId ? { ...a, status, is_series_rsvp: false } : a
-            ),
-          };
-        }
-        return meeting;
-      }));
-    } catch (error) {
-      console.error('Error updating RSVP:', error);
-    }
-  };
-
-  // RSVP to all events in a series
-  const handleSeriesRSVP = async (seriesId: string, status: RSVPStatus) => {
-    if (!user) return;
-
-    try {
-      // Get all meeting IDs in this series
-      const seriesMeetingIds = meetings
-        .filter(m => m.series_id === seriesId)
-        .map(m => m.id);
-
-      // Update all attendee records for this user in this series
-      const { error } = await supabase
-        .from('meeting_attendees')
-        .update({ 
-          status, 
-          responded_at: new Date().toISOString(),
-          is_series_rsvp: true,
-        })
-        .eq('user_id', user.id)
-        .in('meeting_id', seriesMeetingIds);
-
-      if (error) throw error;
-
-      // Update local state for all meetings in the series
-      setMeetings(prev => prev.map(meeting => {
-        if (meeting.series_id === seriesId) {
-          return {
-            ...meeting,
-            attendees: meeting.attendees?.map(a => 
-              a.user_id === user.id ? { ...a, status, is_series_rsvp: true } : a
-            ),
-          };
-        }
-        return meeting;
-      }));
-    } catch (error) {
-      console.error('Error updating series RSVP:', error);
+      rsvpToMeeting(meeting.id, attendeeId, status);
     }
   };
 
@@ -171,9 +73,9 @@ export default function MeetingsScreen() {
     setRsvpModal(prev => ({ ...prev, visible: false }));
 
     if (applyToAll && seriesId) {
-      await handleSeriesRSVP(seriesId, status);
+      await rsvpToSeries(seriesId, status);
     } else {
-      await handleSingleRSVP(meetingId, attendeeId, status);
+      await rsvpToMeeting(meetingId, attendeeId, status);
     }
   };
 
@@ -195,17 +97,8 @@ export default function MeetingsScreen() {
   // Confirm and delete a single meeting
   const confirmSingleDelete = (meetingId: string) => {
     const performDelete = async () => {
-      try {
-        const { error } = await supabase
-          .from('meetings')
-          .delete()
-          .eq('id', meetingId);
-
-        if (error) throw error;
-
-        setMeetings(prev => prev.filter(m => m.id !== meetingId));
-      } catch (error) {
-        console.error('Error deleting meeting:', error);
+      const success = await deleteMeeting(meetingId);
+      if (!success) {
         if (Platform.OS === 'web') {
           window.alert('Failed to delete meeting');
         } else {
@@ -230,47 +123,28 @@ export default function MeetingsScreen() {
     }
   };
 
-  // Delete all meetings in a series
-  const handleDeleteSeries = async (seriesId: string) => {
-    try {
-      const { error } = await supabase
-        .from('meetings')
-        .delete()
-        .eq('series_id', seriesId);
-
-      if (error) throw error;
-
-      // Update local state
-      setMeetings(prev => prev.filter(m => m.series_id !== seriesId));
-    } catch (error) {
-      console.error('Error deleting series:', error);
-      if (Platform.OS === 'web') {
-        window.alert('Failed to delete series');
-      } else {
-        Alert.alert('Error', 'Failed to delete series');
-      }
-    }
-  };
-
   // Handle delete modal response
   const handleDeleteModalResponse = async (deleteAll: boolean) => {
     const { meetingId, seriesId } = deleteModal;
     setDeleteModal(prev => ({ ...prev, visible: false }));
 
     if (deleteAll && seriesId) {
-      await handleDeleteSeries(seriesId);
+      const success = await deleteSeries(seriesId);
+      if (!success) {
+        if (Platform.OS === 'web') {
+          window.alert('Failed to delete series');
+        } else {
+          Alert.alert('Error', 'Failed to delete series');
+        }
+      }
     } else {
-      // Delete just this one (no confirmation needed, modal already confirmed)
-      try {
-        const { error } = await supabase
-          .from('meetings')
-          .delete()
-          .eq('id', meetingId);
-
-        if (error) throw error;
-        setMeetings(prev => prev.filter(m => m.id !== meetingId));
-      } catch (error) {
-        console.error('Error deleting meeting:', error);
+      const success = await deleteMeeting(meetingId);
+      if (!success) {
+        if (Platform.OS === 'web') {
+          window.alert('Failed to delete meeting');
+        } else {
+          Alert.alert('Error', 'Failed to delete meeting');
+        }
       }
     }
   };
@@ -325,19 +199,21 @@ export default function MeetingsScreen() {
                     <View 
                       key={attendee.id} 
                       style={[
-                        styles.attendeeAvatar,
+                        styles.attendeeAvatarWrapper,
                         { marginLeft: idx > 0 ? -8 : 0, zIndex: 4 - idx },
                         attendee.status === 'accepted' && styles.attendeeAvatarAccepted,
                         attendee.status === 'declined' && styles.attendeeAvatarDeclined,
                       ]}
                     >
-                      <Text style={styles.attendeeAvatarText}>
-                        {attendee.user?.full_name?.[0] || '?'}
-                      </Text>
+                      <Avatar 
+                        uri={attendee.user?.avatar_url}
+                        name={attendee.user?.full_name}
+                        size={22}
+                      />
                     </View>
                   ))}
                   {attendeeCount > 4 && (
-                    <View style={[styles.attendeeAvatar, styles.attendeeAvatarMore, { marginLeft: -8, zIndex: 0 }]}>
+                    <View style={[styles.attendeeAvatarWrapper, styles.attendeeAvatarMore, { marginLeft: -8, zIndex: 0 }]}>
                       <Text style={styles.attendeeAvatarText}>+{attendeeCount - 4}</Text>
                     </View>
                   )}
@@ -449,7 +325,7 @@ export default function MeetingsScreen() {
       <CreateMeetingModal
         visible={showCreateModal}
         onClose={() => setShowCreateModal(false)}
-        onCreated={fetchMeetings}
+        onCreated={refetch}
       />
 
       {/* Series RSVP Modal */}
@@ -634,24 +510,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  attendeeAvatar: {
+  attendeeAvatarWrapper: {
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: '#3B82F6',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
     borderColor: '#1E293B',
+    backgroundColor: '#475569',
   },
   attendeeAvatarMore: {
     backgroundColor: '#475569',
   },
   attendeeAvatarAccepted: {
-    backgroundColor: '#22C55E',
+    borderColor: '#22C55E',
   },
   attendeeAvatarDeclined: {
-    backgroundColor: '#EF4444',
+    borderColor: '#EF4444',
     opacity: 0.6,
   },
   attendeeAvatarText: {
