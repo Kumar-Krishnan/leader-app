@@ -158,21 +158,6 @@ export interface ResourceCommentWithUser extends ResourceComment {
   user?: Profile;
 }
 
-export interface ResourceUpvote {
-  id: string;
-  resource_id: string;
-  user_id: string;
-  is_leader_upvote: boolean;
-  created_at: string;
-}
-
-export interface ResourceUpvoteCounts {
-  resource_id: string;
-  total_upvotes: number;
-  leader_upvotes: number;
-  user_upvotes: number;
-}
-
 export interface GroupJoinRequest {
   id: string;
   group_id: string;

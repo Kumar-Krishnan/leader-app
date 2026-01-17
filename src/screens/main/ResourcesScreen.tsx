@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -14,11 +14,9 @@ import {
 } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import { useGroup } from '../../contexts/GroupContext';
-import { useAuth } from '../../contexts/AuthContext';
-import { useResources } from '../../hooks/useResources';
-import { useResourceUpvotes } from '../../hooks/useResourceUpvotes';
-import { Resource, ResourceFolder } from '../../types/database';
+import { useResources, ResourceWithSharing, ResourceFolderWithSharing } from '../../hooks/useResources';
 import ResourceCommentsModal from '../../components/ResourceCommentsModal';
+import ShareResourceModal from '../../components/ShareResourceModal';
 
 const TYPE_ICONS: Record<string, string> = {
   document: '📄',
@@ -28,14 +26,13 @@ const TYPE_ICONS: Record<string, string> = {
   folder: '📁',
 };
 
-type ListItem = 
-  | { type: 'folder'; data: ResourceFolder }
-  | { type: 'resource'; data: Resource };
+type ListItem =
+  | { type: 'folder'; data: ResourceFolderWithSharing }
+  | { type: 'resource'; data: ResourceWithSharing };
 
 export default function ResourcesScreen() {
-  const { currentGroup, canApproveRequests, isGroupLeader } = useGroup();
-  const { isLeader } = useAuth();
-  
+  const { currentGroup, canApproveRequests } = useGroup();
+
   // Use the useResources hook for all data and operations
   const {
     folders,
@@ -53,19 +50,15 @@ export default function ResourcesScreen() {
     deleteFolder: deleteFolderAction,
     deleteResource: deleteResourceAction,
     getResourceUrl,
+    shareResource,
+    unshareResource,
+    shareFolder,
+    unshareFolder,
+    getResourceShares,
+    getFolderShares,
+    getShareableGroups,
   } = useResources();
-  
-  // Upvotes hook
-  const { upvotes, toggleUpvote, fetchUpvotes } = useResourceUpvotes();
-  
-  // Fetch upvotes when resources change
-  useEffect(() => {
-    if (resources.length > 0) {
-      const resourceIds = resources.map(r => r.id);
-      fetchUpvotes(resourceIds);
-    }
-  }, [resources, fetchUpvotes]);
-  
+
   // Modals
   const [showAddModal, setShowAddModal] = useState(false);
   const [showFolderModal, setShowFolderModal] = useState(false);
@@ -74,9 +67,17 @@ export default function ResourcesScreen() {
   const [newResourceUrl, setNewResourceUrl] = useState('');
   const [newResourceType, setNewResourceType] = useState<'link' | 'document'>('link');
   const [selectedFile, setSelectedFile] = useState<DocumentPicker.DocumentPickerAsset | null>(null);
-  
+
   // Comments modal
   const [commentsModal, setCommentsModal] = useState<{
+    visible: boolean;
+    resourceId?: string;
+    folderId?: string;
+    title: string;
+  }>({ visible: false, title: '' });
+
+  // Share modal
+  const [shareModal, setShareModal] = useState<{
     visible: boolean;
     resourceId?: string;
     folderId?: string;
@@ -164,7 +165,7 @@ export default function ResourcesScreen() {
     setShowAddModal(false);
   };
 
-  const openResource = async (resource: Resource) => {
+  const openResource = async (resource: ResourceWithSharing) => {
     if (resource.type === 'link' && resource.url) {
       Linking.openURL(resource.url);
     } else if (resource.file_path) {
@@ -182,7 +183,7 @@ export default function ResourcesScreen() {
     return items;
   };
 
-  const confirmDeleteFolder = (folder: ResourceFolder) => {
+  const confirmDeleteFolder = (folder: ResourceFolderWithSharing) => {
     const performDelete = async () => {
       const success = await deleteFolderAction(folder.id);
       if (!success) {
@@ -206,7 +207,7 @@ export default function ResourcesScreen() {
     }
   };
 
-  const confirmDeleteResource = (resource: Resource) => {
+  const confirmDeleteResource = (resource: ResourceWithSharing) => {
     const performDelete = async () => {
       const success = await deleteResourceAction(resource.id, resource.file_path);
       if (!success) {
@@ -237,41 +238,75 @@ export default function ResourcesScreen() {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
+  const openShareModal = (item: { resourceId?: string; folderId?: string; title: string }) => {
+    setShareModal({
+      visible: true,
+      ...item,
+    });
+  };
+
   const renderItem = ({ item }: { item: ListItem }) => {
     if (item.type === 'folder') {
+      const folder = item.data;
+      const isOwnItem = folder.group_id === currentGroup?.id;
+      const canShare = canApproveRequests && isOwnItem && !folder.isShared;
+
       return (
         <View style={styles.itemCard}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.itemContent}
-            onPress={() => openFolder(item.data)}
-            onLongPress={canApproveRequests ? () => confirmDeleteFolder(item.data) : undefined}
+            onPress={() => openFolder(folder)}
+            onLongPress={canApproveRequests && isOwnItem ? () => confirmDeleteFolder(folder) : undefined}
             delayLongPress={500}
           >
             <View style={styles.iconContainer}>
               <Text style={styles.icon}>📁</Text>
             </View>
             <View style={styles.itemInfo}>
-              <Text style={styles.itemTitle}>{item.data.name}</Text>
-              <Text style={styles.itemMeta}>Folder</Text>
+              <View style={styles.titleRow}>
+                <Text style={styles.itemTitle}>{folder.name}</Text>
+                {folder.shareCount && folder.shareCount > 0 && (
+                  <View style={styles.shareCountBadge}>
+                    <Text style={styles.shareCountText}>Shared</Text>
+                  </View>
+                )}
+              </View>
+              {folder.isShared && folder.sourceGroupName ? (
+                <Text style={styles.sharedFromText}>
+                  Shared from {folder.sourceGroupName}
+                </Text>
+              ) : (
+                <Text style={styles.itemMeta}>Folder</Text>
+              )}
             </View>
-            {!canApproveRequests && <Text style={styles.chevron}>→</Text>}
+            {!canApproveRequests && !folder.isShared && <Text style={styles.chevron}>→</Text>}
           </TouchableOpacity>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.commentButton}
             onPress={() => setCommentsModal({
               visible: true,
-              folderId: item.data.id,
-              title: item.data.name,
+              folderId: folder.id,
+              title: folder.name,
             })}
             activeOpacity={0.6}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
             <Text style={styles.commentButtonText}>💬</Text>
           </TouchableOpacity>
-          {canApproveRequests && (
-            <TouchableOpacity 
+          {canShare && (
+            <TouchableOpacity
+              style={styles.shareButton}
+              onPress={() => openShareModal({ folderId: folder.id, title: folder.name })}
+              activeOpacity={0.6}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Text style={styles.shareButtonText}>↗</Text>
+            </TouchableOpacity>
+          )}
+          {canApproveRequests && isOwnItem && (
+            <TouchableOpacity
               style={styles.deleteButton}
-              onPress={() => confirmDeleteFolder(item.data)}
+              onPress={() => confirmDeleteFolder(folder)}
               activeOpacity={0.6}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
@@ -283,12 +318,15 @@ export default function ResourcesScreen() {
     }
 
     const resource = item.data;
+    const isOwnItem = resource.group_id === currentGroup?.id;
+    const canShare = canApproveRequests && isOwnItem && !resource.isShared;
+
     return (
       <View style={styles.itemCard}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.itemContent}
           onPress={() => openResource(resource)}
-          onLongPress={canApproveRequests ? () => confirmDeleteResource(resource) : undefined}
+          onLongPress={canApproveRequests && isOwnItem ? () => confirmDeleteResource(resource) : undefined}
           delayLongPress={500}
         >
           <View style={styles.iconContainer}>
@@ -302,40 +340,26 @@ export default function ResourcesScreen() {
                   <Text style={styles.leaderBadgeText}>Leaders</Text>
                 </View>
               )}
+              {resource.shareCount && resource.shareCount > 0 && (
+                <View style={styles.shareCountBadge}>
+                  <Text style={styles.shareCountText}>Shared</Text>
+                </View>
+              )}
             </View>
-            <Text style={styles.itemMeta}>
-              {resource.type === 'document' && resource.file_size 
-                ? formatFileSize(resource.file_size)
-                : resource.type}
-            </Text>
+            {resource.isShared && resource.sourceGroupName ? (
+              <Text style={styles.sharedFromText}>
+                Shared from {resource.sourceGroupName}
+              </Text>
+            ) : (
+              <Text style={styles.itemMeta}>
+                {resource.type === 'document' && resource.file_size
+                  ? formatFileSize(resource.file_size)
+                  : resource.type}
+              </Text>
+            )}
           </View>
         </TouchableOpacity>
-        {/* Upvote Button */}
-        {(() => {
-          const upvoteData = upvotes.get(resource.id);
-          const hasUpvoted = upvoteData?.hasUpvoted || false;
-          const total = upvoteData?.totalUpvotes || 0;
-          const leaderCount = upvoteData?.leaderUpvotes || 0;
-          const userCount = upvoteData?.userUpvotes || 0;
-          
-          return (
-            <TouchableOpacity 
-              style={[styles.upvoteButton, hasUpvoted && styles.upvoteButtonActive]}
-              onPress={() => toggleUpvote(resource.id)}
-              activeOpacity={0.6}
-            >
-              <Text style={[styles.upvoteIcon, hasUpvoted && styles.upvoteIconActive]}>
-                {hasUpvoted ? '▲' : '△'}
-              </Text>
-              {total > 0 && (
-                <Text style={[styles.upvoteCount, hasUpvoted && styles.upvoteCountActive]}>
-                  {isLeader || isGroupLeader ? `${leaderCount}/${userCount}` : total}
-                </Text>
-              )}
-            </TouchableOpacity>
-          );
-        })()}
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.commentButton}
           onPress={() => setCommentsModal({
             visible: true,
@@ -347,8 +371,18 @@ export default function ResourcesScreen() {
         >
           <Text style={styles.commentButtonText}>💬</Text>
         </TouchableOpacity>
-        {canApproveRequests && (
-          <TouchableOpacity 
+        {canShare && (
+          <TouchableOpacity
+            style={styles.shareButton}
+            onPress={() => openShareModal({ resourceId: resource.id, title: resource.title })}
+            activeOpacity={0.6}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Text style={styles.shareButtonText}>↗</Text>
+          </TouchableOpacity>
+        )}
+        {canApproveRequests && isOwnItem && (
+          <TouchableOpacity
             style={styles.deleteButton}
             onPress={() => confirmDeleteResource(resource)}
             activeOpacity={0.6}
@@ -368,7 +402,7 @@ export default function ResourcesScreen() {
         {currentFolderId ? 'This folder is empty' : 'No resources yet'}
       </Text>
       <Text style={styles.emptyText}>
-        {canApproveRequests 
+        {canApproveRequests
           ? 'Add resources or create folders to organize content.'
           : 'Resources shared with you will appear here.'}
       </Text>
@@ -376,9 +410,7 @@ export default function ResourcesScreen() {
   );
 
   // Handle breadcrumb click to navigate to specific folder in path
-  const navigateToPathFolder = (folder: ResourceFolder, index: number) => {
-    // This is a workaround since we can't directly set folderPath from outside
-    // We need to go back to that folder level
+  const navigateToPathFolder = (folder: ResourceFolderWithSharing, index: number) => {
     const stepsBack = folderPath.length - index - 1;
     for (let i = 0; i < stepsBack; i++) {
       goBack();
@@ -402,13 +434,13 @@ export default function ResourcesScreen() {
         </View>
         {canApproveRequests && (
           <View style={styles.headerButtons}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.folderButton}
               onPress={() => setShowFolderModal(true)}
             >
               <Text style={styles.folderButtonText}>📁</Text>
             </TouchableOpacity>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.addButton}
               onPress={() => setShowAddModal(true)}
             >
@@ -430,7 +462,7 @@ export default function ResourcesScreen() {
               {index === folderPath.length - 1 ? (
                 <Text style={styles.breadcrumbCurrent}>{folder.name}</Text>
               ) : (
-                <TouchableOpacity onPress={() => navigateToPathFolder(folder, index)}>
+                <TouchableOpacity onPress={() => navigateToPathFolder(folder as ResourceFolderWithSharing, index)}>
                   <Text style={styles.breadcrumbLink}>{folder.name}</Text>
                 </TouchableOpacity>
               )}
@@ -487,13 +519,13 @@ export default function ResourcesScreen() {
 
             {/* Type Selector */}
             <View style={styles.typeSelector}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[styles.typeOption, newResourceType === 'link' && styles.typeOptionActive]}
                 onPress={() => setNewResourceType('link')}
               >
                 <Text style={styles.typeOptionText}>🔗 Link</Text>
               </TouchableOpacity>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[styles.typeOption, newResourceType === 'document' && styles.typeOptionActive]}
                 onPress={() => setNewResourceType('document')}
               >
@@ -536,8 +568,8 @@ export default function ResourcesScreen() {
               </TouchableOpacity>
             )}
 
-            <TouchableOpacity 
-              style={[styles.submitButton, uploading && styles.submitButtonDisabled]} 
+            <TouchableOpacity
+              style={[styles.submitButton, uploading && styles.submitButtonDisabled]}
               onPress={handleUploadResource}
               disabled={uploading}
             >
@@ -558,6 +590,19 @@ export default function ResourcesScreen() {
         resourceId={commentsModal.resourceId}
         folderId={commentsModal.folderId}
         title={commentsModal.title}
+      />
+
+      {/* Share Modal */}
+      <ShareResourceModal
+        visible={shareModal.visible}
+        onClose={() => setShareModal({ visible: false, title: '' })}
+        resourceId={shareModal.resourceId}
+        folderId={shareModal.folderId}
+        title={shareModal.title}
+        getShareableGroups={getShareableGroups}
+        getShares={shareModal.resourceId ? getResourceShares : getFolderShares}
+        onShare={shareModal.resourceId ? shareResource : shareFolder}
+        onUnshare={shareModal.resourceId ? unshareResource : unshareFolder}
       />
     </View>
   );
@@ -686,37 +731,25 @@ const styles = StyleSheet.create({
     marginTop: 2,
     textTransform: 'capitalize',
   },
+  sharedFromText: {
+    fontSize: 12,
+    color: '#3B82F6',
+    marginTop: 2,
+  },
+  shareCountBadge: {
+    backgroundColor: 'rgba(59, 130, 246, 0.2)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  shareCountText: {
+    color: '#3B82F6',
+    fontSize: 10,
+    fontWeight: '600',
+  },
   chevron: {
     color: '#64748B',
     fontSize: 16,
-  },
-  upvoteButton: {
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    minWidth: 40,
-  },
-  upvoteButtonActive: {
-    backgroundColor: 'rgba(34, 197, 94, 0.1)',
-    borderRadius: 8,
-  },
-  upvoteIcon: {
-    fontSize: 14,
-    color: '#64748B',
-  },
-  upvoteIconActive: {
-    color: '#22C55E',
-  },
-  upvoteCount: {
-    fontSize: 11,
-    color: '#64748B',
-    marginTop: 2,
-  },
-  upvoteCountActive: {
-    color: '#22C55E',
-    fontWeight: '600',
   },
   commentButton: {
     padding: 14,
@@ -724,6 +757,14 @@ const styles = StyleSheet.create({
   },
   commentButtonText: {
     fontSize: 16,
+  },
+  shareButton: {
+    padding: 14,
+    paddingLeft: 8,
+  },
+  shareButtonText: {
+    fontSize: 18,
+    color: '#3B82F6',
   },
   deleteButton: {
     padding: 14,
