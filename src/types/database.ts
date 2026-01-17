@@ -1,59 +1,119 @@
+/**
+ * Global user role in the application
+ * - user: Regular user
+ * - leader: Can create groups and manage content
+ * - admin: Full system access
+ */
 export type UserRole = 'user' | 'leader' | 'admin';
+
+/**
+ * Role within a specific group
+ * - member: Regular group member
+ * - leader-helper: Can approve join requests
+ * - leader: Can create content and manage members
+ * - admin: Full group control, can see join code
+ */
 export type GroupRole = 'member' | 'leader-helper' | 'leader' | 'admin';
+
+/**
+ * Status of a group join request
+ */
 export type JoinRequestStatus = 'pending' | 'approved' | 'rejected';
 
+/**
+ * User profile extending Supabase auth.users
+ * Created automatically via database trigger on user signup
+ */
 export interface Profile {
+  /** UUID matching auth.users.id */
   id: string;
+  /** User's email address */
   email: string;
+  /** User's display name */
   full_name: string | null;
+  /** URL to user's avatar image */
   avatar_url: string | null;
+  /** Global application role */
   role: UserRole;
+  /** User's notification settings */
   notification_preferences: NotificationPreferences;
+  /** HubSpot CRM contact ID for sync */
   hubspot_contact_id: string | null;
   created_at: string;
   updated_at: string;
 }
 
+/**
+ * User notification preferences
+ */
 export interface NotificationPreferences {
+  /** Receive notifications for new messages */
   messages: boolean;
+  /** Receive notifications for meetings */
   meetings: boolean;
+  /** Receive notifications for new resources */
   resources: boolean;
+  /** Whether push notifications are enabled */
   push_enabled: boolean;
 }
 
+/**
+ * A group/community that users can belong to
+ */
 export interface Group {
   id: string;
+  /** Display name of the group */
   name: string;
+  /** Optional description */
   description: string | null;
+  /** Join code for new members (visible to admins) */
   code: string | null;
+  /** User ID who created the group */
   created_by: string | null;
   created_at: string;
   updated_at: string;
 }
 
+/**
+ * User membership in a group
+ */
 export interface GroupMember {
   id: string;
   group_id: string;
   user_id: string;
+  /** User's role within this specific group */
   role: GroupRole;
   joined_at: string;
 }
 
+/**
+ * GroupMember with related Group and Profile data
+ */
 export interface GroupMemberWithDetails extends GroupMember {
   group?: Group;
   user?: Profile;
 }
 
+/**
+ * A discussion thread within a group
+ */
 export interface Thread {
   id: string;
+  /** Thread title */
   name: string;
+  /** Group this thread belongs to */
   group_id: string;
+  /** User who created the thread */
   created_by: string;
+  /** Whether the thread is archived */
   is_archived: boolean;
   created_at: string;
   updated_at: string;
 }
 
+/**
+ * User membership in a thread
+ */
 export interface ThreadMember {
   id: string;
   thread_id: string;
@@ -61,82 +121,142 @@ export interface ThreadMember {
   joined_at: string;
 }
 
+/**
+ * A message within a thread
+ */
 export interface Message {
   id: string;
   thread_id: string;
+  /** User who sent the message */
   sender_id: string;
+  /** Message text content */
   content: string;
+  /** URLs to attached files */
   attachments: string[];
   created_at: string;
 }
 
+/**
+ * A scheduled meeting/event within a group
+ */
 export interface Meeting {
   id: string;
+  /** Meeting title */
   title: string;
+  /** Optional description/notes */
   description: string | null;
+  /** ISO date string of meeting date/time */
   date: string;
+  /** Physical or virtual location */
   location: string | null;
+  /** Bible passages to discuss */
   passages: string[];
+  /** Group this meeting belongs to */
   group_id: string;
+  /** Optional linked discussion thread */
   thread_id: string | null;
+  /** URLs to attached files */
   attachments: string[];
+  /** User who created the meeting */
   created_by: string;
-  // Series support for recurring events
+  /** ID for recurring meeting series */
   series_id: string | null;
-  series_index: number | null;  // 1, 2, 3... for display like "Event (1/4)"
-  series_total: number | null;  // Total events in series
+  /** Position in series (1, 2, 3...) for display like "Event (1/4)" */
+  series_index: number | null;
+  /** Total events in the series */
+  series_total: number | null;
   created_at: string;
   updated_at: string;
 }
 
+/**
+ * RSVP status for meeting attendees
+ */
 export type AttendeeStatus = 'invited' | 'accepted' | 'declined' | 'maybe';
 
+/**
+ * Meeting attendance record
+ */
 export interface MeetingAttendee {
   id: string;
   meeting_id: string;
   user_id: string;
+  /** RSVP status */
   status: AttendeeStatus;
   invited_at: string;
   responded_at: string | null;
-  is_series_rsvp: boolean;  // True if this was set via series-level RSVP
+  /** True if RSVP was set for entire series */
+  is_series_rsvp: boolean;
 }
 
+/**
+ * MeetingAttendee with related Profile data
+ */
 export interface MeetingAttendeeWithProfile extends MeetingAttendee {
   user?: Profile;
 }
 
+/**
+ * Meeting with attendee list populated
+ */
 export interface MeetingWithAttendees extends Meeting {
   attendees?: MeetingAttendeeWithProfile[];
 }
 
+/**
+ * A folder for organizing resources within a group
+ */
 export interface ResourceFolder {
   id: string;
+  /** Folder name */
   name: string;
+  /** Group this folder belongs to */
   group_id: string;
+  /** Parent folder ID (null for root level) */
   parent_id: string | null;
+  /** User who created the folder */
   created_by: string | null;
   created_at: string;
   updated_at: string;
 }
 
+/**
+ * A shared resource (document, link, video, etc.) within a group
+ */
 export interface Resource {
   id: string;
+  /** Display title */
   title: string;
+  /** Resource type */
   type: 'document' | 'link' | 'video' | 'other';
+  /** Text content (for text-based resources) */
   content: string | null;
+  /** External URL (for link type) */
   url: string | null;
+  /** Tags for categorization */
   tags: string[];
+  /** Visibility level - 'leaders_only' restricts to leaders/admins */
   visibility: 'all' | 'leaders_only';
+  /** Group this resource belongs to */
   group_id: string;
+  /** Parent folder ID (null for root level) */
   folder_id: string | null;
+  /** Storage path for uploaded files */
   file_path: string | null;
+  /** File size in bytes */
   file_size: number | null;
+  /** MIME type of uploaded file */
   mime_type: string | null;
+  /** User who uploaded/created the resource */
   shared_by: string;
   created_at: string;
   updated_at: string;
 }
 
+/**
+ * Legacy resource sharing record (user-to-user)
+ * @deprecated Use resource_group_shares for group-based sharing
+ */
 export interface ResourceShare {
   id: string;
   resource_id: string;
@@ -144,36 +264,66 @@ export interface ResourceShare {
   shared_at: string;
 }
 
+/**
+ * Comment on a resource or folder
+ */
 export interface ResourceComment {
   id: string;
+  /** Resource ID (mutually exclusive with folder_id) */
   resource_id: string | null;
+  /** Folder ID (mutually exclusive with resource_id) */
   folder_id: string | null;
+  /** User who posted the comment */
   user_id: string;
+  /** Comment text */
   content: string;
   created_at: string;
   updated_at: string;
 }
 
+/**
+ * ResourceComment with related Profile data
+ */
 export interface ResourceCommentWithUser extends ResourceComment {
   user?: Profile;
 }
 
+/**
+ * Request from a user to join a group
+ */
 export interface GroupJoinRequest {
   id: string;
   group_id: string;
   user_id: string;
+  /** Current request status */
   status: JoinRequestStatus;
+  /** User who approved/rejected (if any) */
   reviewed_by: string | null;
+  /** When the request was reviewed */
   reviewed_at: string | null;
   created_at: string;
 }
 
+/**
+ * GroupJoinRequest with related Profile and Group data
+ */
 export interface GroupJoinRequestWithDetails extends GroupJoinRequest {
   user?: Profile;
   group?: Group;
 }
 
-// Supabase Database type for client
+/**
+ * Supabase Database type definition for the TypeScript client.
+ * Used for typed queries and mutations.
+ *
+ * @example
+ * ```typescript
+ * import { createClient } from '@supabase/supabase-js';
+ * import { Database } from './types/database';
+ *
+ * const supabase = createClient<Database>(url, key);
+ * ```
+ */
 export interface Database {
   public: {
     Tables: {

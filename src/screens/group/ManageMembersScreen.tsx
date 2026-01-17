@@ -6,13 +6,13 @@ import {
   TouchableOpacity,
   FlatList,
   ActivityIndicator,
-  Alert,
   Modal,
 } from 'react-native';
 import { useGroup } from '../../contexts/GroupContext';
 import { useGroupMembers, MemberWithProfile } from '../../hooks/useGroupMembers';
 import { GroupRole } from '../../types/database';
 import Avatar from '../../components/Avatar';
+import { showAlert } from '../../lib/errors';
 
 export default function ManageMembersScreen() {
   const { 
@@ -41,7 +41,7 @@ export default function ManageMembersScreen() {
     setLocalProcessingId(requestId);
     const { error } = await approveRequest(requestId);
     if (error) {
-      Alert.alert('Error', error.message);
+      showAlert('Error', error.message);
     } else {
       refetch();
     }
@@ -52,7 +52,7 @@ export default function ManageMembersScreen() {
     setLocalProcessingId(requestId);
     const { error } = await rejectRequest(requestId);
     if (error) {
-      Alert.alert('Error', error.message);
+      showAlert('Error', error.message);
     }
     setLocalProcessingId(null);
   };
@@ -60,7 +60,7 @@ export default function ManageMembersScreen() {
   const handleRoleChange = async (memberId: string, newRole: GroupRole) => {
     const success = await updateRole(memberId, newRole);
     if (!success) {
-      Alert.alert('Error', 'Failed to update role');
+      showAlert('Error', 'Failed to update role');
     } else {
       setSelectedMember(null);
     }

@@ -15,15 +15,43 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { ResourceCommentWithUser } from '../types/database';
 import Avatar from './Avatar';
+import { showAlert, showDestructiveConfirm } from '../lib/errors';
 
+/**
+ * Props for the ResourceCommentsModal component
+ */
 interface ResourceCommentsModalProps {
+  /** Whether the modal is visible */
   visible: boolean;
+  /** Callback when modal is closed */
   onClose: () => void;
+  /** ID of the resource to show comments for (mutually exclusive with folderId) */
   resourceId?: string;
+  /** ID of the folder to show comments for (mutually exclusive with resourceId) */
   folderId?: string;
+  /** Display title of the resource or folder */
   title: string;
 }
 
+/**
+ * Modal component for viewing and posting comments on resources or folders.
+ *
+ * Features:
+ * - Real-time comment updates via Supabase subscriptions
+ * - User avatars and timestamps for each comment
+ * - Delete functionality for own comments
+ * - Keyboard-aware input for composing new comments
+ *
+ * @example
+ * ```tsx
+ * <ResourceCommentsModal
+ *   visible={showComments}
+ *   onClose={() => setShowComments(false)}
+ *   resourceId={resource.id}
+ *   title={resource.title}
+ * />
+ * ```
+ */
 export default function ResourceCommentsModal({
   visible,
   onClose,
@@ -139,18 +167,18 @@ export default function ResourceCommentsModal({
       setNewComment('');
     } catch (error) {
       console.error('[ResourceComments] Error sending comment:', error);
-      if (Platform.OS === 'web') {
-        alert('Failed to send comment');
-      }
+      showAlert('Error', 'Failed to send comment');
     } finally {
       setSending(false);
     }
   };
 
   const handleDeleteComment = async (commentId: string) => {
-    const confirm = Platform.OS === 'web'
-      ? window.confirm('Delete this comment?')
-      : true; // On native, we'd use Alert.alert
+    const confirm = await showDestructiveConfirm(
+      'Delete Comment',
+      'Are you sure you want to delete this comment?',
+      'Delete'
+    );
 
     if (!confirm) return;
 
@@ -270,6 +298,12 @@ export default function ResourceCommentsModal({
   );
 }
 
+/**
+ * Formats a date as a human-readable relative time string.
+ *
+ * @param date - The date to format
+ * @returns A string like "just now", "5m ago", "2h ago", "3d ago", or a locale date string
+ */
 function getTimeAgo(date: Date): string {
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();

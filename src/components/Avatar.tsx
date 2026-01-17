@@ -1,17 +1,36 @@
 import React, { useState } from 'react';
 import { View, Text, Image, StyleSheet, ViewStyle, TextStyle } from 'react-native';
 
+/**
+ * Props for the Avatar component
+ */
 interface AvatarProps {
+  /** URL to the user's profile image */
   uri?: string | null;
+  /** User's full name (used to generate initials) */
   name?: string | null;
+  /** Avatar diameter in pixels (default: 40) */
   size?: number;
+  /** Additional container styles */
   style?: ViewStyle;
+  /** Additional text styles for initials */
   textStyle?: TextStyle;
 }
 
 /**
- * Reusable Avatar component
- * Shows profile picture if available, otherwise shows initials
+ * Reusable Avatar component that displays a user's profile picture.
+ * Falls back to displaying initials on a colored background if:
+ * - No image URL is provided
+ * - The image fails to load
+ *
+ * @example
+ * ```tsx
+ * // With image
+ * <Avatar uri={user.avatar_url} name={user.full_name} size={48} />
+ *
+ * // Initials fallback
+ * <Avatar name="John Doe" size={36} />
+ * ```
  */
 export default function Avatar({ uri, name, size = 40, style, textStyle }: AvatarProps) {
   const [imageError, setImageError] = useState(false);

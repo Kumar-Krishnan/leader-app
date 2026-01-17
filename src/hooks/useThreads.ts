@@ -3,6 +3,8 @@ import { supabase } from '../lib/supabase';
 import { Thread } from '../types/database';
 import { useAuth } from '../contexts/AuthContext';
 import { useGroup } from '../contexts/GroupContext';
+import { logger } from '../lib/logger';
+import { getUserErrorMessage } from '../lib/errors';
 
 /**
  * Extended thread interface with optional UI-specific fields
@@ -83,8 +85,8 @@ export function useThreads(): UseThreadsResult {
       
       setThreads(data || []);
     } catch (err: any) {
-      console.error('[useThreads] Error fetching threads:', err);
-      setError(err.message || 'Failed to load threads');
+      logger.error('useThreads', 'Error fetching threads', { error: err });
+      setError(getUserErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -124,8 +126,8 @@ export function useThreads(): UseThreadsResult {
 
       return data;
     } catch (err: any) {
-      console.error('[useThreads] Error creating thread:', err);
-      setError(err.message || 'Failed to create thread');
+      logger.error('useThreads', 'Error creating thread', { error: err });
+      setError(getUserErrorMessage(err));
       return null;
     }
   }, [user, currentGroup]);
@@ -147,8 +149,8 @@ export function useThreads(): UseThreadsResult {
 
       return true;
     } catch (err: any) {
-      console.error('[useThreads] Error archiving thread:', err);
-      setError(err.message || 'Failed to archive thread');
+      logger.error('useThreads', 'Error archiving thread', { error: err });
+      setError(getUserErrorMessage(err));
       return false;
     }
   }, []);

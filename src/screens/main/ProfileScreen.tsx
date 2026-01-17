@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Switch, ScrollView, Modal, Platform, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Switch, ScrollView, Modal, ActivityIndicator } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { useGroup } from '../../contexts/GroupContext';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -8,6 +8,7 @@ import { ProfileStackParamList } from '../../navigation/types';
 import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '../../lib/supabase';
 import Avatar from '../../components/Avatar';
+import { showAlert } from '../../lib/errors';
 
 export default function ProfileScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<ProfileStackParamList>>();
@@ -43,12 +44,7 @@ export default function ProfileScreen() {
       // Request permission
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
-        if (Platform.OS === 'web') {
-          alert('Permission to access photos is required!');
-        } else {
-          const { Alert } = require('react-native');
-          Alert.alert('Permission Required', 'Permission to access photos is required!');
-        }
+        showAlert('Permission Required', 'Permission to access photos is required!');
         return;
       }
 
@@ -126,12 +122,7 @@ export default function ProfileScreen() {
       console.log('[ProfileScreen] Avatar uploaded successfully:', avatarUrl);
     } catch (error) {
       console.error('[ProfileScreen] Error uploading avatar:', error);
-      if (Platform.OS === 'web') {
-        alert('Failed to upload avatar. Please try again.');
-      } else {
-        const { Alert } = require('react-native');
-        Alert.alert('Error', 'Failed to upload avatar. Please try again.');
-      }
+      showAlert('Error', 'Failed to upload avatar. Please try again.');
     } finally {
       setUploadingAvatar(false);
     }

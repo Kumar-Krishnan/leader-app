@@ -3,6 +3,8 @@ import { supabase } from '../lib/supabase';
 import { MeetingWithAttendees } from '../types/database';
 import { useAuth } from '../contexts/AuthContext';
 import { useGroup } from '../contexts/GroupContext';
+import { logger } from '../lib/logger';
+import { getUserErrorMessage } from '../lib/errors';
 
 /**
  * RSVP status type
@@ -92,8 +94,8 @@ export function useMeetings(): UseMeetingsResult {
       
       setMeetings(data || []);
     } catch (err: any) {
-      console.error('[useMeetings] Error fetching meetings:', err);
-      setError(err.message || 'Failed to load meetings');
+      logger.error('useMeetings', 'Error fetching meetings', { error: err });
+      setError(getUserErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -134,8 +136,8 @@ export function useMeetings(): UseMeetingsResult {
 
       return true;
     } catch (err: any) {
-      console.error('[useMeetings] Error updating RSVP:', err);
-      setError(err.message || 'Failed to update RSVP');
+      logger.error('useMeetings', 'Error updating RSVP', { error: err });
+      setError(getUserErrorMessage(err));
       return false;
     }
   }, []);
@@ -191,8 +193,8 @@ export function useMeetings(): UseMeetingsResult {
 
       return true;
     } catch (err: any) {
-      console.error('[useMeetings] Error updating series RSVP:', err);
-      setError(err.message || 'Failed to update series RSVP');
+      logger.error('useMeetings', 'Error updating series RSVP', { error: err });
+      setError(getUserErrorMessage(err));
       return false;
     }
   }, [user, meetings]);
@@ -214,8 +216,8 @@ export function useMeetings(): UseMeetingsResult {
 
       return true;
     } catch (err: any) {
-      console.error('[useMeetings] Error deleting meeting:', err);
-      setError(err.message || 'Failed to delete meeting');
+      logger.error('useMeetings', 'Error deleting meeting', { error: err });
+      setError(getUserErrorMessage(err));
       return false;
     }
   }, []);
@@ -237,8 +239,8 @@ export function useMeetings(): UseMeetingsResult {
 
       return true;
     } catch (err: any) {
-      console.error('[useMeetings] Error deleting series:', err);
-      setError(err.message || 'Failed to delete series');
+      logger.error('useMeetings', 'Error deleting series', { error: err });
+      setError(getUserErrorMessage(err));
       return false;
     }
   }, []);

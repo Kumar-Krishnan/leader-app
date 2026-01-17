@@ -148,7 +148,7 @@ describe('useThreads', () => {
       expect(result.current.loading).toBe(false);
     });
 
-    expect(result.current.error).toBe('Network error');
+    expect(result.current.error).toBe('Unable to connect. Please check your internet connection.');
     expect(result.current.threads).toEqual([]);
 
     consoleSpy.mockRestore();
@@ -225,7 +225,8 @@ describe('useThreads', () => {
     });
 
     expect(createdThread).toBeNull();
-    expect(result.current.error).toBe('Insert failed');
+    // getUserErrorMessage returns user-friendly message for unknown errors
+    expect(result.current.error).toBe('Something went wrong. Please try again.');
 
     consoleSpy.mockRestore();
   });
@@ -276,7 +277,8 @@ describe('useThreads', () => {
     });
 
     expect(success).toBe(false);
-    expect(result.current.error).toBe('Archive failed');
+    // getUserErrorMessage returns user-friendly message for unknown errors
+    expect(result.current.error).toBe('Something went wrong. Please try again.');
 
     consoleSpy.mockRestore();
   });

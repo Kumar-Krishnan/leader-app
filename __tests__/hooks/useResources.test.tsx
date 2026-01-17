@@ -60,29 +60,57 @@ jest.mock('../../src/contexts/GroupContext', () => ({
   useGroup: () => mockGroupContext,
 }));
 
-// Helper to create mock chain
-const createMockChain = (data: any, error: any = null) => ({
-  select: jest.fn().mockReturnThis(),
-  eq: jest.fn().mockReturnThis(),
-  is: jest.fn().mockReturnThis(),
-  order: jest.fn().mockResolvedValue({ data, error }),
-  insert: jest.fn().mockResolvedValue({ data, error }),
-  delete: jest.fn().mockReturnThis(),
-});
+// Helper to create mock chain for a single query
+const createMockChain = (data: any, error: any = null) => {
+  const chain: any = {
+    select: jest.fn().mockReturnThis(),
+    eq: jest.fn().mockReturnThis(),
+    is: jest.fn().mockReturnThis(),
+    in: jest.fn().mockResolvedValue({ data: [], error: null }),
+    neq: jest.fn().mockReturnThis(),
+    order: jest.fn().mockResolvedValue({ data, error }),
+    insert: jest.fn().mockResolvedValue({ data, error }),
+    upsert: jest.fn().mockResolvedValue({ data, error }),
+  };
+  // delete() returns a new chain where eq() resolves (for delete().eq(id) pattern)
+  chain.delete = jest.fn().mockReturnValue({
+    eq: jest.fn().mockResolvedValue({ data: {}, error: null }),
+  });
+  return chain;
+};
+
+// Default mock implementation that handles all tables fetchContents() needs
+const getDefaultMock = (overrides: Record<string, any> = {}) => {
+  return (table: string) => {
+    // Check for test-specific overrides first
+    if (overrides[table]) {
+      return overrides[table];
+    }
+    // Default implementations for all tables
+    if (table === 'resource_folders') {
+      return createMockChain([mockFolder]);
+    }
+    if (table === 'resources') {
+      return createMockChain([mockResource]);
+    }
+    if (table === 'resource_group_shares' || table === 'resource_folder_group_shares') {
+      return createMockChain([]);
+    }
+    if (table === 'groups') {
+      return createMockChain([]);
+    }
+    return createMockChain([]);
+  };
+};
 
 describe('useResources', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockAuthContext = { user: mockUser };
     mockGroupContext = { currentGroup: mockGroup };
-    
-    // Default: return folders and resources
-    (supabase.from as jest.Mock).mockImplementation((table) => {
-      if (table === 'resource_folders') {
-        return createMockChain([mockFolder]);
-      }
-      return createMockChain([mockResource]);
-    });
+
+    // Default mock that handles all tables fetchContents() queries
+    (supabase.from as jest.Mock).mockImplementation(getDefaultMock());
   });
 
   it('should start with loading state', () => {
@@ -99,6 +127,10 @@ describe('useResources', () => {
       expect(result.current.loading).toBe(false);
     });
 
+    // Verify no error occurred
+    expect(result.current.error).toBeNull();
+
+    // Verify data was fetched correctly
     expect(result.current.folders).toHaveLength(1);
     expect(result.current.folders[0].name).toBe('Documents');
     expect(result.current.resources).toHaveLength(1);
@@ -176,12 +208,9 @@ describe('useResources', () => {
 
   it('should create folder successfully', async () => {
     const mockInsert = jest.fn().mockResolvedValue({ data: {}, error: null });
-    (supabase.from as jest.Mock).mockImplementation((table) => {
-      if (table === 'resource_folders') {
-        return { ...createMockChain([mockFolder]), insert: mockInsert };
-      }
-      return createMockChain([mockResource]);
-    });
+    (supabase.from as jest.Mock).mockImplementation(getDefaultMock({
+      resource_folders: { ...createMockChain([mockFolder]), insert: mockInsert },
+    }));
 
     const { result } = renderHook(() => useResources());
 
@@ -199,24 +228,16 @@ describe('useResources', () => {
   });
 
   it('should delete folder successfully', async () => {
-    const mockDelete = jest.fn().mockReturnThis();
-    const mockEq = jest.fn().mockResolvedValue({ data: {}, error: null });
-    (supabase.from as jest.Mock).mockImplementation((table) => {
-      if (table === 'resource_folders') {
-        return { 
-          ...createMockChain([mockFolder]), 
-          delete: mockDelete,
-          eq: mockEq,
-        };
-      }
-      return createMockChain([mockResource]);
-    });
-
+    // Use default mock - delete operation is tested by verifying success
+    // The delete chain is: from().delete().eq() which the default mock handles
     const { result } = renderHook(() => useResources());
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
     });
+
+    // Verify folder exists before delete
+    expect(result.current.folders).toHaveLength(1);
 
     let success;
     await act(async () => {
@@ -224,16 +245,15 @@ describe('useResources', () => {
     });
 
     expect(success).toBe(true);
+    // Folder should be removed from local state
+    expect(result.current.folders).toHaveLength(0);
   });
 
   it('should create link resource successfully', async () => {
     const mockInsert = jest.fn().mockResolvedValue({ data: {}, error: null });
-    (supabase.from as jest.Mock).mockImplementation((table) => {
-      if (table === 'resources') {
-        return { ...createMockChain([mockResource]), insert: mockInsert };
-      }
-      return createMockChain([mockFolder]);
-    });
+    (supabase.from as jest.Mock).mockImplementation(getDefaultMock({
+      resources: { ...createMockChain([mockResource]), insert: mockInsert },
+    }));
 
     const { result } = renderHook(() => useResources());
 
@@ -267,8 +287,7 @@ describe('useResources', () => {
   });
 
   it('should set error on fetch failure', async () => {
-    const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
-    (supabase.from as jest.Mock).mockImplementation(() => 
+    (supabase.from as jest.Mock).mockImplementation(() =>
       createMockChain(null, new Error('Network error'))
     );
 
@@ -278,8 +297,262 @@ describe('useResources', () => {
       expect(result.current.loading).toBe(false);
     });
 
-    expect(result.current.error).toBe('Network error');
-    consoleSpy.mockRestore();
+    expect(result.current.error).toBe('Unable to connect. Please check your internet connection.');
+  });
+
+  describe('Resource Sharing', () => {
+    const mockOtherGroups = [
+      { id: 'other-group-1', name: 'Other Group 1' },
+      { id: 'other-group-2', name: 'Other Group 2' },
+    ];
+
+    const mockShareData = [
+      {
+        shared_with_group_id: 'other-group-1',
+        shared_at: '2024-01-01T00:00:00Z',
+        group: { id: 'other-group-1', name: 'Other Group 1' }
+      },
+    ];
+
+    beforeEach(() => {
+      // Add groups to mock context for sharing
+      mockGroupContext = {
+        currentGroup: mockGroup,
+        groups: [
+          { ...mockGroup, role: 'leader' },
+          { id: 'other-group-1', name: 'Other Group 1', role: 'leader' },
+          { id: 'other-group-2', name: 'Other Group 2', role: 'member' },
+        ],
+      };
+    });
+
+    it('should share resource with groups', async () => {
+      const mockUpsert = jest.fn().mockResolvedValue({ data: {}, error: null });
+      (supabase.from as jest.Mock).mockImplementation(getDefaultMock({
+        resource_group_shares: { ...createMockChain([]), upsert: mockUpsert },
+      }));
+
+      const { result } = renderHook(() => useResources());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      let success;
+      await act(async () => {
+        success = await result.current.shareResource('resource-1', ['other-group-1']);
+      });
+
+      expect(success).toBe(true);
+      expect(mockUpsert).toHaveBeenCalled();
+    });
+
+    it('should unshare resource from groups', async () => {
+      const mockDelete = jest.fn().mockReturnThis();
+      const mockEq2 = jest.fn().mockResolvedValue({ data: {}, error: null });
+
+      (supabase.from as jest.Mock).mockImplementation(getDefaultMock({
+        resource_group_shares: {
+          ...createMockChain([]),
+          delete: mockDelete,
+          eq: jest.fn().mockReturnValue({ eq: mockEq2 }),
+        },
+      }));
+
+      const { result } = renderHook(() => useResources());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      let success;
+      await act(async () => {
+        success = await result.current.unshareResource('resource-1', ['other-group-1']);
+      });
+
+      expect(success).toBe(true);
+    });
+
+    it('should share folder with groups', async () => {
+      const mockUpsert = jest.fn().mockResolvedValue({ data: {}, error: null });
+      (supabase.from as jest.Mock).mockImplementation(getDefaultMock({
+        resource_folder_group_shares: { ...createMockChain([]), upsert: mockUpsert },
+      }));
+
+      const { result } = renderHook(() => useResources());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      let success;
+      await act(async () => {
+        success = await result.current.shareFolder('folder-1', ['other-group-1', 'other-group-2']);
+      });
+
+      expect(success).toBe(true);
+    });
+
+    it('should unshare folder from groups', async () => {
+      const mockDelete = jest.fn().mockReturnThis();
+      const mockEq2 = jest.fn().mockResolvedValue({ data: {}, error: null });
+
+      (supabase.from as jest.Mock).mockImplementation(getDefaultMock({
+        resource_folder_group_shares: {
+          ...createMockChain([]),
+          delete: mockDelete,
+          eq: jest.fn().mockReturnValue({ eq: mockEq2 }),
+        },
+      }));
+
+      const { result } = renderHook(() => useResources());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      let success;
+      await act(async () => {
+        success = await result.current.unshareFolder('folder-1', ['other-group-1']);
+      });
+
+      expect(success).toBe(true);
+    });
+
+    it('should get resource shares', async () => {
+      (supabase.from as jest.Mock).mockImplementation(getDefaultMock({
+        resource_group_shares: {
+          ...createMockChain([]),
+          select: jest.fn().mockReturnThis(),
+          eq: jest.fn().mockResolvedValue({ data: mockShareData, error: null }),
+        },
+      }));
+
+      const { result } = renderHook(() => useResources());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      let shares;
+      await act(async () => {
+        shares = await result.current.getResourceShares('resource-1');
+      });
+
+      expect(shares).toHaveLength(1);
+      expect(shares[0].groupId).toBe('other-group-1');
+      expect(shares[0].groupName).toBe('Other Group 1');
+    });
+
+    it('should get folder shares', async () => {
+      (supabase.from as jest.Mock).mockImplementation(getDefaultMock({
+        resource_folder_group_shares: {
+          ...createMockChain([]),
+          select: jest.fn().mockReturnThis(),
+          eq: jest.fn().mockResolvedValue({ data: mockShareData, error: null }),
+        },
+      }));
+
+      const { result } = renderHook(() => useResources());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      let shares;
+      await act(async () => {
+        shares = await result.current.getFolderShares('folder-1');
+      });
+
+      expect(shares).toHaveLength(1);
+      expect(shares[0].groupId).toBe('other-group-1');
+    });
+
+    it('should get shareable groups (all groups except current)', async () => {
+      (supabase.from as jest.Mock).mockImplementation(getDefaultMock({
+        groups: {
+          select: jest.fn().mockReturnThis(),
+          neq: jest.fn().mockReturnThis(),
+          order: jest.fn().mockResolvedValue({
+            data: mockOtherGroups,
+            error: null
+          }),
+        },
+      }));
+
+      const { result } = renderHook(() => useResources());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      let groups;
+      await act(async () => {
+        groups = await result.current.getShareableGroups();
+      });
+
+      expect(groups).toHaveLength(2);
+      expect(groups[0].name).toBe('Other Group 1');
+    });
+
+    it('should return empty shareable groups when no current group', async () => {
+      mockGroupContext.currentGroup = null;
+
+      const { result } = renderHook(() => useResources());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      let groups;
+      await act(async () => {
+        groups = await result.current.getShareableGroups();
+      });
+
+      expect(groups).toEqual([]);
+    });
+
+    it('should handle share error gracefully', async () => {
+      const mockUpsert = jest.fn().mockResolvedValue({
+        data: null,
+        error: new Error('Share failed')
+      });
+
+      (supabase.from as jest.Mock).mockImplementation(getDefaultMock({
+        resource_group_shares: { ...createMockChain([]), upsert: mockUpsert },
+      }));
+
+      const { result } = renderHook(() => useResources());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      let success;
+      await act(async () => {
+        success = await result.current.shareResource('resource-1', ['other-group-1']);
+      });
+
+      expect(success).toBe(false);
+      expect(result.current.error).toBe('Something went wrong. Please try again.');
+    });
+
+    it('should return false when sharing without authentication', async () => {
+      mockAuthContext = { user: null };
+
+      const { result } = renderHook(() => useResources());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      let success;
+      await act(async () => {
+        success = await result.current.shareResource('resource-1', ['other-group-1']);
+      });
+
+      expect(success).toBe(false);
+    });
   });
 });
 

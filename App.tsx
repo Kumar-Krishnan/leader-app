@@ -1,10 +1,12 @@
 import React from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer } from '@react-navigation/native';
+import { Platform } from 'react-native';
 import { AuthProvider } from './src/contexts/AuthContext';
 import { GroupProvider } from './src/contexts/GroupContext';
 import RootNavigator from './src/navigation/RootNavigator';
-import { Platform } from 'react-native';
+import { ErrorBoundary } from './src/components/ErrorBoundary';
+import { logger } from './src/lib/logger';
 
 const linking = {
   prefixes: ['http://localhost:8081', 'leaderapp://'],
@@ -34,20 +36,39 @@ const linking = {
   },
 };
 
+/**
+ * Handle errors caught by the ErrorBoundary
+ * In production, this would send to a monitoring service like Sentry
+ */
+function handleError(error: Error, errorInfo: React.ErrorInfo): void {
+  logger.error('App', 'Unhandled error caught by ErrorBoundary', {
+    error: error.message,
+    stack: error.stack,
+    componentStack: errorInfo.componentStack,
+  });
+
+  // TODO: Send to monitoring service in production
+  // if (!__DEV__) {
+  //   Sentry.captureException(error, { extra: errorInfo });
+  // }
+}
+
 export default function App() {
   return (
-    <AuthProvider>
-      <GroupProvider>
-        <NavigationContainer 
-          linking={Platform.OS === 'web' ? linking : undefined}
-          documentTitle={{
-            formatter: () => 'Leader App',
-          }}
-        >
-          <StatusBar style="light" />
-          <RootNavigator />
-        </NavigationContainer>
-      </GroupProvider>
-    </AuthProvider>
+    <ErrorBoundary onError={handleError}>
+      <AuthProvider>
+        <GroupProvider>
+          <NavigationContainer
+            linking={Platform.OS === 'web' ? linking : undefined}
+            documentTitle={{
+              formatter: () => 'Leader App',
+            }}
+          >
+            <StatusBar style="light" />
+            <RootNavigator />
+          </NavigationContainer>
+        </GroupProvider>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }

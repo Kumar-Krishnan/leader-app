@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, Platform, Modal } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Modal } from 'react-native';
 import { useGroup } from '../../contexts/GroupContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useMeetings, RSVPStatus } from '../../hooks/useMeetings';
 import { MeetingWithAttendees } from '../../types/database';
 import CreateMeetingModal from '../../components/CreateMeetingModal';
 import Avatar from '../../components/Avatar';
+import { showAlert, showDestructiveConfirm } from '../../lib/errors';
 
 interface RSVPModalState {
   visible: boolean;
@@ -95,31 +96,18 @@ export default function MeetingsScreen() {
   };
 
   // Confirm and delete a single meeting
-  const confirmSingleDelete = (meetingId: string) => {
-    const performDelete = async () => {
+  const confirmSingleDelete = async (meetingId: string) => {
+    const confirmed = await showDestructiveConfirm(
+      'Delete Event',
+      'Are you sure you want to delete this event?',
+      'Delete'
+    );
+
+    if (confirmed) {
       const success = await deleteMeeting(meetingId);
       if (!success) {
-        if (Platform.OS === 'web') {
-          window.alert('Failed to delete meeting');
-        } else {
-          Alert.alert('Error', 'Failed to delete meeting');
-        }
+        showAlert('Error', 'Failed to delete meeting');
       }
-    };
-
-    if (Platform.OS === 'web') {
-      if (window.confirm('Are you sure you want to delete this event?')) {
-        performDelete();
-      }
-    } else {
-      Alert.alert(
-        'Delete Event',
-        'Are you sure you want to delete this event?',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Delete', style: 'destructive', onPress: performDelete },
-        ]
-      );
     }
   };
 
@@ -131,20 +119,12 @@ export default function MeetingsScreen() {
     if (deleteAll && seriesId) {
       const success = await deleteSeries(seriesId);
       if (!success) {
-        if (Platform.OS === 'web') {
-          window.alert('Failed to delete series');
-        } else {
-          Alert.alert('Error', 'Failed to delete series');
-        }
+        showAlert('Error', 'Failed to delete series');
       }
     } else {
       const success = await deleteMeeting(meetingId);
       if (!success) {
-        if (Platform.OS === 'web') {
-          window.alert('Failed to delete meeting');
-        } else {
-          Alert.alert('Error', 'Failed to delete meeting');
-        }
+        showAlert('Error', 'Failed to delete meeting');
       }
     }
   };

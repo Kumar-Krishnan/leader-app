@@ -9,11 +9,18 @@ leader_app/
 ├── src/
 │   ├── components/
 │   │   ├── CreateThreadModal.tsx   # Modal for creating threads
-│   │   └── AddResourceModal.tsx    # Modal for adding resources/folders
+│   │   ├── AddResourceModal.tsx    # Modal for adding resources/folders
+│   │   ├── ShareResourceModal.tsx  # Modal for sharing resources/folders with groups
+│   │   └── ResourceCommentsModal.tsx # Modal for resource/folder comments
 │   ├── contexts/
 │   │   ├── AuthContext.tsx     # Authentication state & methods
 │   │   └── GroupContext.tsx    # Group membership & management
-│   ├── hooks/                  # Custom hooks (add as needed)
+│   ├── hooks/
+│   │   ├── useResources.ts     # Resource CRUD, folder nav, sharing
+│   │   ├── useThreads.ts       # Thread CRUD operations
+│   │   ├── useMeetings.ts      # Meeting CRUD operations
+│   │   ├── useMessages.ts      # Message sending & real-time
+│   │   └── useGroupMembers.ts  # Member management
 │   ├── lib/
 │   │   ├── supabase.ts         # Supabase client configuration
 │   │   └── storage/
@@ -156,3 +163,39 @@ const { url, error } = await storageProvider.upload(path, file);
 - Native uses SecureStore for auth tokens
 - Platform-specific code guarded with `Platform.OS`
 - Alert.alert replaced with window.confirm on web
+
+## Resource Sharing
+
+Resources and folders can be shared between groups. The `useResources` hook provides sharing functionality:
+
+```tsx
+const {
+  folders,              // Includes shared folders with isShared flag
+  resources,            // Includes shared resources with isShared flag
+  shareResource,        // Share resource with groups
+  unshareResource,      // Remove share
+  shareFolder,          // Share folder (includes all contents)
+  unshareFolder,        // Remove folder share
+  getResourceShares,    // Get current shares for a resource
+  getFolderShares,      // Get current shares for a folder
+  getShareableGroups,   // Get all groups available to share with
+} = useResources();
+```
+
+### Shared Item Types
+
+```tsx
+interface ResourceWithSharing extends Resource {
+  isShared?: boolean;        // True if received from another group
+  sourceGroupId?: string;    // ID of sharing group
+  sourceGroupName?: string;  // Name of sharing group
+  shareCount?: number;       // Number of groups shared with (own items)
+}
+```
+
+### UI Indicators
+
+- **Own items being shared**: Show "Shared" badge
+- **Received items**: Show "Shared from [Group Name]" subtitle
+- **Share button**: Only shown for leaders on own items (↗ icon)
+- **No edit/delete**: Shared items can't be modified by receiving group

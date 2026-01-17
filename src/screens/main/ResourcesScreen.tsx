@@ -8,15 +8,14 @@ import {
   ActivityIndicator,
   Modal,
   TextInput,
-  Alert,
   Linking,
-  Platform,
 } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import { useGroup } from '../../contexts/GroupContext';
 import { useResources, ResourceWithSharing, ResourceFolderWithSharing } from '../../hooks/useResources';
 import ResourceCommentsModal from '../../components/ResourceCommentsModal';
 import ShareResourceModal from '../../components/ShareResourceModal';
+import { showAlert, showDestructiveConfirm } from '../../lib/errors';
 
 const TYPE_ICONS: Record<string, string> = {
   document: '📄',
@@ -92,7 +91,7 @@ export default function ResourcesScreen() {
       setNewFolderName('');
       setShowFolderModal(false);
     } else {
-      Alert.alert('Error', 'Failed to create folder');
+      showAlert('Error', 'Failed to create folder');
     }
   };
 
@@ -116,11 +115,11 @@ export default function ResourcesScreen() {
   const handleUploadResource = async () => {
     if (newResourceType === 'link') {
       if (!newResourceUrl.trim()) {
-        Alert.alert('Error', 'Please enter a URL');
+        showAlert('Error', 'Please enter a URL');
         return;
       }
       if (!newResourceTitle.trim()) {
-        Alert.alert('Error', 'Please enter a title');
+        showAlert('Error', 'Please enter a title');
         return;
       }
 
@@ -128,15 +127,15 @@ export default function ResourcesScreen() {
       if (success) {
         resetAddForm();
       } else {
-        Alert.alert('Error', 'Failed to create link');
+        showAlert('Error', 'Failed to create link');
       }
     } else {
       if (!selectedFile) {
-        Alert.alert('Error', 'Please select a file');
+        showAlert('Error', 'Please select a file');
         return;
       }
       if (!newResourceTitle.trim()) {
-        Alert.alert('Error', 'Please enter a title');
+        showAlert('Error', 'Please enter a title');
         return;
       }
 
@@ -153,7 +152,7 @@ export default function ResourcesScreen() {
       if (success) {
         resetAddForm();
       } else {
-        Alert.alert('Error', 'Failed to upload file');
+        showAlert('Error', 'Failed to upload file');
       }
     }
   };
@@ -183,51 +182,33 @@ export default function ResourcesScreen() {
     return items;
   };
 
-  const confirmDeleteFolder = (folder: ResourceFolderWithSharing) => {
-    const performDelete = async () => {
+  const confirmDeleteFolder = async (folder: ResourceFolderWithSharing) => {
+    const confirmed = await showDestructiveConfirm(
+      'Delete Folder',
+      `Are you sure you want to delete "${folder.name}"? This will also delete all contents inside.`,
+      'Delete'
+    );
+
+    if (confirmed) {
       const success = await deleteFolderAction(folder.id);
       if (!success) {
-        Alert.alert('Error', 'Failed to delete folder');
+        showAlert('Error', 'Failed to delete folder');
       }
-    };
-
-    if (Platform.OS === 'web') {
-      if (window.confirm(`Are you sure you want to delete "${folder.name}"? This will also delete all contents inside.`)) {
-        performDelete();
-      }
-    } else {
-      Alert.alert(
-        'Delete Folder',
-        `Are you sure you want to delete "${folder.name}"? This will also delete all contents inside.`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Delete', style: 'destructive', onPress: performDelete },
-        ]
-      );
     }
   };
 
-  const confirmDeleteResource = (resource: ResourceWithSharing) => {
-    const performDelete = async () => {
+  const confirmDeleteResource = async (resource: ResourceWithSharing) => {
+    const confirmed = await showDestructiveConfirm(
+      'Delete Resource',
+      `Are you sure you want to delete "${resource.title}"?`,
+      'Delete'
+    );
+
+    if (confirmed) {
       const success = await deleteResourceAction(resource.id, resource.file_path);
       if (!success) {
-        Alert.alert('Error', 'Failed to delete resource');
+        showAlert('Error', 'Failed to delete resource');
       }
-    };
-
-    if (Platform.OS === 'web') {
-      if (window.confirm(`Are you sure you want to delete "${resource.title}"?`)) {
-        performDelete();
-      }
-    } else {
-      Alert.alert(
-        'Delete Resource',
-        `Are you sure you want to delete "${resource.title}"?`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Delete', style: 'destructive', onPress: performDelete },
-        ]
-      );
     }
   };
 

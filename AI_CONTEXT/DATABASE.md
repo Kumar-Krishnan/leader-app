@@ -18,7 +18,9 @@ The complete schema is in `/supabase-fresh-start.sql`. Run this in Supabase SQL 
 | `meetings` | Scheduled meetings (scoped to group) |
 | `resources` | Shared documents/links (scoped to group) |
 | `resource_folders` | Folder organization for resources |
-| `resource_shares` | Leader-to-leader resource sharing |
+| `resource_shares` | Leader-to-leader resource sharing (legacy) |
+| `resource_group_shares` | Share resources with other groups |
+| `resource_folder_group_shares` | Share folders with other groups |
 
 ## Key Relationships
 
@@ -129,3 +131,53 @@ JOIN groups g ON g.id = gm.group_id;
 DROP TRIGGER IF EXISTS check_email_before_signup ON auth.users;
 DROP FUNCTION IF EXISTS check_allowed_email();
 ```
+
+## Resource Sharing Between Groups
+
+Resources and folders can be shared with other groups. The sharing creates a reference (not a copy) - the original owner retains control.
+
+### Sharing Tables
+
+```sql
+-- Share individual resources
+resource_group_shares (
+  id UUID PRIMARY KEY,
+  resource_id UUID REFERENCES resources(id) ON DELETE CASCADE,
+  shared_with_group_id UUID REFERENCES groups(id) ON DELETE CASCADE,
+  shared_by_user_id UUID REFERENCES profiles(id),
+  shared_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(resource_id, shared_with_group_id)
+)
+
+-- Share folders (includes all contents recursively)
+resource_folder_group_shares (
+  id UUID PRIMARY KEY,
+  folder_id UUID REFERENCES resource_folders(id) ON DELETE CASCADE,
+  shared_with_group_id UUID REFERENCES groups(id) ON DELETE CASCADE,
+  shared_by_user_id UUID REFERENCES profiles(id),
+  shared_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(folder_id, shared_with_group_id)
+)
+```
+
+### Sharing Rules
+
+- **Who can share**: Leaders/admins of the source group
+- **Where can they share**: Any group in the system
+- **What happens on delete**: Cascade removes share records
+- **Visibility**: Shared items appear in target group's resource list with "Shared from [Group]" label
+- **Editing**: Only the original group can edit/delete the resource
+
+### Helper Functions
+
+```sql
+-- Check if folder is shared to user (via direct share or ancestor)
+is_folder_shared_to_user(folder_id UUID, user_id UUID) RETURNS BOOLEAN
+
+-- Check if folder or any ancestor is shared to user
+is_folder_or_ancestor_shared_to_user(folder_id UUID, user_id UUID) RETURNS BOOLEAN
+```
+
+### Migration File
+
+See `supabase-resource-sharing.sql` for complete schema with RLS policies.

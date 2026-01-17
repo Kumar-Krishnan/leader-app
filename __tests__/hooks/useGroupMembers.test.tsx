@@ -191,7 +191,7 @@ describe('useGroupMembers', () => {
       expect(result.current.loading).toBe(false);
     });
 
-    expect(result.current.error).toBe('Network error');
+    expect(result.current.error).toBe('Unable to connect. Please check your internet connection.');
     consoleSpy.mockRestore();
   });
 
@@ -218,7 +218,7 @@ describe('useGroupMembers', () => {
     });
 
     expect(success).toBe(false);
-    expect(result.current.error).toBe('Update failed');
+    expect(result.current.error).toBe('Something went wrong. Please try again.');
     consoleSpy.mockRestore();
   });
 

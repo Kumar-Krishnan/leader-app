@@ -121,7 +121,7 @@ describe('useMeetings', () => {
       expect(result.current.loading).toBe(false);
     });
 
-    expect(result.current.error).toBe('Network error');
+    expect(result.current.error).toBe('Unable to connect. Please check your internet connection.');
     consoleSpy.mockRestore();
   });
 
@@ -215,7 +215,7 @@ describe('useMeetings', () => {
     });
 
     expect(success).toBe(false);
-    expect(result.current.error).toBe('Delete failed');
+    expect(result.current.error).toBe('Something went wrong. Please try again.');
     consoleSpy.mockRestore();
   });
 });

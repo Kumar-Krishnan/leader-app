@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { GroupMember, Profile, GroupRole } from '../types/database';
 import { useGroup } from '../contexts/GroupContext';
+import { logger } from '../lib/logger';
+import { getUserErrorMessage } from '../lib/errors';
 
 /**
  * Member with profile information
@@ -86,8 +88,8 @@ export function useGroupMembers(): UseGroupMembersResult {
       if (fetchError) throw fetchError;
       setMembers(data || []);
     } catch (err: any) {
-      console.error('[useGroupMembers] Error fetching members:', err);
-      setError(err.message || 'Failed to load members');
+      logger.error('useGroupMembers', 'Error fetching members', { error: err });
+      setError(getUserErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -124,8 +126,8 @@ export function useGroupMembers(): UseGroupMembersResult {
 
       return true;
     } catch (err: any) {
-      console.error('[useGroupMembers] Error updating role:', err);
-      setError(err.message || 'Failed to update role');
+      logger.error('useGroupMembers', 'Error updating role', { error: err });
+      setError(getUserErrorMessage(err));
       return false;
     } finally {
       setProcessingId(null);
@@ -158,8 +160,8 @@ export function useGroupMembers(): UseGroupMembersResult {
 
       return true;
     } catch (err: any) {
-      console.error('[useGroupMembers] Error removing member:', err);
-      setError(err.message || 'Failed to remove member');
+      logger.error('useGroupMembers', 'Error removing member', { error: err });
+      setError(getUserErrorMessage(err));
       return false;
     } finally {
       setProcessingId(null);

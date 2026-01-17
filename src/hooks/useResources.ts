@@ -4,6 +4,8 @@ import { storage, RESOURCES_BUCKET, generateFilePath } from '../lib/storage';
 import { Resource, ResourceFolder } from '../types/database';
 import { useAuth } from '../contexts/AuthContext';
 import { useGroup } from '../contexts/GroupContext';
+import { logger } from '../lib/logger';
+import { getUserErrorMessage } from '../lib/errors';
 
 /**
  * File to upload
@@ -330,8 +332,8 @@ export function useResources(): UseResourcesResult {
       setFolders([...ownFolders, ...sharedFolders]);
       setResources([...ownResources, ...sharedResources]);
     } catch (err: any) {
-      console.error('[useResources] Error fetching contents:', err);
-      setError(err.message || 'Failed to load resources');
+      logger.error('useResources', 'Error fetching contents', { error: err });
+      setError(getUserErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -389,8 +391,8 @@ export function useResources(): UseResourcesResult {
       await fetchContents();
       return true;
     } catch (err: any) {
-      console.error('[useResources] Error creating folder:', err);
-      setError(err.message || 'Failed to create folder');
+      logger.error('useResources', 'Error creating folder', { error: err });
+      setError(getUserErrorMessage(err));
       return false;
     }
   }, [currentGroup, currentFolderId, user, fetchContents]);
@@ -451,8 +453,8 @@ export function useResources(): UseResourcesResult {
       await fetchContents();
       return true;
     } catch (err: any) {
-      console.error('[useResources] Error uploading file:', err);
-      setError(err.message || 'Failed to upload file');
+      logger.error('useResources', 'Error uploading file', { error: err });
+      setError(getUserErrorMessage(err));
       return false;
     } finally {
       setUploading(false);
@@ -495,8 +497,8 @@ export function useResources(): UseResourcesResult {
       await fetchContents();
       return true;
     } catch (err: any) {
-      console.error('[useResources] Error creating link:', err);
-      setError(err.message || 'Failed to create link');
+      logger.error('useResources', 'Error creating link', { error: err });
+      setError(getUserErrorMessage(err));
       return false;
     }
   }, [currentGroup, currentFolderId, user, fetchContents]);
@@ -516,8 +518,8 @@ export function useResources(): UseResourcesResult {
       setFolders(prev => prev.filter(f => f.id !== folderId));
       return true;
     } catch (err: any) {
-      console.error('[useResources] Error deleting folder:', err);
-      setError(err.message || 'Failed to delete folder');
+      logger.error('useResources', 'Error deleting folder', { error: err });
+      setError(getUserErrorMessage(err));
       return false;
     }
   }, []);
@@ -545,8 +547,8 @@ export function useResources(): UseResourcesResult {
       setResources(prev => prev.filter(r => r.id !== resourceId));
       return true;
     } catch (err: any) {
-      console.error('[useResources] Error deleting resource:', err);
-      setError(err.message || 'Failed to delete resource');
+      logger.error('useResources', 'Error deleting resource', { error: err });
+      setError(getUserErrorMessage(err));
       return false;
     }
   }, []);
@@ -559,7 +561,7 @@ export function useResources(): UseResourcesResult {
       const result = await storage.getDownloadUrl(RESOURCES_BUCKET, filePath, 3600);
       return result.url || null;
     } catch (err: any) {
-      console.error('[useResources] Error getting download URL:', err);
+      logger.error('useResources', 'Error getting download URL', { error: err });
       return null;
     }
   }, []);
@@ -593,8 +595,8 @@ export function useResources(): UseResourcesResult {
       await fetchContents();
       return true;
     } catch (err: any) {
-      console.error('[useResources] Error sharing resource:', err);
-      setError(err.message || 'Failed to share resource');
+      logger.error('useResources', 'Error sharing resource', { error: err });
+      setError(getUserErrorMessage(err));
       return false;
     }
   }, [user, fetchContents]);
@@ -620,8 +622,8 @@ export function useResources(): UseResourcesResult {
       await fetchContents();
       return true;
     } catch (err: any) {
-      console.error('[useResources] Error unsharing resource:', err);
-      setError(err.message || 'Failed to unshare resource');
+      logger.error('useResources', 'Error unsharing resource', { error: err });
+      setError(getUserErrorMessage(err));
       return false;
     }
   }, [fetchContents]);
@@ -655,8 +657,8 @@ export function useResources(): UseResourcesResult {
       await fetchContents();
       return true;
     } catch (err: any) {
-      console.error('[useResources] Error sharing folder:', err);
-      setError(err.message || 'Failed to share folder');
+      logger.error('useResources', 'Error sharing folder', { error: err });
+      setError(getUserErrorMessage(err));
       return false;
     }
   }, [user, fetchContents]);
@@ -682,8 +684,8 @@ export function useResources(): UseResourcesResult {
       await fetchContents();
       return true;
     } catch (err: any) {
-      console.error('[useResources] Error unsharing folder:', err);
-      setError(err.message || 'Failed to unshare folder');
+      logger.error('useResources', 'Error unsharing folder', { error: err });
+      setError(getUserErrorMessage(err));
       return false;
     }
   }, [fetchContents]);
@@ -712,7 +714,7 @@ export function useResources(): UseResourcesResult {
           sharedAt: item.shared_at,
         }));
     } catch (err: any) {
-      console.error('[useResources] Error getting resource shares:', err);
+      logger.error('useResources', 'Error getting resource shares', { error: err });
       return [];
     }
   }, []);
@@ -741,7 +743,7 @@ export function useResources(): UseResourcesResult {
           sharedAt: item.shared_at,
         }));
     } catch (err: any) {
-      console.error('[useResources] Error getting folder shares:', err);
+      logger.error('useResources', 'Error getting folder shares', { error: err });
       return [];
     }
   }, []);
@@ -765,7 +767,7 @@ export function useResources(): UseResourcesResult {
 
       return (data || []).map(g => ({ id: g.id, name: g.name }));
     } catch (err: any) {
-      console.error('[useResources] Error fetching shareable groups:', err);
+      logger.error('useResources', 'Error fetching shareable groups', { error: err });
       return [];
     }
   }, [currentGroup]);

@@ -9,13 +9,13 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { useMessages, MessageWithSender } from '../../hooks/useMessages';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ThreadsStackParamList } from '../../navigation/types';
 import Avatar from '../../components/Avatar';
+import { showAlert, showDestructiveConfirm } from '../../lib/errors';
 
 type Props = NativeStackScreenProps<ThreadsStackParamList, 'ThreadDetail'>;
 
@@ -75,42 +75,27 @@ export default function ThreadDetailScreen({ route, navigation }: Props) {
     if (!editingText.trim() || !editingMessageId) return;
 
     const success = await editMessage(editingMessageId, editingText.trim());
-    
+
     if (success) {
       cancelEdit();
     } else {
-      if (Platform.OS === 'web') {
-        alert('Failed to update message');
-      } else {
-        Alert.alert('Error', 'Failed to update message');
-      }
+      showAlert('Error', 'Failed to update message');
     }
   };
 
   const handleDeleteMessage = async (messageId: string) => {
-    const confirmDelete = Platform.OS === 'web'
-      ? window.confirm('Are you sure you want to delete this message?')
-      : await new Promise<boolean>(resolve => {
-          Alert.alert(
-            'Delete Message',
-            'Are you sure you want to delete this message?',
-            [
-              { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
-              { text: 'Delete', style: 'destructive', onPress: () => resolve(true) },
-            ]
-          );
-        });
+    const confirmDelete = await showDestructiveConfirm(
+      'Delete Message',
+      'Are you sure you want to delete this message?',
+      'Delete'
+    );
 
     if (!confirmDelete) return;
 
     const success = await deleteMessage(messageId);
-    
+
     if (!success) {
-      if (Platform.OS === 'web') {
-        alert('Failed to delete message');
-      } else {
-        Alert.alert('Error', 'Failed to delete message');
-      }
+      showAlert('Error', 'Failed to delete message');
     }
   };
 

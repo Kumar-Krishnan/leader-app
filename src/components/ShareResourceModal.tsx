@@ -7,28 +7,65 @@ import {
   TouchableOpacity,
   FlatList,
   ActivityIndicator,
-  Alert,
-  Platform,
 } from 'react-native';
 import { ShareInfo } from '../hooks/useResources';
+import { showAlert } from '../lib/errors';
 
+/**
+ * Represents a group that can be shared with
+ */
 interface ShareableGroup {
+  /** Unique identifier of the group */
   id: string;
+  /** Display name of the group */
   name: string;
 }
 
+/**
+ * Props for the ShareResourceModal component
+ */
 interface ShareResourceModalProps {
+  /** Whether the modal is visible */
   visible: boolean;
+  /** Callback when modal is closed */
   onClose: () => void;
+  /** ID of the resource to share (mutually exclusive with folderId) */
   resourceId?: string;
+  /** ID of the folder to share (mutually exclusive with resourceId) */
   folderId?: string;
+  /** Display title for the resource or folder */
   title: string;
+  /** Function to fetch available groups to share with */
   getShareableGroups: () => Promise<ShareableGroup[]>;
+  /** Function to get current shares for the item */
   getShares: (id: string) => Promise<ShareInfo[]>;
+  /** Function to share the item with groups */
   onShare: (id: string, groupIds: string[]) => Promise<boolean>;
+  /** Function to unshare the item from groups */
   onUnshare: (id: string, groupIds: string[]) => Promise<boolean>;
 }
 
+/**
+ * Modal component for sharing resources or folders with other groups.
+ *
+ * Displays a list of available groups with checkboxes, allowing users to
+ * select which groups should have access to the resource or folder.
+ * Handles both adding new shares and removing existing shares.
+ *
+ * @example
+ * ```tsx
+ * <ShareResourceModal
+ *   visible={showShareModal}
+ *   onClose={() => setShowShareModal(false)}
+ *   resourceId={resource.id}
+ *   title={resource.title}
+ *   getShareableGroups={getShareableGroups}
+ *   getShares={getResourceShares}
+ *   onShare={shareResource}
+ *   onUnshare={unshareResource}
+ * />
+ * ```
+ */
 export default function ShareResourceModal({
   visible,
   onClose,
@@ -112,21 +149,11 @@ export default function ShareResourceModal({
       if (success) {
         onClose();
       } else {
-        const alertMessage = `Failed to update sharing settings`;
-        if (Platform.OS === 'web') {
-          window.alert(alertMessage);
-        } else {
-          Alert.alert('Error', alertMessage);
-        }
+        showAlert('Error', 'Failed to update sharing settings');
       }
     } catch (err: any) {
       console.error('[ShareResourceModal] Error saving shares:', err);
-      const alertMessage = err.message || 'Failed to save sharing settings';
-      if (Platform.OS === 'web') {
-        window.alert(alertMessage);
-      } else {
-        Alert.alert('Error', alertMessage);
-      }
+      showAlert('Error', err.message || 'Failed to save sharing settings');
     } finally {
       setSaving(false);
     }

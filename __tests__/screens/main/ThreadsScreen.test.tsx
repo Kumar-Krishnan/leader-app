@@ -305,9 +305,10 @@ describe('ThreadsScreen', () => {
     render(<ThreadsScreen />);
 
     await waitFor(() => {
+      // Logger formats output as: '[color][ERROR][reset] [tag] message'
       expect(consoleSpy).toHaveBeenCalledWith(
-        '[useThreads] Error fetching threads:',
-        expect.any(Error)
+        expect.stringContaining('[useThreads] Error fetching threads'),
+        expect.objectContaining({ error: expect.any(Error) })
       );
     });
 

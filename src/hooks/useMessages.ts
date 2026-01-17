@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { Message, Profile } from '../types/database';
 import { useAuth } from '../contexts/AuthContext';
+import { logger } from '../lib/logger';
+import { getUserErrorMessage } from '../lib/errors';
 
 /**
  * Extended message interface with sender information
@@ -89,8 +91,8 @@ export function useMessages(threadId: string): UseMessagesResult {
       
       setMessages(data || []);
     } catch (err: any) {
-      console.error('[useMessages] Error fetching messages:', err);
-      setError(err.message || 'Failed to load messages');
+      logger.error('useMessages', 'Error fetching messages', { error: err });
+      setError(getUserErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -122,8 +124,8 @@ export function useMessages(threadId: string): UseMessagesResult {
       // Note: The realtime subscription will add the message to the list
       return true;
     } catch (err: any) {
-      console.error('[useMessages] Error sending message:', err);
-      setError(err.message || 'Failed to send message');
+      logger.error('useMessages', 'Error sending message', { error: err });
+      setError(getUserErrorMessage(err));
       return false;
     } finally {
       setSending(false);
@@ -158,8 +160,8 @@ export function useMessages(threadId: string): UseMessagesResult {
 
       return true;
     } catch (err: any) {
-      console.error('[useMessages] Error editing message:', err);
-      setError(err.message || 'Failed to edit message');
+      logger.error('useMessages', 'Error editing message', { error: err });
+      setError(getUserErrorMessage(err));
       return false;
     }
   }, []);
@@ -181,8 +183,8 @@ export function useMessages(threadId: string): UseMessagesResult {
 
       return true;
     } catch (err: any) {
-      console.error('[useMessages] Error deleting message:', err);
-      setError(err.message || 'Failed to delete message');
+      logger.error('useMessages', 'Error deleting message', { error: err });
+      setError(getUserErrorMessage(err));
       return false;
     }
   }, []);

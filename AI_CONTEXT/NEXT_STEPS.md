@@ -27,7 +27,7 @@ The list view exists but needs full functionality.
 - [ ] Notification preferences UI (already in profile type)
 
 ### 3. Leader Features (Medium Priority)
-- [ ] Share resource with specific leaders
+- [x] Share resources/folders with other groups (✅ Implemented)
 - [ ] Leader-to-leader messaging
 - [ ] Member management improvements
 
