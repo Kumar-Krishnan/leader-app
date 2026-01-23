@@ -2,19 +2,23 @@
 
 ## Current State (January 2026)
 
+**Target: Demo Org** - Building toward organizational pilot.
+
 The app is deployed on Netlify with core features working:
 - ✅ Authentication
 - ✅ Group system with join codes
 - ✅ Real-time messaging
 - ✅ Resources with folders/uploads
+- ✅ Resource sharing across groups
 - ✅ Role-based access
+- ✅ HubSpot file sync (every 8 hours)
 
 ## Immediate Priorities
 
 ### 1. Meetings CRUD (High Priority)
 The list view exists but needs full functionality.
 
-- [ ] Create meeting form (title, date, location, passages)
+- [ ] Create meeting form (title, date, location, topics)
 - [ ] Edit meeting
 - [ ] Delete meeting
 - [ ] Meeting detail view
@@ -31,10 +35,12 @@ The list view exists but needs full functionality.
 - [ ] Leader-to-leader messaging
 - [ ] Member management improvements
 
-### 4. HubSpot Integration (Lower Priority)
-- [ ] HubSpot API connection
-- [ ] Sync contacts
-- [ ] Store hubspot_contact_id in profiles
+### 4. HubSpot Integration (In Progress)
+- [x] HubSpot File Manager sync (Edge Function)
+- [x] Auto-sync every 8 hours via GitHub Actions
+- [x] System group for HubSpot resources
+- [x] Auto-add leaders to HubSpot group
+- [ ] Sync contacts to profiles
 - [ ] Activity tracking
 
 ### 5. Polish & UX

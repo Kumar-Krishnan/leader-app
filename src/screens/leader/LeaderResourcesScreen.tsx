@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator }
 import { supabase } from '../../lib/supabase';
 import { Resource } from '../../types/database';
 import { useAuth } from '../../contexts/AuthContext';
+import ScreenHeader from '../../components/ScreenHeader';
 
 const TYPE_ICONS: Record<string, string> = {
   document: '📄',
@@ -89,15 +90,15 @@ export default function LeaderResourcesScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.title}>Leader Hub</Text>
-          <Text style={styles.subtitle}>Resources for leaders only</Text>
-        </View>
-        <TouchableOpacity style={styles.newButton}>
-          <Text style={styles.newButtonText}>+ Share</Text>
-        </TouchableOpacity>
-      </View>
+      <ScreenHeader
+        title="Leader Hub"
+        subtitle="Resources for leaders only"
+        showGroupName={false}
+        rightAction={{
+          label: '+ Share',
+          onPress: () => {},
+        }}
+      />
 
       <View style={styles.statsRow}>
         <View style={styles.statCard}>

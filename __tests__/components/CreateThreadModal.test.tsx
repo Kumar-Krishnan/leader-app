@@ -123,7 +123,7 @@ describe('CreateThreadModal', () => {
       />
     );
 
-    const input = getByPlaceholderText('e.g., Bible Study Group');
+    const input = getByPlaceholderText('e.g., Weekly Discussion');
     fireEvent.changeText(input, 'Test Thread');
 
     const createButton = getByText('Create Thread');
@@ -179,7 +179,7 @@ describe('CreateThreadModal', () => {
       />
     );
 
-    const input = getByPlaceholderText('e.g., Bible Study Group');
+    const input = getByPlaceholderText('e.g., Weekly Discussion');
     fireEvent.changeText(input, 'Test Thread');
 
     const createButton = getByText('Create Thread');
@@ -211,7 +211,7 @@ describe('CreateThreadModal', () => {
       />
     );
 
-    const input = getByPlaceholderText('e.g., Bible Study Group');
+    const input = getByPlaceholderText('e.g., Weekly Discussion');
     fireEvent.changeText(input, 'Test Thread');
 
     const createButton = getByText('Create Thread');
@@ -248,7 +248,7 @@ describe('CreateThreadModal', () => {
       />
     );
 
-    const input = getByPlaceholderText('e.g., Bible Study Group');
+    const input = getByPlaceholderText('e.g., Weekly Discussion');
     fireEvent.changeText(input, 'Test Thread');
 
     const closeButton = getByText('✕');
@@ -271,7 +271,7 @@ describe('CreateThreadModal', () => {
       />
     );
 
-    const reopenedInput = getByPlaceholderText('e.g., Bible Study Group');
+    const reopenedInput = getByPlaceholderText('e.g., Weekly Discussion');
     expect(reopenedInput.props.value).toBe('');
   });
 

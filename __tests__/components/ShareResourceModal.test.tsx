@@ -4,13 +4,13 @@ import ShareResourceModal from '../../src/components/ShareResourceModal';
 
 // Mock data
 const mockGroups = [
-  { id: 'group-1', name: 'Youth Ministry' },
-  { id: 'group-2', name: 'Adult Ministry' },
+  { id: 'group-1', name: 'Team Alpha' },
+  { id: 'group-2', name: 'Team Beta' },
   { id: 'group-3', name: 'Music Team' },
 ];
 
 const mockExistingShares = [
-  { groupId: 'group-1', groupName: 'Youth Ministry', sharedAt: '2024-01-01T00:00:00Z' },
+  { groupId: 'group-1', groupName: 'Team Alpha', sharedAt: '2024-01-01T00:00:00Z' },
 ];
 
 // Default mock functions
@@ -69,8 +69,8 @@ describe('ShareResourceModal', () => {
     const { getByText } = render(<ShareResourceModal {...defaultProps} />);
 
     await waitFor(() => {
-      expect(getByText('Youth Ministry')).toBeTruthy();
-      expect(getByText('Adult Ministry')).toBeTruthy();
+      expect(getByText('Team Alpha')).toBeTruthy();
+      expect(getByText('Team Beta')).toBeTruthy();
       expect(getByText('Music Team')).toBeTruthy();
     });
   });
@@ -79,7 +79,7 @@ describe('ShareResourceModal', () => {
     const { getByText } = render(<ShareResourceModal {...defaultProps} />);
 
     await waitFor(() => {
-      // Youth Ministry should be pre-selected since it's in mockExistingShares
+      // Team Alpha should be pre-selected since it's in mockExistingShares
       expect(getByText('1 group selected')).toBeTruthy();
     });
   });
@@ -88,12 +88,12 @@ describe('ShareResourceModal', () => {
     const { getByText } = render(<ShareResourceModal {...defaultProps} />);
 
     await waitFor(() => {
-      expect(getByText('Youth Ministry')).toBeTruthy();
+      expect(getByText('Team Alpha')).toBeTruthy();
     });
 
-    // Select Adult Ministry
+    // Select Team Beta
     await act(async () => {
-      fireEvent.press(getByText('Adult Ministry'));
+      fireEvent.press(getByText('Team Beta'));
     });
 
     await waitFor(() => {
@@ -105,12 +105,12 @@ describe('ShareResourceModal', () => {
     const { getByText } = render(<ShareResourceModal {...defaultProps} />);
 
     await waitFor(() => {
-      expect(getByText('Youth Ministry')).toBeTruthy();
+      expect(getByText('Team Alpha')).toBeTruthy();
     });
 
-    // Deselect Youth Ministry (was pre-selected)
+    // Deselect Team Alpha (was pre-selected)
     await act(async () => {
-      fireEvent.press(getByText('Youth Ministry'));
+      fireEvent.press(getByText('Team Alpha'));
     });
 
     await waitFor(() => {
@@ -130,11 +130,11 @@ describe('ShareResourceModal', () => {
     const { getByText } = render(<ShareResourceModal {...defaultProps} />);
 
     await waitFor(() => {
-      expect(getByText('Adult Ministry')).toBeTruthy();
+      expect(getByText('Team Beta')).toBeTruthy();
     });
 
     await act(async () => {
-      fireEvent.press(getByText('Adult Ministry'));
+      fireEvent.press(getByText('Team Beta'));
     });
 
     await waitFor(() => {
@@ -146,12 +146,12 @@ describe('ShareResourceModal', () => {
     const { getByText } = render(<ShareResourceModal {...defaultProps} />);
 
     await waitFor(() => {
-      expect(getByText('Adult Ministry')).toBeTruthy();
+      expect(getByText('Team Beta')).toBeTruthy();
     });
 
-    // Select Adult Ministry
+    // Select Team Beta
     await act(async () => {
-      fireEvent.press(getByText('Adult Ministry'));
+      fireEvent.press(getByText('Team Beta'));
     });
 
     // Save changes
@@ -168,12 +168,12 @@ describe('ShareResourceModal', () => {
     const { getByText } = render(<ShareResourceModal {...defaultProps} />);
 
     await waitFor(() => {
-      expect(getByText('Youth Ministry')).toBeTruthy();
+      expect(getByText('Team Alpha')).toBeTruthy();
     });
 
-    // Deselect Youth Ministry (was pre-selected)
+    // Deselect Team Alpha (was pre-selected)
     await act(async () => {
-      fireEvent.press(getByText('Youth Ministry'));
+      fireEvent.press(getByText('Team Alpha'));
     });
 
     // Save changes
@@ -190,11 +190,11 @@ describe('ShareResourceModal', () => {
     const { getByText } = render(<ShareResourceModal {...defaultProps} />);
 
     await waitFor(() => {
-      expect(getByText('Adult Ministry')).toBeTruthy();
+      expect(getByText('Team Beta')).toBeTruthy();
     });
 
     await act(async () => {
-      fireEvent.press(getByText('Adult Ministry'));
+      fireEvent.press(getByText('Team Beta'));
     });
 
     await act(async () => {
@@ -210,7 +210,7 @@ describe('ShareResourceModal', () => {
     const { getByText } = render(<ShareResourceModal {...defaultProps} />);
 
     await waitFor(() => {
-      expect(getByText('Youth Ministry')).toBeTruthy();
+      expect(getByText('Team Alpha')).toBeTruthy();
     });
 
     await act(async () => {
@@ -261,11 +261,11 @@ describe('ShareResourceModal', () => {
     const { getByText } = render(<ShareResourceModal {...propsWithFailure} />);
 
     await waitFor(() => {
-      expect(getByText('Adult Ministry')).toBeTruthy();
+      expect(getByText('Team Beta')).toBeTruthy();
     });
 
     await act(async () => {
-      fireEvent.press(getByText('Adult Ministry'));
+      fireEvent.press(getByText('Team Beta'));
     });
 
     await act(async () => {
@@ -282,13 +282,13 @@ describe('ShareResourceModal', () => {
     const { getByText } = render(<ShareResourceModal {...defaultProps} />);
 
     await waitFor(() => {
-      expect(getByText('Youth Ministry')).toBeTruthy();
+      expect(getByText('Team Alpha')).toBeTruthy();
     });
 
-    // Deselect Youth Ministry and select Adult Ministry
+    // Deselect Team Alpha and select Team Beta
     await act(async () => {
-      fireEvent.press(getByText('Youth Ministry'));
-      fireEvent.press(getByText('Adult Ministry'));
+      fireEvent.press(getByText('Team Alpha'));
+      fireEvent.press(getByText('Team Beta'));
     });
 
     await act(async () => {

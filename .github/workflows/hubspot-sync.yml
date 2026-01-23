@@ -1,0 +1,46 @@
+# HubSpot File Sync - Scheduled Workflow
+# Runs every 8 hours to sync files from HubSpot File Manager
+
+name: HubSpot File Sync
+
+on:
+  # Run every 8 hours (0:00, 8:00, 16:00 UTC)
+  schedule:
+    - cron: '0 0,8,16 * * *'
+
+  # Allow manual trigger
+  workflow_dispatch:
+
+jobs:
+  sync:
+    name: Sync HubSpot Files
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Trigger HubSpot Sync Function
+        run: |
+          response=$(curl -s -w "\n%{http_code}" -X POST \
+            "${{ secrets.SUPABASE_URL }}/functions/v1/hubspot-sync" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "Content-Type: application/json")
+
+          # Extract body and status code
+          body=$(echo "$response" | sed '$d')
+          status=$(echo "$response" | tail -1)
+
+          echo "Response status: $status"
+          echo "Response body: $body"
+
+          # Check for success
+          if [ "$status" -ge 200 ] && [ "$status" -lt 300 ]; then
+            echo "Sync completed successfully"
+            echo "$body" | jq -r '.result // .'
+          else
+            echo "Sync failed with status $status"
+            exit 1
+          fi
+
+      - name: Log Sync Results
+        if: always()
+        run: |
+          echo "HubSpot sync workflow completed at $(date -u)"

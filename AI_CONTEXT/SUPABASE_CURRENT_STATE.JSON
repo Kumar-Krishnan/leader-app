@@ -1,0 +1,1646 @@
+{ "FUNCTIONS" : 
+[
+  {
+    "header": "== FUNCTION: public.add_leader_to_hubspot_group ==",
+    "definition": "CREATE OR REPLACE FUNCTION public.add_leader_to_hubspot_group()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\nAS $function$\nDECLARE\n  hubspot_group_id UUID;\nBEGIN\n  -- Only process if user is becoming a leader or admin\n  IF NEW.role IN ('leader', 'admin') THEN\n    -- Get the HubSpot system group ID\n    SELECT id INTO hubspot_group_id\n    FROM groups\n    WHERE system_type = 'hubspot'\n    LIMIT 1;\n\n    IF hubspot_group_id IS NOT NULL THEN\n      -- Add user to HubSpot group as member\n      INSERT INTO group_members (group_id, user_id, role)\n      VALUES (hubspot_group_id, NEW.id, 'member')\n      ON CONFLICT (group_id, user_id) DO NOTHING;\n    END IF;\n  END IF;\n\n  RETURN NEW;\nEND;\n$function$\n"
+  },
+  {
+    "header": "== FUNCTION: public.approve_join_request ==",
+    "definition": "CREATE OR REPLACE FUNCTION public.approve_join_request(request_id uuid)\n RETURNS void\n LANGUAGE plpgsql\n SECURITY DEFINER\nAS $function$\nDECLARE\n  req RECORD;\nBEGIN\n  SELECT * INTO req FROM group_join_requests WHERE id = request_id;\n  \n  IF req IS NULL THEN\n    RAISE EXCEPTION 'Request not found';\n  END IF;\n  \n  -- Add user to group\n  INSERT INTO group_members (group_id, user_id, role)\n  VALUES (req.group_id, req.user_id, 'member');\n  \n  -- Update request status\n  UPDATE group_join_requests\n  SET status = 'approved', reviewed_by = auth.uid(), reviewed_at = NOW()\n  WHERE id = request_id;\nEND;\n$function$\n"
+  },
+  {
+    "header": "== FUNCTION: public.check_allowed_email ==",
+    "definition": "CREATE OR REPLACE FUNCTION public.check_allowed_email()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\nAS $function$\nDECLARE\n  allowed_emails TEXT[] := ARRAY[\n    'joshirby@gmail.com',\n    'gkrishnan803@gmail.com',\n    'joshirby1@usertest.com',\n    'joshirby2@usertest.com',\n    'gkrishnan803@usertest.com'\n  ];\nBEGIN\n  IF NOT (NEW.email = ANY(allowed_emails)) THEN\n    RAISE EXCEPTION 'Email not authorized for signup. Contact administrator.';\n  END IF;\n  RETURN NEW;\nEND;\n$function$\n"
+  },
+  {
+    "header": "== FUNCTION: public.get_hubspot_group_id ==",
+    "definition": "CREATE OR REPLACE FUNCTION public.get_hubspot_group_id()\n RETURNS uuid\n LANGUAGE plpgsql\n SECURITY DEFINER\nAS $function$\nBEGIN\n  RETURN (\n    SELECT id FROM groups\n    WHERE system_type = 'hubspot'\n    LIMIT 1\n  );\nEND;\n$function$\n"
+  },
+  {
+    "header": "== FUNCTION: public.get_latest_hubspot_sync_state ==",
+    "definition": "CREATE OR REPLACE FUNCTION public.get_latest_hubspot_sync_state()\n RETURNS hubspot_sync_state\n LANGUAGE plpgsql\n SECURITY DEFINER\nAS $function$\nBEGIN\n  RETURN (\n    SELECT * FROM hubspot_sync_state\n    ORDER BY created_at DESC\n    LIMIT 1\n  );\nEND;\n$function$\n"
+  },
+  {
+    "header": "== FUNCTION: public.handle_new_user ==",
+    "definition": "CREATE OR REPLACE FUNCTION public.handle_new_user()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\nAS $function$\nBEGIN\n  INSERT INTO public.profiles (id, email, full_name)\n  VALUES (\n    NEW.id,\n    NEW.email,\n    COALESCE(NEW.raw_user_meta_data->>'full_name', '')\n  );\n  RETURN NEW;\nEND;\n$function$\n"
+  },
+  {
+    "header": "== FUNCTION: public.is_folder_or_ancestor_shared_to_user ==",
+    "definition": "CREATE OR REPLACE FUNCTION public.is_folder_or_ancestor_shared_to_user(check_folder_id uuid, check_user_id uuid)\n RETURNS boolean\n LANGUAGE sql\n STABLE SECURITY DEFINER\nAS $function$\nWITH RECURSIVE folder_chain AS (\n  SELECT id, parent_id FROM resource_folders WHERE id = check_folder_id\n  UNION ALL\n  SELECT rf.id, rf.parent_id\n  FROM resource_folders rf\n  JOIN folder_chain fc ON rf.id = fc.parent_id\n)\nSELECT EXISTS (\n  SELECT 1 FROM folder_chain fc\n  JOIN resource_folder_group_shares rfgs ON rfgs.folder_id = fc.id\n  JOIN group_members gm ON gm.group_id = rfgs.shared_with_group_id\n  WHERE gm.user_id = check_user_id\n);\n$function$\n"
+  },
+  {
+    "header": "== FUNCTION: public.is_folder_shared_to_user ==",
+    "definition": "CREATE OR REPLACE FUNCTION public.is_folder_shared_to_user(check_folder_id uuid, check_user_id uuid)\n RETURNS boolean\n LANGUAGE sql\n STABLE SECURITY DEFINER\nAS $function$\nWITH RECURSIVE folder_ancestors AS (\n  -- Start with the folder itself\n  SELECT id, parent_id FROM resource_folders WHERE id = check_folder_id\n  UNION ALL\n  -- Recursively get parent folders\n  SELECT rf.id, rf.parent_id\n  FROM resource_folders rf\n  JOIN folder_ancestors fa ON rf.id = fa.parent_id\n)\nSELECT EXISTS (\n  SELECT 1 FROM folder_ancestors fa\n  JOIN resource_folder_group_shares rfgs ON rfgs.folder_id = fa.id\n  JOIN group_members gm ON gm.group_id = rfgs.shared_with_group_id\n  WHERE gm.user_id = check_user_id\n);\n$function$\n"
+  },
+  {
+    "header": "== FUNCTION: public.mark_hubspot_file_deleted ==",
+    "definition": "CREATE OR REPLACE FUNCTION public.mark_hubspot_file_deleted()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\nAS $function$                                                                                                                                                                                                                                                                                                      \n  BEGIN                                                                                                                                                                                                                                                                                                                      \n    UPDATE hubspot_files                                                                                                                                                                                                                                                                                                     \n    SET sync_status = 'deleted', last_synced_at = NOW()                                                                                                                                                                                                                                                                      \n    WHERE resource_id = OLD.id;                                                                                                                                                                                                                                                                                              \n    RETURN OLD;                                                                                                                                                                                                                                                                                                              \n  END;                                                                                                                                                                                                                                                                                                                       \n  $function$\n"
+  },
+  {
+    "header": "== FUNCTION: public.reject_join_request ==",
+    "definition": "CREATE OR REPLACE FUNCTION public.reject_join_request(request_id uuid)\n RETURNS void\n LANGUAGE plpgsql\n SECURITY DEFINER\nAS $function$\nBEGIN\n  UPDATE group_join_requests\n  SET status = 'rejected', reviewed_by = auth.uid(), reviewed_at = NOW()\n  WHERE id = request_id;\nEND;\n$function$\n"
+  },
+  {
+    "header": "== FUNCTION: public.request_to_join_group ==",
+    "definition": "CREATE OR REPLACE FUNCTION public.request_to_join_group(group_code text)\n RETURNS void\n LANGUAGE plpgsql\n SECURITY DEFINER\nAS $function$\nDECLARE\n  target_group_id UUID;\nBEGIN\n  SELECT id INTO target_group_id FROM groups WHERE code = group_code;\n  \n  IF target_group_id IS NULL THEN\n    RAISE EXCEPTION 'Invalid group code';\n  END IF;\n  \n  INSERT INTO group_join_requests (group_id, user_id, status)\n  VALUES (target_group_id, auth.uid(), 'pending')\n  ON CONFLICT (group_id, user_id) DO NOTHING;\nEND;\n$function$\n"
+  },
+  {
+    "header": "== FUNCTION: public.update_member_role ==",
+    "definition": "CREATE OR REPLACE FUNCTION public.update_member_role(member_id uuid, new_role text)\n RETURNS void\n LANGUAGE plpgsql\n SECURITY DEFINER\nAS $function$\nBEGIN\n  UPDATE group_members\n  SET role = new_role\n  WHERE id = member_id;\nEND;\n$function$\n"
+  },
+  {
+    "header": "== FUNCTION: public.update_updated_at_column ==",
+    "definition": "CREATE OR REPLACE FUNCTION public.update_updated_at_column()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n  NEW.updated_at = NOW();\n  RETURN NEW;\nEND;\n$function$\n"
+  }
+],
+"TRIGGERS":
+[
+  {
+    "header": "== TRIGGER: update_groups_updated_at ON groups ==",
+    "trigger_name": "update_groups_updated_at",
+    "event_object_table": "groups",
+    "event_manipulation": "UPDATE",
+    "action_statement": "EXECUTE FUNCTION update_updated_at_column()",
+    "action_timing": "BEFORE"
+  },
+  {
+    "header": "== TRIGGER: update_meetings_updated_at ON meetings ==",
+    "trigger_name": "update_meetings_updated_at",
+    "event_object_table": "meetings",
+    "event_manipulation": "UPDATE",
+    "action_statement": "EXECUTE FUNCTION update_updated_at_column()",
+    "action_timing": "BEFORE"
+  },
+  {
+    "header": "== TRIGGER: on_profile_becomes_leader ON profiles ==",
+    "trigger_name": "on_profile_becomes_leader",
+    "event_object_table": "profiles",
+    "event_manipulation": "INSERT",
+    "action_statement": "EXECUTE FUNCTION add_leader_to_hubspot_group()",
+    "action_timing": "AFTER"
+  },
+  {
+    "header": "== TRIGGER: on_profile_becomes_leader ON profiles ==",
+    "trigger_name": "on_profile_becomes_leader",
+    "event_object_table": "profiles",
+    "event_manipulation": "UPDATE",
+    "action_statement": "EXECUTE FUNCTION add_leader_to_hubspot_group()",
+    "action_timing": "AFTER"
+  },
+  {
+    "header": "== TRIGGER: update_profiles_updated_at ON profiles ==",
+    "trigger_name": "update_profiles_updated_at",
+    "event_object_table": "profiles",
+    "event_manipulation": "UPDATE",
+    "action_statement": "EXECUTE FUNCTION update_updated_at_column()",
+    "action_timing": "BEFORE"
+  },
+  {
+    "header": "== TRIGGER: update_resource_folders_updated_at ON resource_folders ==",
+    "trigger_name": "update_resource_folders_updated_at",
+    "event_object_table": "resource_folders",
+    "event_manipulation": "UPDATE",
+    "action_statement": "EXECUTE FUNCTION update_updated_at_column()",
+    "action_timing": "BEFORE"
+  },
+  {
+    "header": "== TRIGGER: on_resource_deleted_mark_hubspot ON resources ==",
+    "trigger_name": "on_resource_deleted_mark_hubspot",
+    "event_object_table": "resources",
+    "event_manipulation": "DELETE",
+    "action_statement": "EXECUTE FUNCTION mark_hubspot_file_deleted()",
+    "action_timing": "BEFORE"
+  },
+  {
+    "header": "== TRIGGER: update_resources_updated_at ON resources ==",
+    "trigger_name": "update_resources_updated_at",
+    "event_object_table": "resources",
+    "event_manipulation": "UPDATE",
+    "action_statement": "EXECUTE FUNCTION update_updated_at_column()",
+    "action_timing": "BEFORE"
+  },
+  {
+    "header": "== TRIGGER: update_threads_updated_at ON threads ==",
+    "trigger_name": "update_threads_updated_at",
+    "event_object_table": "threads",
+    "event_manipulation": "UPDATE",
+    "action_statement": "EXECUTE FUNCTION update_updated_at_column()",
+    "action_timing": "BEFORE"
+  },
+  {
+    "header": "== TRIGGER: check_email_before_signup ON users ==",
+    "trigger_name": "check_email_before_signup",
+    "event_object_table": "users",
+    "event_manipulation": "INSERT",
+    "action_statement": "EXECUTE FUNCTION check_allowed_email()",
+    "action_timing": "BEFORE"
+  },
+  {
+    "header": "== TRIGGER: on_auth_user_created ON users ==",
+    "trigger_name": "on_auth_user_created",
+    "event_object_table": "users",
+    "event_manipulation": "INSERT",
+    "action_statement": "EXECUTE FUNCTION handle_new_user()",
+    "action_timing": "AFTER"
+  }
+],
+"TABLES_WITH_COLUMNS":
+[
+  {
+    "header": "== TABLE: group_join_requests ==",
+    "table_name": "group_join_requests",
+    "column_name": "id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": "uuid_generate_v4()"
+  },
+  {
+    "header": "== TABLE: group_join_requests ==",
+    "table_name": "group_join_requests",
+    "column_name": "group_id",
+    "data_type": "uuid",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "header": "== TABLE: group_join_requests ==",
+    "table_name": "group_join_requests",
+    "column_name": "user_id",
+    "data_type": "uuid",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "header": "== TABLE: group_join_requests ==",
+    "table_name": "group_join_requests",
+    "column_name": "status",
+    "data_type": "text",
+    "is_nullable": "NO",
+    "column_default": "'pending'::text"
+  },
+  {
+    "header": "== TABLE: group_join_requests ==",
+    "table_name": "group_join_requests",
+    "column_name": "reviewed_by",
+    "data_type": "uuid",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "header": "== TABLE: group_join_requests ==",
+    "table_name": "group_join_requests",
+    "column_name": "reviewed_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "header": "== TABLE: group_join_requests ==",
+    "table_name": "group_join_requests",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "YES",
+    "column_default": "now()"
+  },
+  {
+    "header": "== TABLE: group_members ==",
+    "table_name": "group_members",
+    "column_name": "id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": "uuid_generate_v4()"
+  },
+  {
+    "header": "== TABLE: group_members ==",
+    "table_name": "group_members",
+    "column_name": "group_id",
+    "data_type": "uuid",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "header": "== TABLE: group_members ==",
+    "table_name": "group_members",
+    "column_name": "user_id",
+    "data_type": "uuid",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "header": "== TABLE: group_members ==",
+    "table_name": "group_members",
+    "column_name": "role",
+    "data_type": "text",
+    "is_nullable": "NO",
+    "column_default": "'member'::text"
+  },
+  {
+    "header": "== TABLE: group_members ==",
+    "table_name": "group_members",
+    "column_name": "joined_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "YES",
+    "column_default": "now()"
+  },
+  {
+    "header": "== TABLE: groups ==",
+    "table_name": "groups",
+    "column_name": "id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": "uuid_generate_v4()"
+  },
+  {
+    "header": "== TABLE: groups ==",
+    "table_name": "groups",
+    "column_name": "name",
+    "data_type": "text",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "header": "== TABLE: groups ==",
+    "table_name": "groups",
+    "column_name": "description",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "header": "== TABLE: groups ==",
+    "table_name": "groups",
+    "column_name": "code",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "header": "== TABLE: groups ==",
+    "table_name": "groups",
+    "column_name": "created_by",
+    "data_type": "uuid",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "header": "== TABLE: groups ==",
+    "table_name": "groups",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "YES",
+    "column_default": "now()"
+  },
+  {
+    "header": "== TABLE: groups ==",
+    "table_name": "groups",
+    "column_name": "updated_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "YES",
+    "column_default": "now()"
+  },
+  {
+    "header": "== TABLE: groups ==",
+    "table_name": "groups",
+    "column_name": "is_system",
+    "data_type": "boolean",
+    "is_nullable": "YES",
+    "column_default": "false"
+  },
+  {
+    "header": "== TABLE: groups ==",
+    "table_name": "groups",
+    "column_name": "system_type",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "header": "== TABLE: hubspot_files ==",
+    "table_name": "hubspot_files",
+    "column_name": "id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": "uuid_generate_v4()"
+  },
+  {
+    "header": "== TABLE: hubspot_files ==",
+    "table_name": "hubspot_files",
+    "column_name": "hubspot_file_id",
+    "data_type": "text",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "header": "== TABLE: hubspot_files ==",
+    "table_name": "hubspot_files",
+    "column_name": "hubspot_file_name",
+    "data_type": "text",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "header": "== TABLE: hubspot_files ==",
+    "table_name": "hubspot_files",
+    "column_name": "hubspot_file_size",
+    "data_type": "integer",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "header": "== TABLE: hubspot_files ==",
+    "table_name": "hubspot_files",
+    "column_name": "hubspot_file_url",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "header": "== TABLE: hubspot_files ==",
+    "table_name": "hubspot_files",
+    "column_name": "resource_id",
+    "data_type": "uuid",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "header": "== TABLE: hubspot_files ==",
+    "table_name": "hubspot_files",
+    "column_name": "sync_status",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": "'synced'::text"
+  },
+  {
+    "header": "== TABLE: hubspot_files ==",
+    "table_name": "hubspot_files",
+    "column_name": "last_synced_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "YES",
+    "column_default": "now()"
+  },
+  {
+    "header": "== TABLE: hubspot_files ==",
+    "table_name": "hubspot_files",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "YES",
+    "column_default": "now()"
+  },
+  {
+    "header": "== TABLE: hubspot_sync_state ==",
+    "table_name": "hubspot_sync_state",
+    "column_name": "id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": "uuid_generate_v4()"
+  },
+  {
+    "header": "== TABLE: hubspot_sync_state ==",
+    "table_name": "hubspot_sync_state",
+    "column_name": "last_sync_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "header": "== TABLE: hubspot_sync_state ==",
+    "table_name": "hubspot_sync_state",
+    "column_name": "status",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": "'pending'::text"
+  },
+  {
+    "header": "== TABLE: hubspot_sync_state ==",
+    "table_name": "hubspot_sync_state",
+    "column_name": "files_synced",
+    "data_type": "integer",
+    "is_nullable": "YES",
+    "column_default": "0"
+  },
+  {
+    "header": "== TABLE: hubspot_sync_state ==",
+    "table_name": "hubspot_sync_state",
+    "column_name": "files_skipped",
+    "data_type": "integer",
+    "is_nullable": "YES",
+    "column_default": "0"
+  },
+  {
+    "header": "== TABLE: hubspot_sync_state ==",
+    "table_name": "hubspot_sync_state",
+    "column_name": "files_failed",
+    "data_type": "integer",
+    "is_nullable": "YES",
+    "column_default": "0"
+  },
+  {
+    "header": "== TABLE: hubspot_sync_state ==",
+    "table_name": "hubspot_sync_state",
+    "column_name": "error_message",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "header": "== TABLE: hubspot_sync_state ==",
+    "table_name": "hubspot_sync_state",
+    "column_name": "started_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "header": "== TABLE: hubspot_sync_state ==",
+    "table_name": "hubspot_sync_state",
+    "column_name": "completed_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "header": "== TABLE: hubspot_sync_state ==",
+    "table_name": "hubspot_sync_state",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "YES",
+    "column_default": "now()"
+  },
+  {
+    "header": "== TABLE: location_events ==",
+    "table_name": "location_events",
+    "column_name": "id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": "gen_random_uuid()"
+  },
+  {
+    "header": "== TABLE: location_events ==",
+    "table_name": "location_events",
+    "column_name": "lat",
+    "data_type": "numeric",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "header": "== TABLE: location_events ==",
+    "table_name": "location_events",
+    "column_name": "lng",
+    "data_type": "numeric",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "header": "== TABLE: location_events ==",
+    "table_name": "location_events",
+    "column_name": "event_type",
+    "data_type": "text",
+    "is_nullable": "NO",
+    "column_default": "'app_open'::text"
+  },
+  {
+    "header": "== TABLE: location_events ==",
+    "table_name": "location_events",
+    "column_name": "platform",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "header": "== TABLE: location_events ==",
+    "table_name": "location_events",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "YES",
+    "column_default": "now()"
+  },
+  {
+    "header": "== TABLE: location_events_by_region ==",
+    "table_name": "location_events_by_region",
+    "column_name": "lat_region",
+    "data_type": "numeric",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "header": "== TABLE: location_events_by_region ==",
+    "table_name": "location_events_by_region",
+    "column_name": "lng_region",
+    "data_type": "numeric",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "header": "== TABLE: location_events_by_region ==",
+    "table_name": "location_events_by_region",
+    "column_name": "total_events",
+    "data_type": "bigint",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "header": "== TABLE: location_events_by_region ==",
+    "table_name": "location_events_by_region",
+    "column_name": "active_days",
+    "data_type": "bigint",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "header": "== TABLE: location_events_daily ==",
+    "table_name": "location_events_daily",
+    "column_name": "date",
+    "data_type": "date",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "header": "== TABLE: location_events_daily ==",
+    "table_name": "location_events_daily",
+    "column_name": "lat",
+    "data_type": "numeric",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "header": "== TABLE: location_events_daily ==",
+    "table_name": "location_events_daily",
+    "column_name": "lng",
+    "data_type": "numeric",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "header": "== TABLE: location_events_daily ==",
+    "table_name": "location_events_daily",
+    "column_name": "event_type",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "header": "== TABLE: location_events_daily ==",
+    "table_name": "location_events_daily",
+    "column_name": "platform",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "header": "== TABLE: location_events_daily ==",
+    "table_name": "location_events_daily",
+    "column_name": "event_count",
+    "data_type": "bigint",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "header": "== TABLE: meeting_attendees ==",
+    "table_name": "meeting_attendees",
+    "column_name": "id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": "uuid_generate_v4()"
+  },
+  {
+    "header": "== TABLE: meeting_attendees ==",
+    "table_name": "meeting_attendees",
+    "column_name": "meeting_id",
+    "data_type": "uuid",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "header": "== TABLE: meeting_attendees ==",
+    "table_name": "meeting_attendees",
+    "column_name": "user_id",
+    "data_type": "uuid",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "header": "== TABLE: meeting_attendees ==",
+    "table_name": "meeting_attendees",
+    "column_name": "status",
+    "data_type": "text",
+    "is_nullable": "NO",
+    "column_default": "'invited'::text"
+  },
+  {
+    "header": "== TABLE: meeting_attendees ==",
+    "table_name": "meeting_attendees",
+    "column_name": "invited_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "YES",
+    "column_default": "now()"
+  },
+  {
+    "header": "== TABLE: meeting_attendees ==",
+    "table_name": "meeting_attendees",
+    "column_name": "responded_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "header": "== TABLE: meeting_attendees ==",
+    "table_name": "meeting_attendees",
+    "column_name": "is_series_rsvp",
+    "data_type": "boolean",
+    "is_nullable": "YES",
+    "column_default": "false"
+  },
+  {
+    "header": "== TABLE: meetings ==",
+    "table_name": "meetings",
+    "column_name": "id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": "uuid_generate_v4()"
+  },
+  {
+    "header": "== TABLE: meetings ==",
+    "table_name": "meetings",
+    "column_name": "title",
+    "data_type": "text",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "header": "== TABLE: meetings ==",
+    "table_name": "meetings",
+    "column_name": "description",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "header": "== TABLE: meetings ==",
+    "table_name": "meetings",
+    "column_name": "date",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "header": "== TABLE: meetings ==",
+    "table_name": "meetings",
+    "column_name": "location",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "header": "== TABLE: meetings ==",
+    "table_name": "meetings",
+    "column_name": "passages",
+    "data_type": "ARRAY",
+    "is_nullable": "YES",
+    "column_default": "'{}'::text[]"
+  },
+  {
+    "header": "== TABLE: meetings ==",
+    "table_name": "meetings",
+    "column_name": "group_id",
+    "data_type": "uuid",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "header": "== TABLE: meetings ==",
+    "table_name": "meetings",
+    "column_name": "thread_id",
+    "data_type": "uuid",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "header": "== TABLE: meetings ==",
+    "table_name": "meetings",
+    "column_name": "attachments",
+    "data_type": "ARRAY",
+    "is_nullable": "YES",
+    "column_default": "'{}'::text[]"
+  },
+  {
+    "header": "== TABLE: meetings ==",
+    "table_name": "meetings",
+    "column_name": "created_by",
+    "data_type": "uuid",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "header": "== TABLE: meetings ==",
+    "table_name": "meetings",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "YES",
+    "column_default": "now()"
+  },
+  {
+    "header": "== TABLE: meetings ==",
+    "table_name": "meetings",
+    "column_name": "updated_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "YES",
+    "column_default": "now()"
+  },
+  {
+    "header": "== TABLE: meetings ==",
+    "table_name": "meetings",
+    "column_name": "series_id",
+    "data_type": "uuid",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "header": "== TABLE: meetings ==",
+    "table_name": "meetings",
+    "column_name": "series_index",
+    "data_type": "integer",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "header": "== TABLE: meetings ==",
+    "table_name": "meetings",
+    "column_name": "series_total",
+    "data_type": "integer",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "header": "== TABLE: messages ==",
+    "table_name": "messages",
+    "column_name": "id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": "uuid_generate_v4()"
+  },
+  {
+    "header": "== TABLE: messages ==",
+    "table_name": "messages",
+    "column_name": "thread_id",
+    "data_type": "uuid",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "header": "== TABLE: messages ==",
+    "table_name": "messages",
+    "column_name": "sender_id",
+    "data_type": "uuid",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "header": "== TABLE: messages ==",
+    "table_name": "messages",
+    "column_name": "content",
+    "data_type": "text",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "header": "== TABLE: messages ==",
+    "table_name": "messages",
+    "column_name": "attachments",
+    "data_type": "ARRAY",
+    "is_nullable": "YES",
+    "column_default": "'{}'::text[]"
+  },
+  {
+    "header": "== TABLE: messages ==",
+    "table_name": "messages",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "YES",
+    "column_default": "now()"
+  },
+  {
+    "header": "== TABLE: profiles ==",
+    "table_name": "profiles",
+    "column_name": "id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "header": "== TABLE: profiles ==",
+    "table_name": "profiles",
+    "column_name": "email",
+    "data_type": "text",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "header": "== TABLE: profiles ==",
+    "table_name": "profiles",
+    "column_name": "full_name",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "header": "== TABLE: profiles ==",
+    "table_name": "profiles",
+    "column_name": "avatar_url",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "header": "== TABLE: profiles ==",
+    "table_name": "profiles",
+    "column_name": "role",
+    "data_type": "text",
+    "is_nullable": "NO",
+    "column_default": "'user'::text"
+  },
+  {
+    "header": "== TABLE: profiles ==",
+    "table_name": "profiles",
+    "column_name": "notification_preferences",
+    "data_type": "jsonb",
+    "is_nullable": "YES",
+    "column_default": "'{\"meetings\": true, \"messages\": true, \"resources\": true, \"push_enabled\": true}'::jsonb"
+  },
+  {
+    "header": "== TABLE: profiles ==",
+    "table_name": "profiles",
+    "column_name": "hubspot_contact_id",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "header": "== TABLE: profiles ==",
+    "table_name": "profiles",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "YES",
+    "column_default": "now()"
+  },
+  {
+    "header": "== TABLE: profiles ==",
+    "table_name": "profiles",
+    "column_name": "updated_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "YES",
+    "column_default": "now()"
+  },
+  {
+    "header": "== TABLE: resource_comments ==",
+    "table_name": "resource_comments",
+    "column_name": "id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": "uuid_generate_v4()"
+  },
+  {
+    "header": "== TABLE: resource_comments ==",
+    "table_name": "resource_comments",
+    "column_name": "resource_id",
+    "data_type": "uuid",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "header": "== TABLE: resource_comments ==",
+    "table_name": "resource_comments",
+    "column_name": "folder_id",
+    "data_type": "uuid",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "header": "== TABLE: resource_comments ==",
+    "table_name": "resource_comments",
+    "column_name": "user_id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "header": "== TABLE: resource_comments ==",
+    "table_name": "resource_comments",
+    "column_name": "content",
+    "data_type": "text",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "header": "== TABLE: resource_comments ==",
+    "table_name": "resource_comments",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "YES",
+    "column_default": "now()"
+  },
+  {
+    "header": "== TABLE: resource_comments ==",
+    "table_name": "resource_comments",
+    "column_name": "updated_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "YES",
+    "column_default": "now()"
+  }
+],
+"RLS": [
+  {
+    "header": "== POLICY: Leaders can review requests ON group_join_requests ==",
+    "table_name": "group_join_requests",
+    "policy_name": "Leaders can review requests",
+    "command": "w",
+    "using_expr": "(group_id IN ( SELECT group_members.group_id\n   FROM group_members\n  WHERE ((group_members.user_id = auth.uid()) AND (group_members.role = ANY (ARRAY['leader-helper'::text, 'leader'::text, 'admin'::text])))))",
+    "with_check_expr": null
+  },
+  {
+    "header": "== POLICY: Leaders view join requests ON group_join_requests ==",
+    "table_name": "group_join_requests",
+    "policy_name": "Leaders view join requests",
+    "command": "r",
+    "using_expr": "(group_id IN ( SELECT group_members.group_id\n   FROM group_members\n  WHERE ((group_members.user_id = auth.uid()) AND (group_members.role = ANY (ARRAY['leader-helper'::text, 'leader'::text, 'admin'::text])))))",
+    "with_check_expr": null
+  },
+  {
+    "header": "== POLICY: Users can request to join ON group_join_requests ==",
+    "table_name": "group_join_requests",
+    "policy_name": "Users can request to join",
+    "command": "a",
+    "using_expr": null,
+    "with_check_expr": "((user_id = auth.uid()) AND (status = 'pending'::text))"
+  },
+  {
+    "header": "== POLICY: Users view own join requests ON group_join_requests ==",
+    "table_name": "group_join_requests",
+    "policy_name": "Users view own join requests",
+    "command": "r",
+    "using_expr": "(user_id = auth.uid())",
+    "with_check_expr": null
+  },
+  {
+    "header": "== POLICY: gjr_insert ON group_join_requests ==",
+    "table_name": "group_join_requests",
+    "policy_name": "gjr_insert",
+    "command": "a",
+    "using_expr": null,
+    "with_check_expr": "(auth.uid() IS NOT NULL)"
+  },
+  {
+    "header": "== POLICY: gjr_select ON group_join_requests ==",
+    "table_name": "group_join_requests",
+    "policy_name": "gjr_select",
+    "command": "r",
+    "using_expr": "(auth.uid() IS NOT NULL)",
+    "with_check_expr": null
+  },
+  {
+    "header": "== POLICY: gjr_update ON group_join_requests ==",
+    "table_name": "group_join_requests",
+    "policy_name": "gjr_update",
+    "command": "w",
+    "using_expr": "(auth.uid() IS NOT NULL)",
+    "with_check_expr": null
+  },
+  {
+    "header": "== POLICY: Add group members ON group_members ==",
+    "table_name": "group_members",
+    "policy_name": "Add group members",
+    "command": "a",
+    "using_expr": null,
+    "with_check_expr": "((NOT (EXISTS ( SELECT 1\n   FROM group_members pm2\n  WHERE (pm2.group_id = group_members.group_id)))) OR (( SELECT pm3.role\n   FROM group_members pm3\n  WHERE ((pm3.group_id = group_members.group_id) AND (pm3.user_id = auth.uid()))\n LIMIT 1) = ANY (ARRAY['leader-helper'::text, 'leader'::text, 'admin'::text])))"
+  },
+  {
+    "header": "== POLICY: gm_delete ON group_members ==",
+    "table_name": "group_members",
+    "policy_name": "gm_delete",
+    "command": "d",
+    "using_expr": "(auth.uid() IS NOT NULL)",
+    "with_check_expr": null
+  },
+  {
+    "header": "== POLICY: gm_insert ON group_members ==",
+    "table_name": "group_members",
+    "policy_name": "gm_insert",
+    "command": "a",
+    "using_expr": null,
+    "with_check_expr": "(auth.uid() IS NOT NULL)"
+  },
+  {
+    "header": "== POLICY: gm_select ON group_members ==",
+    "table_name": "group_members",
+    "policy_name": "gm_select",
+    "command": "r",
+    "using_expr": "(auth.uid() IS NOT NULL)",
+    "with_check_expr": null
+  },
+  {
+    "header": "== POLICY: gm_update ON group_members ==",
+    "table_name": "group_members",
+    "policy_name": "gm_update",
+    "command": "w",
+    "using_expr": "(auth.uid() IS NOT NULL)",
+    "with_check_expr": null
+  },
+  {
+    "header": "== POLICY: groups_insert ON groups ==",
+    "table_name": "groups",
+    "policy_name": "groups_insert",
+    "command": "a",
+    "using_expr": null,
+    "with_check_expr": "(auth.uid() IS NOT NULL)"
+  },
+  {
+    "header": "== POLICY: groups_select ON groups ==",
+    "table_name": "groups",
+    "policy_name": "groups_select",
+    "command": "r",
+    "using_expr": "(auth.uid() IS NOT NULL)",
+    "with_check_expr": null
+  },
+  {
+    "header": "== POLICY: groups_update ON groups ==",
+    "table_name": "groups",
+    "policy_name": "groups_update",
+    "command": "w",
+    "using_expr": "(auth.uid() IS NOT NULL)",
+    "with_check_expr": null
+  },
+  {
+    "header": "== POLICY: Admins can view hubspot files ON hubspot_files ==",
+    "table_name": "hubspot_files",
+    "policy_name": "Admins can view hubspot files",
+    "command": "r",
+    "using_expr": "(( SELECT profiles.role\n   FROM profiles\n  WHERE (profiles.id = auth.uid())) = 'admin'::text)",
+    "with_check_expr": null
+  },
+  {
+    "header": "== POLICY: Service role full access to hubspot files ON hubspot_files ==",
+    "table_name": "hubspot_files",
+    "policy_name": "Service role full access to hubspot files",
+    "command": "*",
+    "using_expr": "(auth.role() = 'service_role'::text)",
+    "with_check_expr": null
+  },
+  {
+    "header": "== POLICY: Admins can view sync state ON hubspot_sync_state ==",
+    "table_name": "hubspot_sync_state",
+    "policy_name": "Admins can view sync state",
+    "command": "r",
+    "using_expr": "(( SELECT profiles.role\n   FROM profiles\n  WHERE (profiles.id = auth.uid())) = 'admin'::text)",
+    "with_check_expr": null
+  },
+  {
+    "header": "== POLICY: Service role full access to sync state ON hubspot_sync_state ==",
+    "table_name": "hubspot_sync_state",
+    "policy_name": "Service role full access to sync state",
+    "command": "*",
+    "using_expr": "(auth.role() = 'service_role'::text)",
+    "with_check_expr": null
+  },
+  {
+    "header": "== POLICY: Admins can view location events ON location_events ==",
+    "table_name": "location_events",
+    "policy_name": "Admins can view location events",
+    "command": "r",
+    "using_expr": "(EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.role = 'admin'::text))))",
+    "with_check_expr": null
+  },
+  {
+    "header": "== POLICY: Allow anonymous location inserts ON location_events ==",
+    "table_name": "location_events",
+    "policy_name": "Allow anonymous location inserts",
+    "command": "a",
+    "using_expr": null,
+    "with_check_expr": "true"
+  },
+  {
+    "header": "== POLICY: attendees_delete ON meeting_attendees ==",
+    "table_name": "meeting_attendees",
+    "policy_name": "attendees_delete",
+    "command": "d",
+    "using_expr": "(auth.uid() IS NOT NULL)",
+    "with_check_expr": null
+  },
+  {
+    "header": "== POLICY: attendees_insert ON meeting_attendees ==",
+    "table_name": "meeting_attendees",
+    "policy_name": "attendees_insert",
+    "command": "a",
+    "using_expr": null,
+    "with_check_expr": "(auth.uid() IS NOT NULL)"
+  },
+  {
+    "header": "== POLICY: attendees_select ON meeting_attendees ==",
+    "table_name": "meeting_attendees",
+    "policy_name": "attendees_select",
+    "command": "r",
+    "using_expr": "(auth.uid() IS NOT NULL)",
+    "with_check_expr": null
+  },
+  {
+    "header": "== POLICY: attendees_update ON meeting_attendees ==",
+    "table_name": "meeting_attendees",
+    "policy_name": "attendees_update",
+    "command": "w",
+    "using_expr": "(auth.uid() IS NOT NULL)",
+    "with_check_expr": null
+  },
+  {
+    "header": "== POLICY: Leaders create meetings ON meetings ==",
+    "table_name": "meetings",
+    "policy_name": "Leaders create meetings",
+    "command": "a",
+    "using_expr": null,
+    "with_check_expr": "(group_id IN ( SELECT group_members.group_id\n   FROM group_members\n  WHERE ((group_members.user_id = auth.uid()) AND (group_members.role = ANY (ARRAY['leader-helper'::text, 'leader'::text, 'admin'::text])))))"
+  },
+  {
+    "header": "== POLICY: Leaders delete meetings ON meetings ==",
+    "table_name": "meetings",
+    "policy_name": "Leaders delete meetings",
+    "command": "d",
+    "using_expr": "(group_id IN ( SELECT group_members.group_id\n   FROM group_members\n  WHERE ((group_members.user_id = auth.uid()) AND (group_members.role = ANY (ARRAY['leader'::text, 'admin'::text])))))",
+    "with_check_expr": null
+  },
+  {
+    "header": "== POLICY: Leaders update meetings ON meetings ==",
+    "table_name": "meetings",
+    "policy_name": "Leaders update meetings",
+    "command": "w",
+    "using_expr": "(group_id IN ( SELECT group_members.group_id\n   FROM group_members\n  WHERE ((group_members.user_id = auth.uid()) AND (group_members.role = ANY (ARRAY['leader'::text, 'admin'::text])))))",
+    "with_check_expr": null
+  },
+  {
+    "header": "== POLICY: View meetings in group ON meetings ==",
+    "table_name": "meetings",
+    "policy_name": "View meetings in group",
+    "command": "r",
+    "using_expr": "(group_id IN ( SELECT group_members.group_id\n   FROM group_members\n  WHERE (group_members.user_id = auth.uid())))",
+    "with_check_expr": null
+  },
+  {
+    "header": "== POLICY: meetings_insert ON meetings ==",
+    "table_name": "meetings",
+    "policy_name": "meetings_insert",
+    "command": "a",
+    "using_expr": null,
+    "with_check_expr": "(auth.uid() IS NOT NULL)"
+  },
+  {
+    "header": "== POLICY: meetings_select ON meetings ==",
+    "table_name": "meetings",
+    "policy_name": "meetings_select",
+    "command": "r",
+    "using_expr": "(auth.uid() IS NOT NULL)",
+    "with_check_expr": null
+  },
+  {
+    "header": "== POLICY: meetings_update ON meetings ==",
+    "table_name": "meetings",
+    "policy_name": "meetings_update",
+    "command": "w",
+    "using_expr": "(auth.uid() IS NOT NULL)",
+    "with_check_expr": null
+  },
+  {
+    "header": "== POLICY: View messages in threads ON messages ==",
+    "table_name": "messages",
+    "policy_name": "View messages in threads",
+    "command": "r",
+    "using_expr": "(thread_id IN ( SELECT thread_members.thread_id\n   FROM thread_members\n  WHERE (thread_members.user_id = auth.uid())))",
+    "with_check_expr": null
+  },
+  {
+    "header": "== POLICY: messages_delete ON messages ==",
+    "table_name": "messages",
+    "policy_name": "messages_delete",
+    "command": "d",
+    "using_expr": "(auth.uid() IS NOT NULL)",
+    "with_check_expr": null
+  },
+  {
+    "header": "== POLICY: messages_insert ON messages ==",
+    "table_name": "messages",
+    "policy_name": "messages_insert",
+    "command": "a",
+    "using_expr": null,
+    "with_check_expr": "(auth.uid() IS NOT NULL)"
+  },
+  {
+    "header": "== POLICY: messages_select ON messages ==",
+    "table_name": "messages",
+    "policy_name": "messages_select",
+    "command": "r",
+    "using_expr": "(auth.uid() IS NOT NULL)",
+    "with_check_expr": null
+  },
+  {
+    "header": "== POLICY: messages_update ON messages ==",
+    "table_name": "messages",
+    "policy_name": "messages_update",
+    "command": "w",
+    "using_expr": "(auth.uid() IS NOT NULL)",
+    "with_check_expr": null
+  },
+  {
+    "header": "== POLICY: Avatar images are publicly accessible ON objects ==",
+    "table_name": "objects",
+    "policy_name": "Avatar images are publicly accessible",
+    "command": "r",
+    "using_expr": "(bucket_id = 'avatars'::text)",
+    "with_check_expr": null
+  },
+  {
+    "header": "== POLICY: Leaders can delete resource files ON objects ==",
+    "table_name": "objects",
+    "policy_name": "Leaders can delete resource files",
+    "command": "d",
+    "using_expr": "((bucket_id = 'resources'::text) AND (auth.role() = 'authenticated'::text))",
+    "with_check_expr": null
+  },
+  {
+    "header": "== POLICY: Leaders can update resource files ON objects ==",
+    "table_name": "objects",
+    "policy_name": "Leaders can update resource files",
+    "command": "w",
+    "using_expr": "((bucket_id = 'resources'::text) AND (auth.role() = 'authenticated'::text))",
+    "with_check_expr": null
+  },
+  {
+    "header": "== POLICY: Leaders can upload resource files ON objects ==",
+    "table_name": "objects",
+    "policy_name": "Leaders can upload resource files",
+    "command": "a",
+    "using_expr": null,
+    "with_check_expr": "((bucket_id = 'resources'::text) AND (auth.role() = 'authenticated'::text))"
+  },
+  {
+    "header": "== POLICY: Users can delete their own avatar ON objects ==",
+    "table_name": "objects",
+    "policy_name": "Users can delete their own avatar",
+    "command": "d",
+    "using_expr": "((bucket_id = 'avatars'::text) AND ((storage.foldername(name))[1] = (auth.uid())::text))",
+    "with_check_expr": null
+  },
+  {
+    "header": "== POLICY: Users can update their own avatar ON objects ==",
+    "table_name": "objects",
+    "policy_name": "Users can update their own avatar",
+    "command": "w",
+    "using_expr": "((bucket_id = 'avatars'::text) AND ((storage.foldername(name))[1] = (auth.uid())::text))",
+    "with_check_expr": null
+  },
+  {
+    "header": "== POLICY: Users can upload their own avatar ON objects ==",
+    "table_name": "objects",
+    "policy_name": "Users can upload their own avatar",
+    "command": "a",
+    "using_expr": null,
+    "with_check_expr": "((bucket_id = 'avatars'::text) AND ((storage.foldername(name))[1] = (auth.uid())::text))"
+  },
+  {
+    "header": "== POLICY: Users can view resource files ON objects ==",
+    "table_name": "objects",
+    "policy_name": "Users can view resource files",
+    "command": "r",
+    "using_expr": "((bucket_id = 'resources'::text) AND (auth.role() = 'authenticated'::text))",
+    "with_check_expr": null
+  },
+  {
+    "header": "== POLICY: profiles_insert ON profiles ==",
+    "table_name": "profiles",
+    "policy_name": "profiles_insert",
+    "command": "a",
+    "using_expr": null,
+    "with_check_expr": "true"
+  },
+  {
+    "header": "== POLICY: profiles_select ON profiles ==",
+    "table_name": "profiles",
+    "policy_name": "profiles_select",
+    "command": "r",
+    "using_expr": "(auth.uid() IS NOT NULL)",
+    "with_check_expr": null
+  },
+  {
+    "header": "== POLICY: profiles_update ON profiles ==",
+    "table_name": "profiles",
+    "policy_name": "profiles_update",
+    "command": "w",
+    "using_expr": "(auth.uid() = id)",
+    "with_check_expr": null
+  },
+  {
+    "header": "== POLICY: Users can create comments ON resource_comments ==",
+    "table_name": "resource_comments",
+    "policy_name": "Users can create comments",
+    "command": "a",
+    "using_expr": null,
+    "with_check_expr": "((user_id = auth.uid()) AND (((resource_id IS NOT NULL) AND (EXISTS ( SELECT 1\n   FROM (resources r\n     JOIN group_members gm ON ((gm.group_id = r.group_id)))\n  WHERE ((r.id = resource_comments.resource_id) AND (gm.user_id = auth.uid()))))) OR ((folder_id IS NOT NULL) AND (EXISTS ( SELECT 1\n   FROM (resource_folders rf\n     JOIN group_members gm ON ((gm.group_id = rf.group_id)))\n  WHERE ((rf.id = resource_comments.folder_id) AND (gm.user_id = auth.uid())))))))"
+  },
+  {
+    "header": "== POLICY: Users can delete own comments ON resource_comments ==",
+    "table_name": "resource_comments",
+    "policy_name": "Users can delete own comments",
+    "command": "d",
+    "using_expr": "((user_id = auth.uid()) OR (EXISTS ( SELECT 1\n   FROM profiles p\n  WHERE ((p.id = auth.uid()) AND (p.role = ANY (ARRAY['leader'::text, 'admin'::text]))))))",
+    "with_check_expr": null
+  },
+  {
+    "header": "== POLICY: Users can update own comments ON resource_comments ==",
+    "table_name": "resource_comments",
+    "policy_name": "Users can update own comments",
+    "command": "w",
+    "using_expr": "(user_id = auth.uid())",
+    "with_check_expr": "(user_id = auth.uid())"
+  },
+  {
+    "header": "== POLICY: Users can view comments on accessible resources ON resource_comments ==",
+    "table_name": "resource_comments",
+    "policy_name": "Users can view comments on accessible resources",
+    "command": "r",
+    "using_expr": "(((resource_id IS NOT NULL) AND (EXISTS ( SELECT 1\n   FROM (resources r\n     JOIN group_members gm ON ((gm.group_id = r.group_id)))\n  WHERE ((r.id = resource_comments.resource_id) AND (gm.user_id = auth.uid()))))) OR ((folder_id IS NOT NULL) AND (EXISTS ( SELECT 1\n   FROM (resource_folders rf\n     JOIN group_members gm ON ((gm.group_id = rf.group_id)))\n  WHERE ((rf.id = resource_comments.folder_id) AND (gm.user_id = auth.uid()))))))",
+    "with_check_expr": null
+  },
+  {
+    "header": "== POLICY: Create folder shares ON resource_folder_group_shares ==",
+    "table_name": "resource_folder_group_shares",
+    "policy_name": "Create folder shares",
+    "command": "a",
+    "using_expr": null,
+    "with_check_expr": "(EXISTS ( SELECT 1\n   FROM (resource_folders rf\n     JOIN group_members gm ON ((gm.group_id = rf.group_id)))\n  WHERE ((rf.id = resource_folder_group_shares.folder_id) AND (gm.user_id = auth.uid()) AND (gm.role = ANY (ARRAY['leader'::text, 'admin'::text])))))"
+  },
+  {
+    "header": "== POLICY: Delete folder shares ON resource_folder_group_shares ==",
+    "table_name": "resource_folder_group_shares",
+    "policy_name": "Delete folder shares",
+    "command": "d",
+    "using_expr": "(EXISTS ( SELECT 1\n   FROM (resource_folders rf\n     JOIN group_members gm ON ((gm.group_id = rf.group_id)))\n  WHERE ((rf.id = resource_folder_group_shares.folder_id) AND (gm.user_id = auth.uid()) AND (gm.role = ANY (ARRAY['leader'::text, 'admin'::text])))))",
+    "with_check_expr": null
+  },
+  {
+    "header": "== POLICY: View folder shares ON resource_folder_group_shares ==",
+    "table_name": "resource_folder_group_shares",
+    "policy_name": "View folder shares",
+    "command": "r",
+    "using_expr": "(EXISTS ( SELECT 1\n   FROM (resource_folders rf\n     JOIN group_members gm ON (((gm.group_id = rf.group_id) OR (gm.group_id = resource_folder_group_shares.shared_with_group_id))))\n  WHERE ((rf.id = resource_folder_group_shares.folder_id) AND (gm.user_id = auth.uid()))))",
+    "with_check_expr": null
+  },
+  {
+    "header": "== POLICY: View resource folders in group or shared ON resource_folders ==",
+    "table_name": "resource_folders",
+    "policy_name": "View resource folders in group or shared",
+    "command": "r",
+    "using_expr": "((group_id IN ( SELECT group_members.group_id\n   FROM group_members\n  WHERE (group_members.user_id = auth.uid()))) OR is_folder_or_ancestor_shared_to_user(id, auth.uid()))",
+    "with_check_expr": null
+  },
+  {
+    "header": "== POLICY: rf_delete ON resource_folders ==",
+    "table_name": "resource_folders",
+    "policy_name": "rf_delete",
+    "command": "d",
+    "using_expr": "(auth.uid() IS NOT NULL)",
+    "with_check_expr": null
+  },
+  {
+    "header": "== POLICY: rf_insert ON resource_folders ==",
+    "table_name": "resource_folders",
+    "policy_name": "rf_insert",
+    "command": "a",
+    "using_expr": null,
+    "with_check_expr": "(auth.uid() IS NOT NULL)"
+  },
+  {
+    "header": "== POLICY: rf_select ON resource_folders ==",
+    "table_name": "resource_folders",
+    "policy_name": "rf_select",
+    "command": "r",
+    "using_expr": "(auth.uid() IS NOT NULL)",
+    "with_check_expr": null
+  },
+  {
+    "header": "== POLICY: rf_update ON resource_folders ==",
+    "table_name": "resource_folders",
+    "policy_name": "rf_update",
+    "command": "w",
+    "using_expr": "(auth.uid() IS NOT NULL)",
+    "with_check_expr": null
+  },
+  {
+    "header": "== POLICY: Create resource shares ON resource_group_shares ==",
+    "table_name": "resource_group_shares",
+    "policy_name": "Create resource shares",
+    "command": "a",
+    "using_expr": null,
+    "with_check_expr": "(EXISTS ( SELECT 1\n   FROM (resources r\n     JOIN group_members gm ON ((gm.group_id = r.group_id)))\n  WHERE ((r.id = resource_group_shares.resource_id) AND (gm.user_id = auth.uid()) AND (gm.role = ANY (ARRAY['leader'::text, 'admin'::text])))))"
+  },
+  {
+    "header": "== POLICY: Delete resource shares ON resource_group_shares ==",
+    "table_name": "resource_group_shares",
+    "policy_name": "Delete resource shares",
+    "command": "d",
+    "using_expr": "(EXISTS ( SELECT 1\n   FROM (resources r\n     JOIN group_members gm ON ((gm.group_id = r.group_id)))\n  WHERE ((r.id = resource_group_shares.resource_id) AND (gm.user_id = auth.uid()) AND (gm.role = ANY (ARRAY['leader'::text, 'admin'::text])))))",
+    "with_check_expr": null
+  },
+  {
+    "header": "== POLICY: View resource shares ON resource_group_shares ==",
+    "table_name": "resource_group_shares",
+    "policy_name": "View resource shares",
+    "command": "r",
+    "using_expr": "(EXISTS ( SELECT 1\n   FROM (resources r\n     JOIN group_members gm ON (((gm.group_id = r.group_id) OR (gm.group_id = resource_group_shares.shared_with_group_id))))\n  WHERE ((r.id = resource_group_shares.resource_id) AND (gm.user_id = auth.uid()))))",
+    "with_check_expr": null
+  },
+  {
+    "header": "== POLICY: rs_insert ON resource_shares ==",
+    "table_name": "resource_shares",
+    "policy_name": "rs_insert",
+    "command": "a",
+    "using_expr": null,
+    "with_check_expr": "(auth.uid() IS NOT NULL)"
+  },
+  {
+    "header": "== POLICY: rs_select ON resource_shares ==",
+    "table_name": "resource_shares",
+    "policy_name": "rs_select",
+    "command": "r",
+    "using_expr": "(auth.uid() IS NOT NULL)",
+    "with_check_expr": null
+  },
+  {
+    "header": "== POLICY: Users can remove own upvotes ON resource_upvotes ==",
+    "table_name": "resource_upvotes",
+    "policy_name": "Users can remove own upvotes",
+    "command": "d",
+    "using_expr": "(user_id = auth.uid())",
+    "with_check_expr": null
+  },
+  {
+    "header": "== POLICY: Users can upvote accessible resources ON resource_upvotes ==",
+    "table_name": "resource_upvotes",
+    "policy_name": "Users can upvote accessible resources",
+    "command": "a",
+    "using_expr": null,
+    "with_check_expr": "((user_id = auth.uid()) AND (EXISTS ( SELECT 1\n   FROM (resources r\n     JOIN group_members gm ON ((gm.group_id = r.group_id)))\n  WHERE ((r.id = resource_upvotes.resource_id) AND (gm.user_id = auth.uid())))))"
+  },
+  {
+    "header": "== POLICY: Users can view upvotes on accessible resources ON resource_upvotes ==",
+    "table_name": "resource_upvotes",
+    "policy_name": "Users can view upvotes on accessible resources",
+    "command": "r",
+    "using_expr": "(EXISTS ( SELECT 1\n   FROM (resources r\n     JOIN group_members gm ON ((gm.group_id = r.group_id)))\n  WHERE ((r.id = resource_upvotes.resource_id) AND (gm.user_id = auth.uid()))))",
+    "with_check_expr": null
+  },
+  {
+    "header": "== POLICY: Leaders create resources ON resources ==",
+    "table_name": "resources",
+    "policy_name": "Leaders create resources",
+    "command": "a",
+    "using_expr": null,
+    "with_check_expr": "(group_id IN ( SELECT group_members.group_id\n   FROM group_members\n  WHERE ((group_members.user_id = auth.uid()) AND (group_members.role = ANY (ARRAY['leader-helper'::text, 'leader'::text, 'admin'::text])))))"
+  },
+  {
+    "header": "== POLICY: Leaders delete resources ON resources ==",
+    "table_name": "resources",
+    "policy_name": "Leaders delete resources",
+    "command": "d",
+    "using_expr": "(group_id IN ( SELECT group_members.group_id\n   FROM group_members\n  WHERE ((group_members.user_id = auth.uid()) AND (group_members.role = ANY (ARRAY['leader-helper'::text, 'leader'::text, 'admin'::text])))))",
+    "with_check_expr": null
+  },
+  {
+    "header": "== POLICY: Leaders update resources ON resources ==",
+    "table_name": "resources",
+    "policy_name": "Leaders update resources",
+    "command": "w",
+    "using_expr": "(group_id IN ( SELECT group_members.group_id\n   FROM group_members\n  WHERE ((group_members.user_id = auth.uid()) AND (group_members.role = ANY (ARRAY['leader-helper'::text, 'leader'::text, 'admin'::text])))))",
+    "with_check_expr": null
+  },
+  {
+    "header": "== POLICY: View resources in group or shared ON resources ==",
+    "table_name": "resources",
+    "policy_name": "View resources in group or shared",
+    "command": "r",
+    "using_expr": "(((group_id IN ( SELECT group_members.group_id\n   FROM group_members\n  WHERE (group_members.user_id = auth.uid()))) AND ((visibility = 'all'::text) OR ((visibility = 'leaders_only'::text) AND (group_id IN ( SELECT group_members.group_id\n   FROM group_members\n  WHERE ((group_members.user_id = auth.uid()) AND (group_members.role = ANY (ARRAY['leader-helper'::text, 'leader'::text, 'admin'::text])))))))) OR (EXISTS ( SELECT 1\n   FROM (resource_group_shares rgs\n     JOIN group_members gm ON ((gm.group_id = rgs.shared_with_group_id)))\n  WHERE ((rgs.resource_id = resources.id) AND (gm.user_id = auth.uid())))) OR ((folder_id IS NOT NULL) AND is_folder_shared_to_user(folder_id, auth.uid())))",
+    "with_check_expr": null
+  },
+  {
+    "header": "== POLICY: resources_delete ON resources ==",
+    "table_name": "resources",
+    "policy_name": "resources_delete",
+    "command": "d",
+    "using_expr": "(auth.uid() IS NOT NULL)",
+    "with_check_expr": null
+  },
+  {
+    "header": "== POLICY: resources_insert ON resources ==",
+    "table_name": "resources",
+    "policy_name": "resources_insert",
+    "command": "a",
+    "using_expr": null,
+    "with_check_expr": "(auth.uid() IS NOT NULL)"
+  },
+  {
+    "header": "== POLICY: resources_select ON resources ==",
+    "table_name": "resources",
+    "policy_name": "resources_select",
+    "command": "r",
+    "using_expr": "(auth.uid() IS NOT NULL)",
+    "with_check_expr": null
+  },
+  {
+    "header": "== POLICY: resources_update ON resources ==",
+    "table_name": "resources",
+    "policy_name": "resources_update",
+    "command": "w",
+    "using_expr": "(auth.uid() IS NOT NULL)",
+    "with_check_expr": null
+  },
+  {
+    "header": "== POLICY: Leaders add thread members ON thread_members ==",
+    "table_name": "thread_members",
+    "policy_name": "Leaders add thread members",
+    "command": "a",
+    "using_expr": null,
+    "with_check_expr": "(thread_id IN ( SELECT threads.id\n   FROM threads\n  WHERE (threads.group_id IN ( SELECT group_members.group_id\n           FROM group_members\n          WHERE ((group_members.user_id = auth.uid()) AND (group_members.role = ANY (ARRAY['leader-helper'::text, 'leader'::text, 'admin'::text])))))))"
+  },
+  {
+    "header": "== POLICY: tm_insert ON thread_members ==",
+    "table_name": "thread_members",
+    "policy_name": "tm_insert",
+    "command": "a",
+    "using_expr": null,
+    "with_check_expr": "(auth.uid() IS NOT NULL)"
+  },
+  {
+    "header": "== POLICY: tm_select ON thread_members ==",
+    "table_name": "thread_members",
+    "policy_name": "tm_select",
+    "command": "r",
+    "using_expr": "(auth.uid() IS NOT NULL)",
+    "with_check_expr": null
+  },
+  {
+    "header": "== POLICY: Leaders create threads ON threads ==",
+    "table_name": "threads",
+    "policy_name": "Leaders create threads",
+    "command": "a",
+    "using_expr": null,
+    "with_check_expr": "(group_id IN ( SELECT group_members.group_id\n   FROM group_members\n  WHERE ((group_members.user_id = auth.uid()) AND (group_members.role = ANY (ARRAY['leader-helper'::text, 'leader'::text, 'admin'::text])))))"
+  },
+  {
+    "header": "== POLICY: Leaders update threads ON threads ==",
+    "table_name": "threads",
+    "policy_name": "Leaders update threads",
+    "command": "w",
+    "using_expr": "(group_id IN ( SELECT group_members.group_id\n   FROM group_members\n  WHERE ((group_members.user_id = auth.uid()) AND (group_members.role = ANY (ARRAY['leader'::text, 'admin'::text])))))",
+    "with_check_expr": null
+  },
+  {
+    "header": "== POLICY: Users view threads in their group ON threads ==",
+    "table_name": "threads",
+    "policy_name": "Users view threads in their group",
+    "command": "r",
+    "using_expr": "(group_id IN ( SELECT group_members.group_id\n   FROM group_members\n  WHERE (group_members.user_id = auth.uid())))",
+    "with_check_expr": null
+  },
+  {
+    "header": "== POLICY: threads_insert ON threads ==",
+    "table_name": "threads",
+    "policy_name": "threads_insert",
+    "command": "a",
+    "using_expr": null,
+    "with_check_expr": "(auth.uid() IS NOT NULL)"
+  },
+  {
+    "header": "== POLICY: threads_select ON threads ==",
+    "table_name": "threads",
+    "policy_name": "threads_select",
+    "command": "r",
+    "using_expr": "(auth.uid() IS NOT NULL)",
+    "with_check_expr": null
+  },
+  {
+    "header": "== POLICY: threads_update ON threads ==",
+    "table_name": "threads",
+    "policy_name": "threads_update",
+    "command": "w",
+    "using_expr": "(auth.uid() IS NOT NULL)",
+    "with_check_expr": null
+  }
+],
+"AUTH_TRIGGERS": [
+  {
+    "header": "== AUTH TRIGGER: on_auth_user_created ==",
+    "trigger_name": "on_auth_user_created",
+    "table_name": "users",
+    "function_definition": "CREATE OR REPLACE FUNCTION public.handle_new_user()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\nAS $function$\nBEGIN\n  INSERT INTO public.profiles (id, email, full_name)\n  VALUES (\n    NEW.id,\n    NEW.email,\n    COALESCE(NEW.raw_user_meta_data->>'full_name', '')\n  );\n  RETURN NEW;\nEND;\n$function$\n"
+  },
+  {
+    "header": "== AUTH TRIGGER: check_email_before_signup ==",
+    "trigger_name": "check_email_before_signup",
+    "table_name": "users",
+    "function_definition": "CREATE OR REPLACE FUNCTION public.check_allowed_email()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\nAS $function$\nDECLARE\n  allowed_emails TEXT[] := ARRAY[\n    'joshirby@gmail.com',\n    'gkrishnan803@gmail.com',\n    'joshirby1@usertest.com',\n    'joshirby2@usertest.com',\n    'gkrishnan803@usertest.com'\n  ];\nBEGIN\n  IF NOT (NEW.email = ANY(allowed_emails)) THEN\n    RAISE EXCEPTION 'Email not authorized for signup. Contact administrator.';\n  END IF;\n  RETURN NEW;\nEND;\n$function$\n"
+  }
+]
+}

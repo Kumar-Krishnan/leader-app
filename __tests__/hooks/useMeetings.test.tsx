@@ -20,11 +20,11 @@ const mockGroup = {
 const mockMeeting = {
   id: 'meeting-1',
   group_id: 'group-id',
-  title: 'Bible Study',
+  title: 'Team Meeting',
   description: 'Weekly study',
   date: new Date(Date.now() + 86400000).toISOString(),
   time: '19:00',
-  location: 'Church Hall',
+  location: 'Conference Room',
   series_id: null,
   attendees: [
     {
@@ -94,7 +94,7 @@ describe('useMeetings', () => {
     });
 
     expect(result.current.meetings).toHaveLength(1);
-    expect(result.current.meetings[0].title).toBe('Bible Study');
+    expect(result.current.meetings[0].title).toBe('Team Meeting');
   });
 
   it('should return empty array when no group selected', async () => {

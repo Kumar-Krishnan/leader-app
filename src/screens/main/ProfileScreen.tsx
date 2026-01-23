@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Switch, ScrollView, Modal, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Switch, ScrollView, Modal, ActivityIndicator, Platform } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { useGroup } from '../../contexts/GroupContext';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -8,6 +8,7 @@ import { ProfileStackParamList } from '../../navigation/types';
 import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '../../lib/supabase';
 import Avatar from '../../components/Avatar';
+import ScreenHeader from '../../components/ScreenHeader';
 import { showAlert } from '../../lib/errors';
 
 export default function ProfileScreen() {
@@ -130,9 +131,7 @@ export default function ProfileScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Profile</Text>
-      </View>
+      <ScreenHeader title="Profile" showGroupName={false} />
 
       <View style={styles.profileSection}>
         <TouchableOpacity 

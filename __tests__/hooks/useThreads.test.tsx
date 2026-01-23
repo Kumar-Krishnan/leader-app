@@ -31,7 +31,7 @@ const mockThread = {
 const mockThread2 = {
   id: 'thread-2',
   group_id: 'group-id',
-  name: 'Prayer Requests',
+  name: 'Support Requests',
   description: null,
   created_by: 'user-id',
   created_at: new Date().toISOString(),
@@ -109,7 +109,7 @@ describe('useThreads', () => {
 
     expect(result.current.threads).toHaveLength(2);
     expect(result.current.threads[0].name).toBe('General Discussion');
-    expect(result.current.threads[1].name).toBe('Prayer Requests');
+    expect(result.current.threads[1].name).toBe('Support Requests');
   });
 
   it('should return empty array when no group selected', async () => {

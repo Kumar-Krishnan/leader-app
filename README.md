@@ -189,3 +189,6 @@ DROP FUNCTION IF EXISTS check_allowed_email();
 ## License
 
 Private - All rights reserved
+
+npx expo export --platform web 
+cp public/_redirects dist/_redirects 

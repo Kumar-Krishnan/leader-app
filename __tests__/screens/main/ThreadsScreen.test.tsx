@@ -47,7 +47,7 @@ const mockThread = {
 const mockThread2 = {
   id: 'thread-2',
   group_id: 'group-id',
-  name: 'Prayer Requests',
+  name: 'Support Requests',
   description: 'Share prayer needs',
   created_by: 'user-id',
   created_at: new Date().toISOString(),
@@ -119,7 +119,7 @@ describe('ThreadsScreen', () => {
     });
 
     expect(getByText('General Discussion')).toBeTruthy();
-    expect(getByText('Prayer Requests')).toBeTruthy();
+    expect(getByText('Support Requests')).toBeTruthy();
   });
 
   it('should display group name in header', async () => {
@@ -356,7 +356,7 @@ describe('ThreadsScreen', () => {
     });
 
     expect(getByText('G')).toBeTruthy(); // First letter of "General Discussion"
-    expect(getByText('P')).toBeTruthy(); // First letter of "Prayer Requests"
+    expect(getByText('S')).toBeTruthy(); // First letter of "Support Requests"
   });
 });
 

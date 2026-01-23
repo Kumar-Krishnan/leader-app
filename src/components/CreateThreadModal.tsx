@@ -118,7 +118,7 @@ export default function CreateThreadModal({ visible, onClose, onCreated }: Props
             <Text style={styles.label}>Thread Name</Text>
             <TextInput
               style={styles.input}
-              placeholder="e.g., Bible Study Group"
+              placeholder="e.g., Weekly Discussion"
               placeholderTextColor="#64748B"
               value={name}
               onChangeText={setName}

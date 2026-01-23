@@ -17,12 +17,12 @@ const mockGroup = {
 const mockMeeting = {
   id: 'meeting-1',
   group_id: 'group-id',
-  title: 'Bible Study',
+  title: 'Team Meeting',
   description: 'Weekly study',
   date: new Date(Date.now() + 86400000).toISOString(), // Tomorrow
   time: '19:00',
-  location: 'Church Hall',
-  passages: ['John 3:16'],
+  location: 'Conference Room',
+  passages: ['Chapter 3'],
   series_id: null,
   series_index: null,
   series_total: null,
@@ -135,7 +135,7 @@ describe('MeetingsScreen', () => {
     mockUseMeetingsResult.meetings = [mockMeeting];
 
     const { getByText } = render(<MeetingsScreen />);
-    expect(getByText('Bible Study')).toBeTruthy();
+    expect(getByText('Team Meeting')).toBeTruthy();
   });
 
   it('should show Create Event button for leaders', () => {
@@ -219,7 +219,7 @@ describe('MeetingsScreen', () => {
     mockUseMeetingsResult.meetings = [mockMeeting];
 
     const { getByText } = render(<MeetingsScreen />);
-    expect(getByText(/Church Hall/)).toBeTruthy();
+    expect(getByText(/Conference Room/)).toBeTruthy();
   });
 
   it('should display series badge for recurring meetings', () => {

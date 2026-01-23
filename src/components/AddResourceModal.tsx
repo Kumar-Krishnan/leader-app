@@ -265,7 +265,7 @@ export default function AddResourceModal({ visible, folderId, onClose, onCreated
             <Text style={styles.label}>Tags (comma separated)</Text>
             <TextInput
               style={styles.input}
-              placeholder="bible study, prayer, etc"
+              placeholder="project updates, notes, etc"
               placeholderTextColor="#64748B"
               value={tags}
               onChangeText={setTags}

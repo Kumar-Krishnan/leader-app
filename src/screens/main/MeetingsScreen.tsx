@@ -6,6 +6,7 @@ import { useMeetings, RSVPStatus } from '../../hooks/useMeetings';
 import { MeetingWithAttendees } from '../../types/database';
 import CreateMeetingModal from '../../components/CreateMeetingModal';
 import Avatar from '../../components/Avatar';
+import ScreenHeader from '../../components/ScreenHeader';
 import { showAlert, showDestructiveConfirm } from '../../lib/errors';
 
 interface RSVPModalState {
@@ -23,7 +24,7 @@ interface DeleteModalState {
 }
 
 export default function MeetingsScreen() {
-  const { currentGroup, isGroupLeader } = useGroup();
+  const { isGroupLeader } = useGroup();
   const { user } = useAuth();
   
   // Use the useMeetings hook for all data and operations
@@ -282,17 +283,13 @@ export default function MeetingsScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.title}>Events</Text>
-          <Text style={styles.groupName}>{currentGroup?.name}</Text>
-        </View>
-        {isGroupLeader && (
-          <TouchableOpacity style={styles.newButton} onPress={() => setShowCreateModal(true)}>
-            <Text style={styles.newButtonText}>+ New</Text>
-          </TouchableOpacity>
-        )}
-      </View>
+      <ScreenHeader
+        title="Events"
+        rightAction={isGroupLeader ? {
+          label: '+ New',
+          onPress: () => setShowCreateModal(true),
+        } : undefined}
+      />
       <FlatList
         data={meetings}
         renderItem={renderMeeting}

@@ -15,6 +15,7 @@ import { useGroup } from '../../contexts/GroupContext';
 import { useResources, ResourceWithSharing, ResourceFolderWithSharing } from '../../hooks/useResources';
 import ResourceCommentsModal from '../../components/ResourceCommentsModal';
 import ShareResourceModal from '../../components/ShareResourceModal';
+import ScreenHeader from '../../components/ScreenHeader';
 import { showAlert, showDestructiveConfirm } from '../../lib/errors';
 
 const TYPE_ICONS: Record<string, string> = {
@@ -408,12 +409,9 @@ export default function ResourcesScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.title}>Resources</Text>
-          <Text style={styles.groupName}>{currentGroup?.name}</Text>
-        </View>
-        {canApproveRequests && (
+      <ScreenHeader
+        title="Resources"
+        rightContent={canApproveRequests ? (
           <View style={styles.headerButtons}>
             <TouchableOpacity
               style={styles.folderButton}
@@ -428,8 +426,8 @@ export default function ResourcesScreen() {
               <Text style={styles.addButtonText}>+ Add</Text>
             </TouchableOpacity>
           </View>
-        )}
-      </View>
+        ) : undefined}
+      />
 
       {/* Breadcrumb */}
       {folderPath.length > 0 && (

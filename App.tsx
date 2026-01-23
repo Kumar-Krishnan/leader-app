@@ -1,7 +1,9 @@
+import 'react-native-gesture-handler';
 import React from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer } from '@react-navigation/native';
 import { Platform } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { AuthProvider } from './src/contexts/AuthContext';
 import { GroupProvider } from './src/contexts/GroupContext';
 import RootNavigator from './src/navigation/RootNavigator';
@@ -22,14 +24,23 @@ const linking = {
         screens: {
           MainTabs: {
             screens: {
-              Threads: 'threads',
+              Threads: {
+                screens: {
+                  ThreadsList: 'threads',
+                  ThreadDetail: 'thread/:threadId',
+                },
+              },
               Meetings: 'meetings',
               Resources: 'resources',
               LeaderHub: 'leader-hub',
-              Profile: 'profile',
+              Profile: {
+                screens: {
+                  ProfileMain: 'profile',
+                  ManageMembers: 'manage-members',
+                },
+              },
             },
           },
-          ThreadDetail: 'thread/:threadId',
         },
       },
     },
@@ -55,20 +66,22 @@ function handleError(error: Error, errorInfo: React.ErrorInfo): void {
 
 export default function App() {
   return (
-    <ErrorBoundary onError={handleError}>
-      <AuthProvider>
-        <GroupProvider>
-          <NavigationContainer
-            linking={Platform.OS === 'web' ? linking : undefined}
-            documentTitle={{
-              formatter: () => 'Leader App',
-            }}
-          >
-            <StatusBar style="light" />
-            <RootNavigator />
-          </NavigationContainer>
-        </GroupProvider>
-      </AuthProvider>
-    </ErrorBoundary>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <ErrorBoundary onError={handleError}>
+        <AuthProvider>
+          <GroupProvider>
+            <NavigationContainer
+              linking={Platform.OS === 'web' ? linking : undefined}
+              documentTitle={{
+                formatter: () => 'Leader App',
+              }}
+            >
+              <StatusBar style="light" />
+              <RootNavigator />
+            </NavigationContainer>
+          </GroupProvider>
+        </AuthProvider>
+      </ErrorBoundary>
+    </GestureHandlerRootView>
   );
 }

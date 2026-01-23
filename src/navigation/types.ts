@@ -26,6 +26,11 @@ export type MainTabParamList = {
   Profile: undefined;
 };
 
+// Drawer navigator wraps the main tabs
+export type DrawerParamList = {
+  MainTabs: undefined;
+};
+
 export type RootStackParamList = {
   Auth: undefined;
   GroupSelect: undefined;

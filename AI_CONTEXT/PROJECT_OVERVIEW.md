@@ -3,7 +3,7 @@
 ## Purpose
 A mobile/web app for community leaders to manage:
 - Group messaging threads
-- Meeting scheduling with passages/resources
+- Meeting scheduling with topics/resources
 - Resource sharing (files, links, documents)
 - Leader-to-leader collaboration
 
@@ -22,6 +22,10 @@ A mobile/web app for community leaders to manage:
 | Navigation | React Navigation | Nested stacks within tabs |
 | State | React Context | AuthContext + GroupContext |
 
+## Current Focus
+
+**Demo Org Target** - Building toward a demo-ready state for organizational pilot.
+
 ## Key Features Status
 
 | Feature | Status | Notes |
@@ -33,10 +37,11 @@ A mobile/web app for community leaders to manage:
 | Threads | ✅ Complete | Create, view, real-time messages |
 | Message Edit/Delete | ✅ Complete | Users can edit/delete own messages |
 | Resources | ✅ Complete | Folders, file uploads, links |
+| Resource Sharing | ✅ Complete | Share resources across groups |
 | Netlify Deploy | ✅ Complete | Auto-deploy on push |
 | Meetings | 🟡 Partial | List view done, need CRUD |
 | Push Notifications | ❌ Not started | expo-notifications installed |
-| HubSpot Integration | ❌ Not started | Planned for later phase |
+| HubSpot File Sync | 🟡 Partial | File sync works, runs every 8 hours |
 
 ## Group System
 
@@ -101,6 +106,32 @@ Web app is deployed on Netlify:
 - Auto-deploys on push to `main`
 - Environment variables set in Netlify dashboard
 - Configuration in `netlify.toml`
+
+## HubSpot Integration
+
+Files from HubSpot File Manager sync automatically to a system-managed "HubSpot Resources" group.
+
+**How it works:**
+- Supabase Edge Function (`hubspot-sync`) fetches files from HubSpot API
+- Files are uploaded to Supabase Storage and linked as resources
+- Deduplication by name + file size prevents duplicates
+- GitHub Actions triggers sync every 8 hours (0:00, 8:00, 16:00 UTC)
+
+**System Group:**
+- "HubSpot Resources" group created automatically (`system_type = 'hubspot'`)
+- All leaders/admins auto-join via database trigger
+- Synced files appear in "HubSpot Resources" folder within the group
+
+**Configuration:**
+- `HUBSPOT_ACCESS_TOKEN` secret set in Supabase Edge Functions
+- `SUPABASE_URL` and `SUPABASE_ANON_KEY` set in GitHub Actions secrets
+
+**Manual sync:**
+```bash
+curl -X POST "https://PROJECT.supabase.co/functions/v1/hubspot-sync" \
+  -H "Authorization: Bearer ANON_KEY" \
+  -H "Content-Type: application/json"
+```
 
 ## Access Control
 

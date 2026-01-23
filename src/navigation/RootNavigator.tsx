@@ -3,7 +3,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuth } from '../contexts/AuthContext';
 import { useGroup } from '../contexts/GroupContext';
 import AuthNavigator from './AuthNavigator';
-import MainNavigator from './MainNavigator';
+import DrawerNavigator from './DrawerNavigator';
 import GroupSelectScreen from '../screens/group/GroupSelectScreen';
 import { RootStackParamList } from './types';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
@@ -43,7 +43,7 @@ export default function RootNavigator() {
   // Logged in with group selected
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="Main" component={MainNavigator} />
+      <Stack.Screen name="Main" component={DrawerNavigator} />
     </Stack.Navigator>
   );
 }

@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator }
 import { useGroup } from '../../contexts/GroupContext';
 import { useThreads, ThreadWithDetails } from '../../hooks/useThreads';
 import CreateThreadModal from '../../components/CreateThreadModal';
+import ScreenHeader from '../../components/ScreenHeader';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { ThreadsStackParamList } from '../../navigation/types';
@@ -11,7 +12,7 @@ type NavigationProp = NativeStackNavigationProp<ThreadsStackParamList>;
 
 export default function ThreadsScreen() {
   const navigation = useNavigation<NavigationProp>();
-  const { currentGroup, isGroupLeader } = useGroup();
+  const { isGroupLeader } = useGroup();
   const { threads, loading, refetch } = useThreads();
   const [showCreateModal, setShowCreateModal] = useState(false);
 
@@ -71,20 +72,13 @@ export default function ThreadsScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.title}>Threads</Text>
-          <Text style={styles.groupName}>{currentGroup?.name}</Text>
-        </View>
-        {isGroupLeader && (
-          <TouchableOpacity 
-            style={styles.newButton}
-            onPress={() => setShowCreateModal(true)}
-          >
-            <Text style={styles.newButtonText}>+ New</Text>
-          </TouchableOpacity>
-        )}
-      </View>
+      <ScreenHeader
+        title="Threads"
+        rightAction={isGroupLeader ? {
+          label: '+ New',
+          onPress: () => setShowCreateModal(true),
+        } : undefined}
+      />
       <FlatList
         data={threads}
         renderItem={renderThread}
