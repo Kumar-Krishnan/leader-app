@@ -39,8 +39,10 @@ A mobile/web app for community leaders to manage:
 | Resources | ✅ Complete | Folders, file uploads, links |
 | Resource Sharing | ✅ Complete | Share resources across groups |
 | Netlify Deploy | ✅ Complete | Auto-deploy on push |
-| Meetings | 🟡 Partial | List view done, need CRUD |
+| Meetings | ✅ Complete | Full CRUD, series, RSVP, skip |
+| Meeting Series | ✅ Complete | Recurring meetings with series editor |
 | Push Notifications | ❌ Not started | expo-notifications installed |
+| Email Reminders | ❌ Not started | Future: Supabase Edge Function + Resend |
 | HubSpot File Sync | 🟡 Partial | File sync works, runs every 8 hours |
 
 ## Group System
@@ -132,6 +134,79 @@ curl -X POST "https://PROJECT.supabase.co/functions/v1/hubspot-sync" \
   -H "Authorization: Bearer ANON_KEY" \
   -H "Content-Type: application/json"
 ```
+
+## Meetings System
+
+### Features
+- **Single Meetings** - One-off events with date, time, location, description
+- **Meeting Series** - Recurring meetings (weekly, etc.) with shared title but individual descriptions
+- **RSVP** - Attendees can respond Yes/Maybe/No to individual meetings or entire series
+- **Skip Meeting** - Organizers can skip a week, pushing all dates forward by one frequency interval
+
+### Key Behaviors
+- Series displayed as single card on main view showing next upcoming meeting
+- Clicking series card opens view of all meetings with individual RSVP
+- "Edit Series" opens spreadsheet-like editor for per-meeting descriptions
+- Skip resets individual RSVPs but preserves series RSVPs
+- Users who declined a specific date revert to their series preference when date changes
+
+### Files
+- `src/hooks/useMeetings.ts` - All meeting operations (CRUD, RSVP, skip)
+- `src/screens/main/MeetingsScreen.tsx` - Main meetings list with series grouping
+- `src/components/CreateMeetingModal.tsx` - Create single or series meetings
+- `src/components/MeetingSeriesEditorModal.tsx` - Edit series descriptions
+
+---
+
+## Test Coverage
+
+### Well-Tested Areas ✅
+| Area | Test File | Tests |
+|------|-----------|-------|
+| useMeetings hook | `__tests__/hooks/useMeetings.test.tsx` | 17 |
+| MeetingSeriesEditorModal | `__tests__/components/MeetingSeriesEditorModal.test.tsx` | 17 |
+| useThreads hook | `__tests__/hooks/useThreads.test.tsx` | ✓ |
+| useMessages hook | `__tests__/hooks/useMessages.test.tsx` | ✓ |
+| useResources hook | `__tests__/hooks/useResources.test.tsx` | ✓ |
+| useGroupMembers hook | `__tests__/hooks/useGroupMembers.test.tsx` | ✓ |
+| AuthContext | `__tests__/contexts/AuthContext.test.tsx` | ✓ |
+| GroupContext | `__tests__/contexts/GroupContext.test.tsx` | ✓ |
+| Auth screens | `__tests__/screens/auth/*.test.tsx` | ✓ |
+
+### Needs Testing 🔴
+
+**Components (no tests):**
+- `CreateMeetingModal.tsx` - Meeting/series creation flow
+- `ResourceCommentsModal.tsx` - Comment functionality
+- `Avatar.tsx` - Avatar rendering
+- `ErrorBoundary.tsx` - Error handling
+
+**Screens (no tests):**
+- `GroupSelectScreen.tsx` - Group selection/switching
+- `ManageMembersScreen.tsx` - Member management, approvals
+- `LeaderResourcesScreen.tsx` - Leader-only resources
+- `ResourcesScreen.tsx` - Resource browsing (partial, failing)
+
+### Failing Tests 🟡
+
+Screen tests failing due to missing `SafeAreaProvider` wrapper:
+- `ThreadsScreen.test.tsx`
+- `MeetingsScreen.test.tsx`
+
+**Fix needed:** Add SafeAreaProvider to test utilities or mock `useSafeAreaInsets`.
+
+---
+
+## Future Features
+
+| Feature | Priority | Notes |
+|---------|----------|-------|
+| Email Reminders | Medium | Supabase Edge Function + Resend, 2-3 days before meetings |
+| Push Notifications | Medium | expo-notifications already installed |
+| Meeting Attachments | Low | Link resources/files to meetings |
+| Calendar Integration | Low | Export to Google/Apple Calendar |
+
+---
 
 ## Access Control
 

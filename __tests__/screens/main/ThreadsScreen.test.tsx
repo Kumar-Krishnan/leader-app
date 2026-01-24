@@ -3,34 +3,36 @@ import { render, fireEvent, waitFor } from '@testing-library/react-native';
 import ThreadsScreen from '../../../src/screens/main/ThreadsScreen';
 import { supabase } from '../../../src/lib/supabase';
 
+// Import mock factories
+import {
+  createMockUser,
+  createMockGroupWithMembership,
+  createMockAuthContext,
+  createMockGroupContext,
+  createChainableMock,
+} from '../../../__mocks__';
+
 // Mock Supabase
 jest.mock('../../../src/lib/supabase');
 
-// Mock navigation
-const mockNavigate = jest.fn();
-const mockNavigation = {
-  navigate: mockNavigate,
-  goBack: jest.fn(),
-  setOptions: jest.fn(),
-} as any;
+// Access global navigation mocks from jest.setup.js
+const mockNavigate = (global as any).__navigationMocks__?.mockNavigate || jest.fn();
 
-jest.mock('@react-navigation/native', () => ({
-  ...jest.requireActual('@react-navigation/native'),
-  useNavigation: () => mockNavigation,
+// Create mutable mock values
+let mockAuthContext = createMockAuthContext();
+let mockGroupContext = createMockGroupContext();
+
+// Mock auth context
+jest.mock('../../../src/contexts/AuthContext', () => ({
+  useAuth: () => mockAuthContext,
 }));
 
-// Mock data
-const mockUser = {
-  id: 'user-id',
-  email: 'test@example.com',
-};
+// Mock group context
+jest.mock('../../../src/contexts/GroupContext', () => ({
+  useGroup: () => mockGroupContext,
+}));
 
-const mockGroup = {
-  id: 'group-id',
-  name: 'Test Group',
-  role: 'member' as const,
-};
-
+// Mock thread data
 const mockThread = {
   id: 'thread-1',
   group_id: 'group-id',
@@ -55,28 +57,6 @@ const mockThread2 = {
   is_archived: false,
 };
 
-// Mock auth context
-let mockAuthContext = {
-  user: mockUser,
-  profile: null,
-  isLeader: false,
-  isAdmin: false,
-};
-
-jest.mock('../../../src/contexts/AuthContext', () => ({
-  useAuth: () => mockAuthContext,
-}));
-
-// Mock group context
-let mockGroupContext: any = {
-  currentGroup: mockGroup,
-  isGroupLeader: false,
-};
-
-jest.mock('../../../src/contexts/GroupContext', () => ({
-  useGroup: () => mockGroupContext,
-}));
-
 // Helper to create mock chain
 const createMockChain = (data: any, error: any = null) => ({
   select: jest.fn().mockReturnThis(),
@@ -85,29 +65,39 @@ const createMockChain = (data: any, error: any = null) => ({
 });
 
 describe('ThreadsScreen', () => {
+  // Default mock data
+  const mockUser = createMockUser({ id: 'user-id', email: 'test@example.com' });
+  const mockGroup = createMockGroupWithMembership({
+    id: 'group-id',
+    name: 'Test Group',
+    role: 'member',
+  });
+
   beforeEach(() => {
     jest.clearAllMocks();
-    
+
     // Reset to default mock data
-    mockAuthContext = {
+    mockAuthContext = createMockAuthContext({
       user: mockUser,
       profile: null,
       isLeader: false,
       isAdmin: false,
-    };
-    
-    mockGroupContext = {
+    });
+
+    mockGroupContext = createMockGroupContext({
       currentGroup: mockGroup,
       isGroupLeader: false,
-    };
+    });
 
     // Default Supabase mock
-    (supabase.from as jest.Mock).mockReturnValue(createMockChain([mockThread, mockThread2]));
+    (supabase.from as jest.Mock).mockReturnValue(
+      createMockChain([mockThread, mockThread2])
+    );
   });
 
   it('should render loading state initially', () => {
     const { getByTestId } = render(<ThreadsScreen />);
-    
+
     expect(getByTestId('activity-indicator')).toBeTruthy();
   });
 
@@ -179,7 +169,10 @@ describe('ThreadsScreen', () => {
   });
 
   it('should show "+ New" button for leaders', async () => {
-    mockGroupContext.isGroupLeader = true;
+    mockGroupContext = createMockGroupContext({
+      currentGroup: mockGroup,
+      isGroupLeader: true,
+    });
 
     const { getByText, queryByTestId } = render(<ThreadsScreen />);
 
@@ -191,7 +184,10 @@ describe('ThreadsScreen', () => {
   });
 
   it('should not show "+ New" button for regular members', async () => {
-    mockGroupContext.isGroupLeader = false;
+    mockGroupContext = createMockGroupContext({
+      currentGroup: mockGroup,
+      isGroupLeader: false,
+    });
 
     const { queryByText, queryByTestId } = render(<ThreadsScreen />);
 
@@ -203,7 +199,10 @@ describe('ThreadsScreen', () => {
   });
 
   it('should open create modal when "+ New" is pressed', async () => {
-    mockGroupContext.isGroupLeader = true;
+    mockGroupContext = createMockGroupContext({
+      currentGroup: mockGroup,
+      isGroupLeader: true,
+    });
 
     const { getByText, getAllByText, queryByTestId } = render(<ThreadsScreen />);
 
@@ -235,7 +234,10 @@ describe('ThreadsScreen', () => {
   });
 
   it('should show leader-specific empty state message', async () => {
-    mockGroupContext.isGroupLeader = true;
+    mockGroupContext = createMockGroupContext({
+      currentGroup: mockGroup,
+      isGroupLeader: true,
+    });
     (supabase.from as jest.Mock).mockReturnValue(createMockChain([]));
 
     const { getByText, queryByTestId } = render(<ThreadsScreen />);
@@ -244,11 +246,16 @@ describe('ThreadsScreen', () => {
       expect(queryByTestId('activity-indicator')).toBeNull();
     });
 
-    expect(getByText('Create a new thread to start a conversation with your group.')).toBeTruthy();
+    expect(
+      getByText('Create a new thread to start a conversation with your group.')
+    ).toBeTruthy();
   });
 
   it('should show member-specific empty state message', async () => {
-    mockGroupContext.isGroupLeader = false;
+    mockGroupContext = createMockGroupContext({
+      currentGroup: mockGroup,
+      isGroupLeader: false,
+    });
     (supabase.from as jest.Mock).mockReturnValue(createMockChain([]));
 
     const { getByText, queryByTestId } = render(<ThreadsScreen />);
@@ -257,11 +264,16 @@ describe('ThreadsScreen', () => {
       expect(queryByTestId('activity-indicator')).toBeNull();
     });
 
-    expect(getByText("You'll see threads here once you're added to one.")).toBeTruthy();
+    expect(
+      getByText("You'll see threads here once you're added to one.")
+    ).toBeTruthy();
   });
 
   it('should show "Create Thread" button in empty state for leaders', async () => {
-    mockGroupContext.isGroupLeader = true;
+    mockGroupContext = createMockGroupContext({
+      currentGroup: mockGroup,
+      isGroupLeader: true,
+    });
     (supabase.from as jest.Mock).mockReturnValue(createMockChain([]));
 
     const { getByText, queryByTestId } = render(<ThreadsScreen />);
@@ -274,7 +286,10 @@ describe('ThreadsScreen', () => {
   });
 
   it('should not show "Create Thread" button in empty state for members', async () => {
-    mockGroupContext.isGroupLeader = false;
+    mockGroupContext = createMockGroupContext({
+      currentGroup: mockGroup,
+      isGroupLeader: false,
+    });
     (supabase.from as jest.Mock).mockReturnValue(createMockChain([]));
 
     const { queryByText, queryByTestId } = render(<ThreadsScreen />);
@@ -287,7 +302,10 @@ describe('ThreadsScreen', () => {
   });
 
   it('should handle no current group gracefully', async () => {
-    mockGroupContext.currentGroup = null;
+    mockGroupContext = createMockGroupContext({
+      currentGroup: null,
+      isGroupLeader: false,
+    });
 
     const { queryByText } = render(<ThreadsScreen />);
 
@@ -344,7 +362,9 @@ describe('ThreadsScreen', () => {
     render(<ThreadsScreen />);
 
     await waitFor(() => {
-      expect(mockChain.order).toHaveBeenCalledWith('updated_at', { ascending: false });
+      expect(mockChain.order).toHaveBeenCalledWith('updated_at', {
+        ascending: false,
+      });
     });
   });
 
@@ -359,4 +379,3 @@ describe('ThreadsScreen', () => {
     expect(getByText('S')).toBeTruthy(); // First letter of "Support Requests"
   });
 });
-

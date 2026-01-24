@@ -16,10 +16,15 @@ import { useGroup } from '../contexts/GroupContext';
 import { supabase } from '../lib/supabase';
 import { Profile } from '../types/database';
 
+interface SeriesInfo {
+  seriesId: string;
+  seriesTitle: string;
+}
+
 interface Props {
   visible: boolean;
   onClose: () => void;
-  onCreated: () => void;
+  onCreated: (seriesInfo?: SeriesInfo) => void;
 }
 
 type RecurrenceType = 'none' | 'weekly' | 'monthly';
@@ -248,6 +253,9 @@ export default function CreateMeetingModal({ visible, onClose, onCreated }: Prop
         if (attendeesError) throw attendeesError;
       }
 
+      // Capture series info before resetting form
+      const seriesInfo = seriesId ? { seriesId, seriesTitle: title.trim() } : undefined;
+
       // Reset form
       setTitle('');
       setDescription('');
@@ -258,8 +266,8 @@ export default function CreateMeetingModal({ visible, onClose, onCreated }: Prop
       setRecurrence('none');
       setRecurrenceCount('4');
       setSelectedMembers(new Set());
-      
-      onCreated();
+
+      onCreated(seriesInfo);
       onClose();
     } catch (err: any) {
       console.error('Error creating meeting:', err);

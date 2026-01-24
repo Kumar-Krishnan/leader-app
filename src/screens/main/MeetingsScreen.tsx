@@ -1,13 +1,21 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Modal } from 'react-native';
+import React, { useState, useMemo } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Modal, ScrollView } from 'react-native';
 import { useGroup } from '../../contexts/GroupContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useMeetings, RSVPStatus } from '../../hooks/useMeetings';
 import { MeetingWithAttendees } from '../../types/database';
 import CreateMeetingModal from '../../components/CreateMeetingModal';
+import MeetingSeriesEditorModal from '../../components/MeetingSeriesEditorModal';
 import Avatar from '../../components/Avatar';
 import ScreenHeader from '../../components/ScreenHeader';
 import { showAlert, showDestructiveConfirm } from '../../lib/errors';
+
+// Display item can be either a single meeting or a series (represented by its next meeting)
+interface DisplayItem {
+  type: 'single' | 'series';
+  meeting: MeetingWithAttendees; // For series, this is the next upcoming meeting
+  seriesMeetings?: MeetingWithAttendees[]; // All meetings in the series (for series type)
+}
 
 interface RSVPModalState {
   visible: boolean;
@@ -23,19 +31,35 @@ interface DeleteModalState {
   seriesId: string | null;
 }
 
+interface SeriesEditorModalState {
+  visible: boolean;
+  seriesId: string;
+  seriesTitle: string;
+}
+
+interface SeriesViewModalState {
+  visible: boolean;
+  seriesId: string;
+  seriesTitle: string;
+  meetings: MeetingWithAttendees[];
+}
+
 export default function MeetingsScreen() {
   const { isGroupLeader } = useGroup();
   const { user } = useAuth();
   
   // Use the useMeetings hook for all data and operations
-  const { 
-    meetings, 
-    loading, 
-    refetch, 
-    rsvpToMeeting, 
-    rsvpToSeries, 
-    deleteMeeting, 
-    deleteSeries 
+  const {
+    meetings,
+    loading,
+    refetch,
+    rsvpToMeeting,
+    rsvpToSeries,
+    deleteMeeting,
+    deleteSeries,
+    updateMeeting,
+    getSeriesMeetings,
+    skipMeeting,
   } = useMeetings();
   
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -51,6 +75,59 @@ export default function MeetingsScreen() {
     meetingId: '',
     seriesId: null,
   });
+  const [seriesEditorModal, setSeriesEditorModal] = useState<SeriesEditorModalState>({
+    visible: false,
+    seriesId: '',
+    seriesTitle: '',
+  });
+  const [seriesViewModal, setSeriesViewModal] = useState<SeriesViewModalState>({
+    visible: false,
+    seriesId: '',
+    seriesTitle: '',
+    meetings: [],
+  });
+
+  // Group meetings: standalone meetings + one entry per series (showing next upcoming meeting)
+  const displayItems = useMemo((): DisplayItem[] => {
+    const items: DisplayItem[] = [];
+    const processedSeriesIds = new Set<string>();
+
+    // Sort meetings by date
+    const sortedMeetings = [...meetings].sort(
+      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+    );
+
+    for (const meeting of sortedMeetings) {
+      if (!meeting.series_id) {
+        // Standalone meeting
+        items.push({ type: 'single', meeting });
+      } else if (!processedSeriesIds.has(meeting.series_id)) {
+        // First (next upcoming) meeting in this series
+        processedSeriesIds.add(meeting.series_id);
+        const seriesMeetings = getSeriesMeetings(meeting.series_id);
+        items.push({
+          type: 'series',
+          meeting, // This is the next upcoming meeting
+          seriesMeetings,
+        });
+      }
+      // Skip subsequent meetings in already-processed series
+    }
+
+    return items;
+  }, [meetings, getSeriesMeetings]);
+
+  // Open series view modal
+  const openSeriesView = (item: DisplayItem) => {
+    if (item.type === 'series' && item.seriesMeetings) {
+      setSeriesViewModal({
+        visible: true,
+        seriesId: item.meeting.series_id!,
+        seriesTitle: item.meeting.title,
+        meetings: item.seriesMeetings,
+      });
+    }
+  };
 
   // Check if meeting is part of a series and show modal if so
   const initiateRSVP = (meeting: MeetingWithAttendees, attendeeId: string, status: RSVPStatus) => {
@@ -130,38 +207,62 @@ export default function MeetingsScreen() {
     }
   };
 
-  const renderMeeting = ({ item }: { item: MeetingWithAttendees }) => {
-    const attendeeCount = item.attendees?.length || 0;
-    const acceptedCount = item.attendees?.filter(a => a.status === 'accepted').length || 0;
-    
+  // Open series editor modal
+  const openSeriesEditor = (meeting: MeetingWithAttendees) => {
+    if (meeting.series_id) {
+      setSeriesEditorModal({
+        visible: true,
+        seriesId: meeting.series_id,
+        seriesTitle: meeting.title,
+      });
+    }
+  };
+
+  // Handle meeting created - refetch and optionally open series editor
+  const handleMeetingCreated = async (seriesInfo?: { seriesId: string; seriesTitle: string }) => {
+    await refetch();
+    if (seriesInfo) {
+      // Open series editor for the newly created series
+      setSeriesEditorModal({
+        visible: true,
+        seriesId: seriesInfo.seriesId,
+        seriesTitle: seriesInfo.seriesTitle,
+      });
+    }
+  };
+
+  const renderMeetingCard = (meeting: MeetingWithAttendees, isSeries: boolean = false, seriesCount?: number) => {
+    const attendeeCount = meeting.attendees?.length || 0;
+    const acceptedCount = meeting.attendees?.filter(a => a.status === 'accepted').length || 0;
+
     // Find current user's attendance record
-    const myAttendance = item.attendees?.find(a => a.user_id === user?.id);
+    const myAttendance = meeting.attendees?.find(a => a.user_id === user?.id);
     const myStatus = myAttendance?.status;
-    
+
     return (
-      <View style={styles.meetingCard}>
+      <>
         <View style={styles.meetingHeader}>
           <View style={styles.dateBox}>
             <Text style={styles.dateMonth}>
-              {new Date(item.date).toLocaleDateString('en-US', { month: 'short' }).toUpperCase()}
+              {new Date(meeting.date).toLocaleDateString('en-US', { month: 'short' }).toUpperCase()}
             </Text>
-            <Text style={styles.dateDay}>{new Date(item.date).getDate()}</Text>
+            <Text style={styles.dateDay}>{new Date(meeting.date).getDate()}</Text>
           </View>
           <View style={styles.meetingInfo}>
             <View style={styles.titleRow}>
               <View style={styles.titleContainer}>
-                <Text style={styles.meetingTitle}>{item.title}</Text>
-                {item.series_id && item.series_index && item.series_total && (
+                <Text style={styles.meetingTitle}>{meeting.title}</Text>
+                {isSeries && seriesCount && (
                   <View style={styles.seriesBadge}>
                     <Text style={styles.seriesBadgeText}>
-                      {item.series_index}/{item.series_total}
+                      {seriesCount} meetings
                     </Text>
                   </View>
                 )}
               </View>
-              {isGroupLeader && (
-                <TouchableOpacity 
-                  onPress={() => initiateDelete(item)}
+              {isGroupLeader && !isSeries && (
+                <TouchableOpacity
+                  onPress={() => initiateDelete(meeting)}
                   style={styles.deleteButton}
                 >
                   <Text style={styles.deleteButtonText}>🗑️</Text>
@@ -169,16 +270,17 @@ export default function MeetingsScreen() {
               )}
             </View>
             <Text style={styles.meetingDetails}>
-              {new Date(item.date).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
-              {item.location ? ` • ${item.location}` : ''}
+              {isSeries ? 'Next: ' : ''}
+              {new Date(meeting.date).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+              {meeting.location ? ` • ${meeting.location}` : ''}
             </Text>
-            
+
             {attendeeCount > 0 && (
               <View style={styles.attendeesRow}>
                 <View style={styles.attendeeAvatars}>
-                  {item.attendees?.slice(0, 4).map((attendee, idx) => (
-                    <View 
-                      key={attendee.id} 
+                  {meeting.attendees?.slice(0, 4).map((attendee, idx) => (
+                    <View
+                      key={attendee.id}
                       style={[
                         styles.attendeeAvatarWrapper,
                         { marginLeft: idx > 0 ? -8 : 0, zIndex: 4 - idx },
@@ -186,7 +288,7 @@ export default function MeetingsScreen() {
                         attendee.status === 'declined' && styles.attendeeAvatarDeclined,
                       ]}
                     >
-                      <Avatar 
+                      <Avatar
                         uri={attendee.user?.avatar_url}
                         name={attendee.user?.full_name}
                         size={22}
@@ -205,29 +307,49 @@ export default function MeetingsScreen() {
               </View>
             )}
 
-            {item.passages && item.passages.length > 0 && (
+            {meeting.passages && meeting.passages.length > 0 && (
               <View style={styles.passagesContainer}>
-                {item.passages.map((passage, idx) => (
+                {meeting.passages.map((passage, idx) => (
                   <View key={idx} style={styles.passageBadge}>
                     <Text style={styles.passageText}>{passage}</Text>
                   </View>
                 ))}
               </View>
             )}
+
+            {isSeries && (
+              <Text style={styles.viewSeriesHint}>Tap to view all meetings</Text>
+            )}
           </View>
         </View>
-        
-        {/* RSVP Section */}
-        {myAttendance && (
+
+        {/* Skip button for series - allows skipping upcoming meeting from main view */}
+        {isSeries && meeting.created_by === user?.id && isGroupLeader && (
+          <View style={styles.seriesSkipSection}>
+            <TouchableOpacity
+              style={styles.seriesSkipButton}
+              onPress={async () => {
+                const success = await skipMeeting(meeting.id);
+                if (success) {
+                  refetch();
+                }
+              }}
+            >
+              <Text style={styles.seriesSkipButtonText}>Skip This Week</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* RSVP Section - only for single meetings */}
+        {!isSeries && myAttendance && (
           <View style={styles.rsvpSection}>
             <Text style={styles.rsvpLabel}>
               {myStatus === 'invited' ? 'Are you attending?' : 'Your response:'}
-              {myAttendance.is_series_rsvp && item.series_id && ' (series)'}
             </Text>
             <View style={styles.rsvpButtons}>
               <TouchableOpacity
                 style={[styles.rsvpButton, myStatus === 'accepted' && styles.rsvpButtonAccepted]}
-                onPress={() => initiateRSVP(item, myAttendance.id, 'accepted')}
+                onPress={() => initiateRSVP(meeting, myAttendance.id, 'accepted')}
               >
                 <Text style={[styles.rsvpButtonText, myStatus === 'accepted' && styles.rsvpButtonTextActive]}>
                   ✓ Yes
@@ -235,7 +357,7 @@ export default function MeetingsScreen() {
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.rsvpButton, myStatus === 'maybe' && styles.rsvpButtonMaybe]}
-                onPress={() => initiateRSVP(item, myAttendance.id, 'maybe')}
+                onPress={() => initiateRSVP(meeting, myAttendance.id, 'maybe')}
               >
                 <Text style={[styles.rsvpButtonText, myStatus === 'maybe' && styles.rsvpButtonTextActive]}>
                   ? Maybe
@@ -243,7 +365,7 @@ export default function MeetingsScreen() {
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.rsvpButton, myStatus === 'declined' && styles.rsvpButtonDeclined]}
-                onPress={() => initiateRSVP(item, myAttendance.id, 'declined')}
+                onPress={() => initiateRSVP(meeting, myAttendance.id, 'declined')}
               >
                 <Text style={[styles.rsvpButtonText, myStatus === 'declined' && styles.rsvpButtonTextActive]}>
                   ✗ No
@@ -252,6 +374,26 @@ export default function MeetingsScreen() {
             </View>
           </View>
         )}
+      </>
+    );
+  };
+
+  const renderDisplayItem = ({ item }: { item: DisplayItem }) => {
+    if (item.type === 'series') {
+      return (
+        <TouchableOpacity
+          style={[styles.meetingCard, styles.seriesCard]}
+          onPress={() => openSeriesView(item)}
+          activeOpacity={0.7}
+        >
+          {renderMeetingCard(item.meeting, true, item.seriesMeetings?.length)}
+        </TouchableOpacity>
+      );
+    }
+
+    return (
+      <View style={styles.meetingCard}>
+        {renderMeetingCard(item.meeting)}
       </View>
     );
   };
@@ -291,10 +433,10 @@ export default function MeetingsScreen() {
         } : undefined}
       />
       <FlatList
-        data={meetings}
-        renderItem={renderMeeting}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={meetings.length === 0 ? styles.emptyList : styles.list}
+        data={displayItems}
+        renderItem={renderDisplayItem}
+        keyExtractor={(item) => item.type === 'series' ? `series-${item.meeting.series_id}` : item.meeting.id}
+        contentContainerStyle={displayItems.length === 0 ? styles.emptyList : styles.list}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={renderEmptyState}
       />
@@ -302,7 +444,7 @@ export default function MeetingsScreen() {
       <CreateMeetingModal
         visible={showCreateModal}
         onClose={() => setShowCreateModal(false)}
-        onCreated={refetch}
+        onCreated={handleMeetingCreated}
       />
 
       {/* Series RSVP Modal */}
@@ -370,6 +512,134 @@ export default function MeetingsScreen() {
               <Text style={styles.modalCancelButtonText}>Cancel</Text>
             </TouchableOpacity>
           </View>
+        </View>
+      </Modal>
+
+      {/* Series Editor Modal */}
+      <MeetingSeriesEditorModal
+        visible={seriesEditorModal.visible}
+        onClose={() => setSeriesEditorModal(prev => ({ ...prev, visible: false }))}
+        seriesId={seriesEditorModal.seriesId}
+        seriesTitle={seriesEditorModal.seriesTitle}
+        meetings={seriesEditorModal.seriesId ? getSeriesMeetings(seriesEditorModal.seriesId) : []}
+        onUpdateMeeting={updateMeeting}
+        onSkipMeeting={skipMeeting}
+        onRefresh={refetch}
+      />
+
+      {/* Series View Modal */}
+      <Modal
+        visible={seriesViewModal.visible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setSeriesViewModal(prev => ({ ...prev, visible: false }))}
+      >
+        <View style={styles.seriesViewContainer}>
+          <View style={styles.seriesViewHeader}>
+            <TouchableOpacity onPress={() => setSeriesViewModal(prev => ({ ...prev, visible: false }))}>
+              <Text style={styles.seriesViewDoneButton}>Done</Text>
+            </TouchableOpacity>
+            <Text style={styles.seriesViewTitle}>{seriesViewModal.seriesTitle}</Text>
+            {seriesViewModal.meetings[0]?.created_by === user?.id && isGroupLeader && (
+              <TouchableOpacity
+                onPress={() => {
+                  setSeriesViewModal(prev => ({ ...prev, visible: false }));
+                  setSeriesEditorModal({
+                    visible: true,
+                    seriesId: seriesViewModal.seriesId,
+                    seriesTitle: seriesViewModal.seriesTitle,
+                  });
+                }}
+              >
+                <Text style={styles.seriesViewEditButton}>Edit</Text>
+              </TouchableOpacity>
+            )}
+            {!(seriesViewModal.meetings[0]?.created_by === user?.id && isGroupLeader) && (
+              <View style={{ width: 40 }} />
+            )}
+          </View>
+          <Text style={styles.seriesViewSubtitle}>
+            {seriesViewModal.meetings.length} meetings in series
+          </Text>
+          <ScrollView style={styles.seriesViewContent}>
+            {seriesViewModal.meetings.map((meeting) => {
+              const myAttendance = meeting.attendees?.find(a => a.user_id === user?.id);
+              const myStatus = myAttendance?.status;
+
+              return (
+                <View key={meeting.id} style={styles.seriesViewMeetingCard}>
+                  <View style={styles.seriesViewMeetingHeader}>
+                    <View style={styles.seriesViewIndexBadge}>
+                      <Text style={styles.seriesViewIndexText}>{meeting.series_index}</Text>
+                    </View>
+                    <View style={styles.seriesViewMeetingInfo}>
+                      <Text style={styles.seriesViewMeetingDate}>
+                        {new Date(meeting.date).toLocaleDateString('en-US', {
+                          weekday: 'short',
+                          month: 'short',
+                          day: 'numeric',
+                        })}
+                        {' at '}
+                        {new Date(meeting.date).toLocaleTimeString('en-US', {
+                          hour: 'numeric',
+                          minute: '2-digit',
+                        })}
+                      </Text>
+                      {meeting.description && (
+                        <Text style={styles.seriesViewMeetingDescription}>{meeting.description}</Text>
+                      )}
+                    </View>
+                    {/* Skip button for organizers */}
+                    {meeting.created_by === user?.id && isGroupLeader && (
+                      <TouchableOpacity
+                        style={styles.seriesViewSkipButton}
+                        onPress={async () => {
+                          const success = await skipMeeting(meeting.id);
+                          if (success) {
+                            refetch();
+                          }
+                        }}
+                      >
+                        <Text style={styles.seriesViewSkipButtonText}>Skip</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+
+                  {/* RSVP for each meeting in series */}
+                  {myAttendance && (
+                    <View style={styles.seriesViewRsvpSection}>
+                      <View style={styles.rsvpButtons}>
+                        <TouchableOpacity
+                          style={[styles.rsvpButton, myStatus === 'accepted' && styles.rsvpButtonAccepted]}
+                          onPress={() => rsvpToMeeting(meeting.id, myAttendance.id, 'accepted')}
+                        >
+                          <Text style={[styles.rsvpButtonText, myStatus === 'accepted' && styles.rsvpButtonTextActive]}>
+                            ✓ Yes
+                          </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.rsvpButton, myStatus === 'maybe' && styles.rsvpButtonMaybe]}
+                          onPress={() => rsvpToMeeting(meeting.id, myAttendance.id, 'maybe')}
+                        >
+                          <Text style={[styles.rsvpButtonText, myStatus === 'maybe' && styles.rsvpButtonTextActive]}>
+                            ? Maybe
+                          </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.rsvpButton, myStatus === 'declined' && styles.rsvpButtonDeclined]}
+                          onPress={() => rsvpToMeeting(meeting.id, myAttendance.id, 'declined')}
+                        >
+                          <Text style={[styles.rsvpButtonText, myStatus === 'declined' && styles.rsvpButtonTextActive]}>
+                            ✗ No
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  )}
+                </View>
+              );
+            })}
+          </ScrollView>
         </View>
       </Modal>
     </View>
@@ -471,6 +741,18 @@ const styles = StyleSheet.create({
   },
   deleteButtonText: {
     fontSize: 16,
+  },
+  editSeriesButton: {
+    backgroundColor: '#7C3AED',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    marginLeft: 8,
+  },
+  editSeriesButtonText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
   },
   meetingDetails: {
     fontSize: 14,
@@ -701,5 +983,135 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
     fontSize: 15,
     fontWeight: '500',
+  },
+  // Series card styles
+  seriesCard: {
+    borderWidth: 2,
+    borderColor: '#7C3AED',
+  },
+  viewSeriesHint: {
+    fontSize: 12,
+    color: '#7C3AED',
+    marginTop: 8,
+    fontWeight: '500',
+  },
+  seriesSkipSection: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#334155',
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+  },
+  seriesSkipButton: {
+    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#F59E0B',
+  },
+  seriesSkipButtonText: {
+    color: '#F59E0B',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  // Series view modal styles
+  seriesViewContainer: {
+    flex: 1,
+    backgroundColor: '#0F172A',
+  },
+  seriesViewHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#334155',
+  },
+  seriesViewTitle: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#F8FAFC',
+  },
+  seriesViewDoneButton: {
+    fontSize: 16,
+    color: '#3B82F6',
+    fontWeight: '500',
+  },
+  seriesViewEditButton: {
+    fontSize: 16,
+    color: '#7C3AED',
+    fontWeight: '600',
+  },
+  seriesViewSubtitle: {
+    fontSize: 14,
+    color: '#94A3B8',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#334155',
+  },
+  seriesViewContent: {
+    flex: 1,
+    padding: 16,
+  },
+  seriesViewMeetingCard: {
+    backgroundColor: '#1E293B',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+  },
+  seriesViewMeetingHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  seriesViewIndexBadge: {
+    backgroundColor: '#7C3AED',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  seriesViewIndexText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  seriesViewMeetingInfo: {
+    flex: 1,
+  },
+  seriesViewMeetingDate: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#F8FAFC',
+  },
+  seriesViewMeetingDescription: {
+    fontSize: 14,
+    color: '#94A3B8',
+    marginTop: 4,
+    lineHeight: 20,
+  },
+  seriesViewRsvpSection: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#334155',
+  },
+  seriesViewSkipButton: {
+    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#F59E0B',
+    marginLeft: 8,
+  },
+  seriesViewSkipButtonText: {
+    color: '#F59E0B',
+    fontSize: 13,
+    fontWeight: '600',
   },
 });

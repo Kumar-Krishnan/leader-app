@@ -74,3 +74,54 @@ jest.mock('react-native/Libraries/Utilities/Platform', () => {
   return Platform;
 });
 
+// Mock react-native-safe-area-context globally
+jest.mock('react-native-safe-area-context', () => ({
+  SafeAreaProvider: ({ children }) => children,
+  SafeAreaView: ({ children }) => children,
+  useSafeAreaInsets: () => ({ top: 44, bottom: 34, left: 0, right: 0 }),
+  useSafeAreaFrame: () => ({ x: 0, y: 0, width: 390, height: 844 }),
+}));
+
+// Mock @react-navigation/native globally
+const mockNavigate = jest.fn();
+const mockGoBack = jest.fn();
+const mockSetOptions = jest.fn();
+const mockReset = jest.fn();
+
+jest.mock('@react-navigation/native', () => {
+  const actualNav = jest.requireActual('@react-navigation/native');
+  return {
+    ...actualNav,
+    useNavigation: () => ({
+      navigate: mockNavigate,
+      goBack: mockGoBack,
+      setOptions: mockSetOptions,
+      reset: mockReset,
+      addListener: jest.fn(() => jest.fn()),
+      removeListener: jest.fn(),
+      isFocused: jest.fn(() => true),
+      canGoBack: jest.fn(() => true),
+      dispatch: jest.fn(),
+      getParent: jest.fn(),
+      getState: jest.fn(() => ({ routes: [] })),
+    }),
+    useRoute: () => ({
+      key: 'test-key',
+      name: 'TestScreen',
+      params: {},
+    }),
+    useFocusEffect: jest.fn((callback) => {
+      callback();
+    }),
+    useIsFocused: jest.fn(() => true),
+  };
+});
+
+// Export navigation mocks for test access
+global.__navigationMocks__ = {
+  mockNavigate,
+  mockGoBack,
+  mockSetOptions,
+  mockReset,
+};
+

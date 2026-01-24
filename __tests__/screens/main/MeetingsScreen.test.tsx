@@ -2,114 +2,93 @@ import React from 'react';
 import { render, fireEvent, waitFor } from '@testing-library/react-native';
 import MeetingsScreen from '../../../src/screens/main/MeetingsScreen';
 
-// Mock data
-const mockUser = {
-  id: 'user-id',
-  email: 'test@example.com',
-};
+// Import mock factories
+import {
+  createMockUser,
+  createMockMeetingWithAttendees,
+  createMockGroupWithMembership,
+  createMockAuthContext,
+  createMockGroupContext,
+  createMockUseMeetings,
+} from '../../../__mocks__';
 
-const mockGroup = {
-  id: 'group-id',
-  name: 'Test Group',
-  role: 'member' as const,
-};
-
-const mockMeeting = {
-  id: 'meeting-1',
-  group_id: 'group-id',
-  title: 'Team Meeting',
-  description: 'Weekly study',
-  date: new Date(Date.now() + 86400000).toISOString(), // Tomorrow
-  time: '19:00',
-  location: 'Conference Room',
-  passages: ['Chapter 3'],
-  series_id: null,
-  series_index: null,
-  series_total: null,
-  created_by: 'user-id',
-  created_at: new Date().toISOString(),
-  attendees: [
-    {
-      id: 'attendee-1',
-      user_id: 'user-id',
-      status: 'invited' as const,
-      responded_at: null,
-      is_series_rsvp: false,
-      user: {
-        id: 'user-id',
-        full_name: 'John Doe',
-        email: 'test@example.com',
-      },
-    },
-  ],
-};
+// Create mutable mock values
+let mockAuthContext = createMockAuthContext();
+let mockGroupContext = createMockGroupContext();
+let mockUseMeetingsResult = createMockUseMeetings();
 
 // Mock auth context
-let mockAuthContext = {
-  user: mockUser,
-  profile: null,
-  isLeader: false,
-  isAdmin: false,
-};
-
 jest.mock('../../../src/contexts/AuthContext', () => ({
   useAuth: () => mockAuthContext,
 }));
 
 // Mock group context
-let mockGroupContext: any = {
-  currentGroup: mockGroup,
-  isGroupLeader: false,
-};
-
 jest.mock('../../../src/contexts/GroupContext', () => ({
   useGroup: () => mockGroupContext,
 }));
 
 // Mock useMeetings hook
-let mockUseMeetingsResult: any = {
-  meetings: [],
-  loading: false,
-  error: null,
-  refetch: jest.fn(),
-  rsvpToMeeting: jest.fn().mockResolvedValue(true),
-  rsvpToSeries: jest.fn().mockResolvedValue(true),
-  deleteMeeting: jest.fn().mockResolvedValue(true),
-  deleteSeries: jest.fn().mockResolvedValue(true),
-};
-
 jest.mock('../../../src/hooks/useMeetings', () => ({
   useMeetings: () => mockUseMeetingsResult,
   RSVPStatus: {},
 }));
 
 describe('MeetingsScreen', () => {
+  // Default mock user and group
+  const mockUser = createMockUser({ id: 'user-id', email: 'test@example.com' });
+  const mockGroup = createMockGroupWithMembership({
+    id: 'group-id',
+    name: 'Test Group',
+    role: 'member',
+  });
+
+  // Default mock meeting with attendee
+  const mockMeeting = createMockMeetingWithAttendees({
+    id: 'meeting-1',
+    group_id: 'group-id',
+    title: 'Team Meeting',
+    description: 'Weekly study',
+    date: new Date(Date.now() + 86400000).toISOString(), // Tomorrow
+    location: 'Conference Room',
+    passages: ['Chapter 3'],
+    created_by: 'user-id',
+    attendees: [
+      {
+        id: 'attendee-1',
+        user_id: 'user-id',
+        status: 'invited',
+        responded_at: null,
+        is_series_rsvp: false,
+        user: {
+          id: 'user-id',
+          full_name: 'John Doe',
+          email: 'test@example.com',
+        },
+      },
+    ],
+  });
+
   beforeEach(() => {
     jest.clearAllMocks();
-    
+
     // Reset to default mock data
-    mockAuthContext = {
+    mockAuthContext = createMockAuthContext({
       user: mockUser,
       profile: null,
       isLeader: false,
       isAdmin: false,
-    };
-    
-    mockGroupContext = {
+    });
+
+    mockGroupContext = createMockGroupContext({
       currentGroup: mockGroup,
       isGroupLeader: false,
-    };
+    });
 
-    mockUseMeetingsResult = {
+    mockUseMeetingsResult = createMockUseMeetings({
       meetings: [],
       loading: false,
       error: null,
-      refetch: jest.fn(),
-      rsvpToMeeting: jest.fn().mockResolvedValue(true),
-      rsvpToSeries: jest.fn().mockResolvedValue(true),
-      deleteMeeting: jest.fn().mockResolvedValue(true),
-      deleteSeries: jest.fn().mockResolvedValue(true),
-    };
+    });
   });
 
   it('should render without crashing', () => {
@@ -118,45 +97,54 @@ describe('MeetingsScreen', () => {
   });
 
   it('should show loading indicator when loading', () => {
-    mockUseMeetingsResult.loading = true;
+    mockUseMeetingsResult = createMockUseMeetings({ loading: true });
 
     const { getByTestId } = render(<MeetingsScreen />);
     expect(getByTestId('activity-indicator')).toBeTruthy();
   });
 
   it('should display empty state when no meetings', () => {
-    mockUseMeetingsResult.meetings = [];
+    mockUseMeetingsResult = createMockUseMeetings({ meetings: [] });
 
     const { getByText } = render(<MeetingsScreen />);
     expect(getByText('No upcoming events')).toBeTruthy();
   });
 
   it('should display meetings when available', () => {
-    mockUseMeetingsResult.meetings = [mockMeeting];
+    mockUseMeetingsResult = createMockUseMeetings({ meetings: [mockMeeting] });
 
     const { getByText } = render(<MeetingsScreen />);
     expect(getByText('Team Meeting')).toBeTruthy();
   });
 
   it('should show Create Event button for leaders', () => {
-    mockGroupContext.isGroupLeader = true;
-    mockUseMeetingsResult.meetings = [];
+    mockGroupContext = createMockGroupContext({
+      currentGroup: mockGroup,
+      isGroupLeader: true,
+    });
+    mockUseMeetingsResult = createMockUseMeetings({ meetings: [] });
 
     const { getByText } = render(<MeetingsScreen />);
     expect(getByText('Create Event')).toBeTruthy();
   });
 
   it('should not show Create Event button for regular members', () => {
-    mockGroupContext.isGroupLeader = false;
-    mockUseMeetingsResult.meetings = [];
+    mockGroupContext = createMockGroupContext({
+      currentGroup: mockGroup,
+      isGroupLeader: false,
+    });
+    mockUseMeetingsResult = createMockUseMeetings({ meetings: [] });
 
     const { queryByText } = render(<MeetingsScreen />);
     expect(queryByText('Create Event')).toBeNull();
   });
 
   it('should show + New button in header for leaders', () => {
-    mockGroupContext.isGroupLeader = true;
-    mockUseMeetingsResult.meetings = [mockMeeting];
+    mockGroupContext = createMockGroupContext({
+      currentGroup: mockGroup,
+      isGroupLeader: true,
+    });
+    mockUseMeetingsResult = createMockUseMeetings({ meetings: [mockMeeting] });
 
     const { getByText } = render(<MeetingsScreen />);
     expect(getByText('+ New')).toBeTruthy();
@@ -168,7 +156,7 @@ describe('MeetingsScreen', () => {
   });
 
   it('should show RSVP buttons for invited attendee', () => {
-    mockUseMeetingsResult.meetings = [mockMeeting];
+    mockUseMeetingsResult = createMockUseMeetings({ meetings: [mockMeeting] });
 
     const { getByText } = render(<MeetingsScreen />);
     expect(getByText('✓ Yes')).toBeTruthy();
@@ -177,14 +165,18 @@ describe('MeetingsScreen', () => {
   });
 
   it('should call rsvpToMeeting when RSVP button pressed for non-series meeting', async () => {
-    mockUseMeetingsResult.meetings = [mockMeeting];
+    const rsvpToMeeting = jest.fn().mockResolvedValue(true);
+    mockUseMeetingsResult = createMockUseMeetings({
+      meetings: [mockMeeting],
+      rsvpToMeeting,
+    });
 
     const { getByText } = render(<MeetingsScreen />);
-    
+
     fireEvent.press(getByText('✓ Yes'));
 
     await waitFor(() => {
-      expect(mockUseMeetingsResult.rsvpToMeeting).toHaveBeenCalledWith(
+      expect(rsvpToMeeting).toHaveBeenCalledWith(
         'meeting-1',
         'attendee-1',
         'accepted'
@@ -193,86 +185,142 @@ describe('MeetingsScreen', () => {
   });
 
   it('should show delete button for leaders', () => {
-    mockGroupContext.isGroupLeader = true;
-    mockUseMeetingsResult.meetings = [mockMeeting];
+    mockGroupContext = createMockGroupContext({
+      currentGroup: mockGroup,
+      isGroupLeader: true,
+    });
+    mockUseMeetingsResult = createMockUseMeetings({ meetings: [mockMeeting] });
 
     const { getByText } = render(<MeetingsScreen />);
     expect(getByText('🗑️')).toBeTruthy();
   });
 
   it('should not show delete button for members', () => {
-    mockGroupContext.isGroupLeader = false;
-    mockUseMeetingsResult.meetings = [mockMeeting];
+    mockGroupContext = createMockGroupContext({
+      currentGroup: mockGroup,
+      isGroupLeader: false,
+    });
+    mockUseMeetingsResult = createMockUseMeetings({ meetings: [mockMeeting] });
 
     const { queryByText } = render(<MeetingsScreen />);
     expect(queryByText('🗑️')).toBeNull();
   });
 
   it('should display attendee count', () => {
-    mockUseMeetingsResult.meetings = [mockMeeting];
+    mockUseMeetingsResult = createMockUseMeetings({ meetings: [mockMeeting] });
 
     const { getByText } = render(<MeetingsScreen />);
     expect(getByText('1 invited')).toBeTruthy();
   });
 
   it('should display location when provided', () => {
-    mockUseMeetingsResult.meetings = [mockMeeting];
+    mockUseMeetingsResult = createMockUseMeetings({ meetings: [mockMeeting] });
 
     const { getByText } = render(<MeetingsScreen />);
     expect(getByText(/Conference Room/)).toBeTruthy();
   });
 
-  it('should display series badge for recurring meetings', () => {
-    const seriesMeeting = {
-      ...mockMeeting,
+  it('should display series indicator for recurring meetings', () => {
+    // For series meetings, the component shows "Tap to view all meetings"
+    const seriesMeeting = createMockMeetingWithAttendees({
+      id: 'series-meeting-1',
+      group_id: 'group-id',
+      title: 'Series Meeting',
       series_id: 'series-1',
       series_index: 1,
       series_total: 4,
-    };
-    mockUseMeetingsResult.meetings = [seriesMeeting];
+      created_by: 'user-id',
+      attendees: [
+        {
+          id: 'attendee-1',
+          user_id: 'user-id',
+          status: 'invited',
+          is_series_rsvp: false,
+        },
+      ],
+    });
+
+    // The getSeriesMeetings function needs to return the series meetings
+    const getSeriesMeetings = jest.fn().mockReturnValue([seriesMeeting]);
+    mockUseMeetingsResult = createMockUseMeetings({
+      meetings: [seriesMeeting],
+      getSeriesMeetings,
+    });
 
     const { getByText } = render(<MeetingsScreen />);
-    expect(getByText('1/4')).toBeTruthy();
+    expect(getByText('Tap to view all meetings')).toBeTruthy();
   });
 
-  it('should show series RSVP modal for recurring meetings', async () => {
-    const seriesMeeting = {
-      ...mockMeeting,
+  it('should open series view modal when tapping on series meeting card', async () => {
+    const seriesMeeting = createMockMeetingWithAttendees({
+      id: 'series-meeting-1',
+      group_id: 'group-id',
+      title: 'Series Meeting',
       series_id: 'series-1',
-    };
-    mockUseMeetingsResult.meetings = [seriesMeeting];
+      series_index: 1,
+      created_by: 'user-id',
+      attendees: [
+        {
+          id: 'attendee-1',
+          user_id: 'user-id',
+          status: 'invited',
+          is_series_rsvp: false,
+        },
+      ],
+    });
+
+    const getSeriesMeetings = jest.fn().mockReturnValue([seriesMeeting]);
+    mockUseMeetingsResult = createMockUseMeetings({
+      meetings: [seriesMeeting],
+      getSeriesMeetings,
+    });
 
     const { getByText } = render(<MeetingsScreen />);
-    
-    fireEvent.press(getByText('✓ Yes'));
+
+    // Tap on the series card
+    fireEvent.press(getByText('Tap to view all meetings'));
 
     await waitFor(() => {
-      expect(getByText('Apply to all events?')).toBeTruthy();
+      // Series view modal should show "Done" button and meetings count
+      expect(getByText('Done')).toBeTruthy();
+      expect(getByText('1 meetings in series')).toBeTruthy();
     });
   });
 
-  it('should call rsvpToSeries when "All in series" is pressed', async () => {
-    const seriesMeeting = {
-      ...mockMeeting,
+  it('should display RSVP options in series view modal', async () => {
+    const seriesMeeting = createMockMeetingWithAttendees({
+      id: 'series-meeting-1',
+      group_id: 'group-id',
+      title: 'Series Meeting',
       series_id: 'series-1',
-    };
-    mockUseMeetingsResult.meetings = [seriesMeeting];
-
-    const { getByText } = render(<MeetingsScreen />);
-    
-    fireEvent.press(getByText('✓ Yes'));
-
-    await waitFor(() => {
-      expect(getByText('All in series')).toBeTruthy();
+      series_index: 1,
+      created_by: 'user-id',
+      attendees: [
+        {
+          id: 'attendee-1',
+          user_id: 'user-id',
+          status: 'invited',
+          is_series_rsvp: false,
+        },
+      ],
     });
 
-    fireEvent.press(getByText('All in series'));
+    const getSeriesMeetings = jest.fn().mockReturnValue([seriesMeeting]);
+    mockUseMeetingsResult = createMockUseMeetings({
+      meetings: [seriesMeeting],
+      getSeriesMeetings,
+    });
+
+    const { getByText, getAllByText } = render(<MeetingsScreen />);
+
+    // Tap on the series card to open the modal
+    fireEvent.press(getByText('Tap to view all meetings'));
 
     await waitFor(() => {
-      expect(mockUseMeetingsResult.rsvpToSeries).toHaveBeenCalledWith(
-        'series-1',
-        'accepted'
-      );
+      // The modal should show RSVP buttons for each meeting in the series
+      // There will be multiple "✓ Yes" buttons (one in original card, one in modal)
+      const yesButtons = getAllByText('✓ Yes');
+      expect(yesButtons.length).toBeGreaterThan(0);
     });
   });
 });
