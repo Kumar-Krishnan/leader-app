@@ -99,6 +99,10 @@ export const createMockSupabase = (overrides: any = {}) => {
       ...overrides.storage,
     },
     rpc: jest.fn(() => Promise.resolve({ data: null, error: null })),
+    functions: {
+      invoke: jest.fn(() => Promise.resolve({ data: null, error: null })),
+      ...overrides.functions,
+    },
     channel: jest.fn(() => ({
       on: jest.fn().mockReturnThis(),
       subscribe: jest.fn((callback) => {

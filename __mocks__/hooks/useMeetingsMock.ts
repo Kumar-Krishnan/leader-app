@@ -17,6 +17,7 @@ export function createMockUseMeetings(
     meetings: [],
     loading: false,
     error: null,
+    sendingEmail: false,
     refetch: jest.fn().mockResolvedValue(undefined),
     rsvpToMeeting: jest.fn().mockResolvedValue(true),
     rsvpToSeries: jest.fn().mockResolvedValue(true),
@@ -25,6 +26,7 @@ export function createMockUseMeetings(
     updateMeeting: jest.fn().mockResolvedValue(true),
     getSeriesMeetings: jest.fn().mockReturnValue([]),
     skipMeeting: jest.fn().mockResolvedValue(true),
+    sendMeetingEmail: jest.fn().mockResolvedValue(true),
     ...overrides,
   };
 }
@@ -103,6 +105,7 @@ export function createMockUseMeetingsWithSpies() {
     updateMeeting: jest.fn().mockResolvedValue(true),
     getSeriesMeetings: jest.fn().mockReturnValue([]),
     skipMeeting: jest.fn().mockResolvedValue(true),
+    sendMeetingEmail: jest.fn().mockResolvedValue(true),
   };
 
   const mock = createMockUseMeetings(spies);
@@ -122,4 +125,5 @@ export function resetUseMeetingsMock(mock: UseMeetingsResult): void {
   if (jest.isMockFunction(mock.updateMeeting)) mock.updateMeeting.mockClear();
   if (jest.isMockFunction(mock.getSeriesMeetings)) mock.getSeriesMeetings.mockClear();
   if (jest.isMockFunction(mock.skipMeeting)) mock.skipMeeting.mockClear();
+  if (jest.isMockFunction(mock.sendMeetingEmail)) mock.sendMeetingEmail.mockClear();
 }

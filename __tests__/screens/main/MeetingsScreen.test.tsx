@@ -206,6 +206,48 @@ describe('MeetingsScreen', () => {
     expect(queryByText('🗑️')).toBeNull();
   });
 
+  it('should show email button for leaders', () => {
+    mockGroupContext = createMockGroupContext({
+      currentGroup: mockGroup,
+      isGroupLeader: true,
+    });
+    mockUseMeetingsResult = createMockUseMeetings({ meetings: [mockMeeting] });
+
+    const { getByText } = render(<MeetingsScreen />);
+    expect(getByText('✉️')).toBeTruthy();
+  });
+
+  it('should not show email button for members', () => {
+    mockGroupContext = createMockGroupContext({
+      currentGroup: mockGroup,
+      isGroupLeader: false,
+    });
+    mockUseMeetingsResult = createMockUseMeetings({ meetings: [mockMeeting] });
+
+    const { queryByText } = render(<MeetingsScreen />);
+    expect(queryByText('✉️')).toBeNull();
+  });
+
+  it('should call sendMeetingEmail when email button is pressed', async () => {
+    const sendMeetingEmail = jest.fn().mockResolvedValue(true);
+    mockGroupContext = createMockGroupContext({
+      currentGroup: mockGroup,
+      isGroupLeader: true,
+    });
+    mockUseMeetingsResult = createMockUseMeetings({
+      meetings: [mockMeeting],
+      sendMeetingEmail,
+    });
+
+    const { getByText } = render(<MeetingsScreen />);
+
+    fireEvent.press(getByText('✉️'));
+
+    await waitFor(() => {
+      expect(sendMeetingEmail).toHaveBeenCalledWith('meeting-1');
+    });
+  });
+
   it('should display attendee count', () => {
     mockUseMeetingsResult = createMockUseMeetings({ meetings: [mockMeeting] });
 

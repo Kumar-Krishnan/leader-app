@@ -55,10 +55,16 @@ const createMockChain = (data: any, error: any = null) => ({
 describe('useMessages', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.useFakeTimers();
     mockAuthContext = { user: mockUser };
     (supabase.from as jest.Mock).mockReturnValue(createMockChain([mockMessage]));
     (supabase.channel as jest.Mock).mockReturnValue(mockChannel);
     (supabase.removeChannel as jest.Mock).mockReturnValue(undefined);
+  });
+
+  afterEach(() => {
+    jest.runOnlyPendingTimers();
+    jest.useRealTimers();
   });
 
   it('should start with loading state', () => {

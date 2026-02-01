@@ -75,6 +75,7 @@ describe('ThreadsScreen', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.useFakeTimers();
 
     // Reset to default mock data
     mockAuthContext = createMockAuthContext({
@@ -93,6 +94,11 @@ describe('ThreadsScreen', () => {
     (supabase.from as jest.Mock).mockReturnValue(
       createMockChain([mockThread, mockThread2])
     );
+  });
+
+  afterEach(() => {
+    jest.runOnlyPendingTimers();
+    jest.useRealTimers();
   });
 
   it('should render loading state initially', () => {

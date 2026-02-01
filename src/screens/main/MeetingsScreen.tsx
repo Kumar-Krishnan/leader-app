@@ -52,6 +52,7 @@ export default function MeetingsScreen() {
   const {
     meetings,
     loading,
+    sendingEmail,
     refetch,
     rsvpToMeeting,
     rsvpToSeries,
@@ -60,6 +61,7 @@ export default function MeetingsScreen() {
     updateMeeting,
     getSeriesMeetings,
     skipMeeting,
+    sendMeetingEmail,
   } = useMeetings();
   
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -218,6 +220,16 @@ export default function MeetingsScreen() {
     }
   };
 
+  // Send email notification for a meeting
+  const handleSendEmail = async (meetingId: string) => {
+    const success = await sendMeetingEmail(meetingId);
+    if (success) {
+      showAlert('Email Sent', 'Meeting notification has been sent to all attendees.');
+    } else {
+      showAlert('Error', 'Failed to send email. Please try again.');
+    }
+  };
+
   // Handle meeting created - refetch and optionally open series editor
   const handleMeetingCreated = async (seriesInfo?: { seriesId: string; seriesTitle: string }) => {
     await refetch();
@@ -261,12 +273,21 @@ export default function MeetingsScreen() {
                 )}
               </View>
               {isGroupLeader && !isSeries && (
-                <TouchableOpacity
-                  onPress={() => initiateDelete(meeting)}
-                  style={styles.deleteButton}
-                >
-                  <Text style={styles.deleteButtonText}>🗑️</Text>
-                </TouchableOpacity>
+                <View style={styles.actionButtons}>
+                  <TouchableOpacity
+                    onPress={() => handleSendEmail(meeting.id)}
+                    style={styles.emailButton}
+                    disabled={sendingEmail}
+                  >
+                    <Text style={styles.emailButtonText}>{sendingEmail ? '...' : '✉️'}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => initiateDelete(meeting)}
+                    style={styles.deleteButton}
+                  >
+                    <Text style={styles.deleteButtonText}>🗑️</Text>
+                  </TouchableOpacity>
+                </View>
               )}
             </View>
             <Text style={styles.meetingDetails}>
@@ -735,9 +756,20 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-start',
   },
-  deleteButton: {
+  actionButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  emailButton: {
     padding: 4,
     marginLeft: 8,
+  },
+  emailButtonText: {
+    fontSize: 16,
+  },
+  deleteButton: {
+    padding: 4,
   },
   deleteButtonText: {
     fontSize: 16,

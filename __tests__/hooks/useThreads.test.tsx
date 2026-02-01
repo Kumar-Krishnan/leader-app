@@ -74,7 +74,8 @@ const createMockChain = (data: any, error: any = null) => ({
 describe('useThreads', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    
+    jest.useFakeTimers();
+
     // Reset to default mock data
     mockAuthContext = {
       user: mockUser,
@@ -82,7 +83,7 @@ describe('useThreads', () => {
       isLeader: false,
       isAdmin: false,
     };
-    
+
     mockGroupContext = {
       currentGroup: mockGroup,
       isGroupLeader: true,
@@ -90,6 +91,11 @@ describe('useThreads', () => {
 
     // Default Supabase mock
     (supabase.from as jest.Mock).mockReturnValue(createMockChain([mockThread, mockThread2]));
+  });
+
+  afterEach(() => {
+    jest.runOnlyPendingTimers();
+    jest.useRealTimers();
   });
 
   it('should start with loading state', () => {

@@ -85,9 +85,19 @@ const createMockChain = (data: any, error: any = null) => {
 describe('useMeetings', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.useFakeTimers();
     mockAuthContext = { user: mockUser };
     mockGroupContext = { currentGroup: mockGroup };
     (supabase.from as jest.Mock).mockReturnValue(createMockChain([mockMeeting]));
+    // Mock functions.invoke for email sending
+    (supabase as any).functions = {
+      invoke: jest.fn().mockResolvedValue({ data: { success: true }, error: null }),
+    };
+  });
+
+  afterEach(() => {
+    jest.runOnlyPendingTimers();
+    jest.useRealTimers();
   });
 
   it('should start with loading state', () => {
@@ -570,6 +580,154 @@ describe('useMeetings', () => {
       });
 
       expect(success).toBe(false);
+    });
+  });
+
+  describe('sendMeetingEmail', () => {
+    const mockMeetingWithAttendees = {
+      ...mockMeeting,
+      attendees: [
+        {
+          id: 'attendee-1',
+          user_id: 'other-user',
+          status: 'invited',
+          is_series_rsvp: false,
+          user: { id: 'other-user', full_name: 'Other User', email: 'other@example.com' },
+        },
+        {
+          id: 'attendee-2',
+          user_id: 'user-id', // Current user - should be excluded
+          status: 'accepted',
+          is_series_rsvp: false,
+          user: { id: 'user-id', full_name: 'Test User', email: 'test@example.com' },
+        },
+      ],
+    };
+
+    it('should send email successfully', async () => {
+      (supabase.from as jest.Mock).mockReturnValue(createMockChain([mockMeetingWithAttendees]));
+      (supabase.functions.invoke as jest.Mock).mockResolvedValue({ data: { success: true }, error: null });
+
+      const { result } = renderHook(() => useMeetings());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      let success;
+      await act(async () => {
+        success = await result.current.sendMeetingEmail('meeting-1');
+      });
+
+      expect(success).toBe(true);
+      expect(supabase.functions.invoke).toHaveBeenCalledWith('send-meeting-email', {
+        body: expect.objectContaining({
+          meetingId: 'meeting-1',
+          title: 'Team Meeting',
+          attendees: [{ email: 'other@example.com', name: 'Other User' }], // Excludes current user
+        }),
+      });
+    });
+
+    it('should set sendingEmail state while sending', async () => {
+      (supabase.from as jest.Mock).mockReturnValue(createMockChain([mockMeetingWithAttendees]));
+
+      let resolveInvoke: Function;
+      const invokePromise = new Promise((resolve) => { resolveInvoke = resolve; });
+      (supabase.functions.invoke as jest.Mock).mockReturnValue(invokePromise);
+
+      const { result } = renderHook(() => useMeetings());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      // Start sending but don't await
+      act(() => {
+        result.current.sendMeetingEmail('meeting-1');
+      });
+
+      expect(result.current.sendingEmail).toBe(true);
+
+      // Resolve the invoke
+      await act(async () => {
+        resolveInvoke!({ data: { success: true }, error: null });
+      });
+
+      await waitFor(() => {
+        expect(result.current.sendingEmail).toBe(false);
+      });
+    });
+
+    it('should return false when meeting not found', async () => {
+      (supabase.from as jest.Mock).mockReturnValue(createMockChain([]));
+
+      const { result } = renderHook(() => useMeetings());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      let success;
+      await act(async () => {
+        success = await result.current.sendMeetingEmail('non-existent');
+      });
+
+      expect(success).toBe(false);
+      expect(result.current.error).toBe('Meeting not found');
+    });
+
+    it('should return false when no attendees with email', async () => {
+      const meetingNoEmails = {
+        ...mockMeeting,
+        attendees: [
+          {
+            id: 'attendee-1',
+            user_id: 'user-id', // Only the sender
+            status: 'accepted',
+            is_series_rsvp: false,
+            user: { id: 'user-id', full_name: 'Test User', email: 'test@example.com' },
+          },
+        ],
+      };
+      (supabase.from as jest.Mock).mockReturnValue(createMockChain([meetingNoEmails]));
+
+      const { result } = renderHook(() => useMeetings());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      let success;
+      await act(async () => {
+        success = await result.current.sendMeetingEmail('meeting-1');
+      });
+
+      expect(success).toBe(false);
+      expect(result.current.error).toBe('No attendees with email addresses to send to');
+    });
+
+    it('should return false on edge function error', async () => {
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
+      (supabase.from as jest.Mock).mockReturnValue(createMockChain([mockMeetingWithAttendees]));
+      (supabase.functions.invoke as jest.Mock).mockResolvedValue({
+        data: null,
+        error: new Error('Function failed'),
+      });
+
+      const { result } = renderHook(() => useMeetings());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      let success;
+      await act(async () => {
+        success = await result.current.sendMeetingEmail('meeting-1');
+      });
+
+      expect(success).toBe(false);
+      consoleSpy.mockRestore();
     });
   });
 });

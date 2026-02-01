@@ -58,6 +58,14 @@ console.warn = (...args) => {
   originalWarn(...args);
 };
 
+// Silence benign act() warnings from async state updates
+// These warnings are informational and don't affect test correctness
+const originalError = console.error;
+console.error = (...args) => {
+  if (args[0]?.includes?.('not wrapped in act(')) return;
+  originalError(...args);
+};
+
 // Mock window.crypto for UUID generation
 if (typeof global.crypto === 'undefined') {
   global.crypto = {

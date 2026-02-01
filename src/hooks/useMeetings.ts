@@ -21,6 +21,8 @@ export interface UseMeetingsResult {
   loading: boolean;
   /** Error message if fetch failed */
   error: string | null;
+  /** Whether an email is currently being sent */
+  sendingEmail: boolean;
   /** Manually refresh the meeting list */
   refetch: () => Promise<void>;
   /** RSVP to a single meeting */
@@ -37,6 +39,8 @@ export interface UseMeetingsResult {
   getSeriesMeetings: (seriesId: string) => MeetingWithAttendees[];
   /** Skip a meeting - moves it and all subsequent meetings forward by one frequency interval */
   skipMeeting: (meetingId: string) => Promise<boolean>;
+  /** Send email notification for a meeting to all attendees */
+  sendMeetingEmail: (meetingId: string) => Promise<boolean>;
 }
 
 /**
@@ -66,6 +70,7 @@ export function useMeetings(): UseMeetingsResult {
   const [meetings, setMeetings] = useState<MeetingWithAttendees[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [sendingEmail, setSendingEmail] = useState(false);
 
   /**
    * Fetch all upcoming meetings for the current group with attendees
@@ -419,6 +424,68 @@ export function useMeetings(): UseMeetingsResult {
     }
   }, [meetings]);
 
+  /**
+   * Send email notification for a meeting to all attendees
+   */
+  const sendMeetingEmail = useCallback(async (meetingId: string): Promise<boolean> => {
+    if (!user || !currentGroup) {
+      setError('Not authenticated or no group selected');
+      return false;
+    }
+
+    const meeting = meetings.find(m => m.id === meetingId);
+    if (!meeting) {
+      setError('Meeting not found');
+      return false;
+    }
+
+    // Get attendees with email addresses (exclude the sender)
+    const attendees = meeting.attendees
+      ?.filter(a => a.user?.email && a.user_id !== user.id)
+      .map(a => ({
+        email: a.user!.email!,
+        name: a.user?.full_name || null,
+      })) || [];
+
+    if (attendees.length === 0) {
+      setError('No attendees with email addresses to send to');
+      return false;
+    }
+
+    setSendingEmail(true);
+    setError(null);
+
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke('send-meeting-email', {
+        body: {
+          meetingId: meeting.id,
+          title: meeting.title,
+          description: meeting.description,
+          date: meeting.date,
+          location: meeting.location,
+          attendees,
+          senderName: user.email || 'A group leader',
+          groupName: currentGroup.name,
+        },
+      });
+
+      if (fnError) throw fnError;
+
+      logger.info('useMeetings', 'Meeting email sent successfully', {
+        meetingId,
+        recipientCount: attendees.length,
+      });
+
+      return true;
+    } catch (err: any) {
+      logger.error('useMeetings', 'Error sending meeting email', { error: err });
+      setError(getUserErrorMessage(err));
+      return false;
+    } finally {
+      setSendingEmail(false);
+    }
+  }, [user, currentGroup, meetings]);
+
   // Fetch meetings when group changes
   useEffect(() => {
     fetchMeetings();
@@ -428,6 +495,7 @@ export function useMeetings(): UseMeetingsResult {
     meetings,
     loading,
     error,
+    sendingEmail,
     refetch: fetchMeetings,
     rsvpToMeeting,
     rsvpToSeries,
@@ -436,6 +504,7 @@ export function useMeetings(): UseMeetingsResult {
     updateMeeting,
     getSeriesMeetings,
     skipMeeting,
+    sendMeetingEmail,
   };
 }
 

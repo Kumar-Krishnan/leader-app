@@ -57,8 +57,14 @@ const createMockChain = (data: any, error: any = null) => ({
 describe('useGroupMembers', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.useFakeTimers();
     mockGroupContext = { currentGroup: mockGroup };
     (supabase.from as jest.Mock).mockReturnValue(createMockChain([mockMember, mockLeader]));
+  });
+
+  afterEach(() => {
+    jest.runOnlyPendingTimers();
+    jest.useRealTimers();
   });
 
   it('should start with loading state', () => {
@@ -91,15 +97,17 @@ describe('useGroupMembers', () => {
   });
 
   it('should update member role successfully', async () => {
-    const mockUpdate = jest.fn().mockReturnThis();
-    const mockEq = jest.fn().mockReturnThis();
     const mockEq2 = jest.fn().mockResolvedValue({ data: {}, error: null });
-    
-    (supabase.from as jest.Mock).mockReturnValue({
-      ...createMockChain([mockMember, mockLeader]),
-      update: mockUpdate,
-      eq: jest.fn().mockReturnValue({ eq: mockEq2 }),
-    });
+    const baseChain = createMockChain([mockMember, mockLeader]);
+
+    // Create a mock that handles both fetch (select.eq.order) and update (update.eq.eq) chains
+    const mockChain = {
+      ...baseChain,
+      update: jest.fn().mockReturnValue({
+        eq: jest.fn().mockReturnValue({ eq: mockEq2 }),
+      }),
+    };
+    (supabase.from as jest.Mock).mockReturnValue(mockChain);
 
     const { result } = renderHook(() => useGroupMembers());
 
@@ -117,17 +125,20 @@ describe('useGroupMembers', () => {
   });
 
   it('should set processingId during role update', async () => {
-    const mockUpdate = jest.fn().mockReturnThis();
     let resolveUpdate: Function;
     const updatePromise = new Promise((resolve) => { resolveUpdate = resolve; });
-    
-    (supabase.from as jest.Mock).mockReturnValue({
-      ...createMockChain([mockMember]),
-      update: mockUpdate,
-      eq: jest.fn().mockReturnValue({ 
-        eq: jest.fn().mockReturnValue(updatePromise) 
+    const baseChain = createMockChain([mockMember]);
+
+    // Create a mock that handles both fetch (select.eq.order) and update (update.eq.eq) chains
+    const mockChain = {
+      ...baseChain,
+      update: jest.fn().mockReturnValue({
+        eq: jest.fn().mockReturnValue({
+          eq: jest.fn().mockReturnValue(updatePromise),
+        }),
       }),
-    });
+    };
+    (supabase.from as jest.Mock).mockReturnValue(mockChain);
 
     const { result } = renderHook(() => useGroupMembers());
 
@@ -153,14 +164,17 @@ describe('useGroupMembers', () => {
   });
 
   it('should remove member successfully', async () => {
-    const mockDelete = jest.fn().mockReturnThis();
     const mockEq2 = jest.fn().mockResolvedValue({ data: {}, error: null });
-    
-    (supabase.from as jest.Mock).mockReturnValue({
-      ...createMockChain([mockMember, mockLeader]),
-      delete: mockDelete,
-      eq: jest.fn().mockReturnValue({ eq: mockEq2 }),
-    });
+    const baseChain = createMockChain([mockMember, mockLeader]);
+
+    // Create a mock that handles both fetch (select.eq.order) and delete (delete.eq.eq) chains
+    const mockChain = {
+      ...baseChain,
+      delete: jest.fn().mockReturnValue({
+        eq: jest.fn().mockReturnValue({ eq: mockEq2 }),
+      }),
+    };
+    (supabase.from as jest.Mock).mockReturnValue(mockChain);
 
     const { result } = renderHook(() => useGroupMembers());
 
@@ -197,14 +211,18 @@ describe('useGroupMembers', () => {
 
   it('should set error on role update failure', async () => {
     const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
-    
-    (supabase.from as jest.Mock).mockReturnValue({
-      ...createMockChain([mockMember]),
-      update: jest.fn().mockReturnThis(),
-      eq: jest.fn().mockReturnValue({ 
-        eq: jest.fn().mockResolvedValue({ data: null, error: new Error('Update failed') })
+    const baseChain = createMockChain([mockMember]);
+
+    // Create a mock that handles both fetch (select.eq.order) and update (update.eq.eq) chains
+    const mockChain = {
+      ...baseChain,
+      update: jest.fn().mockReturnValue({
+        eq: jest.fn().mockReturnValue({
+          eq: jest.fn().mockResolvedValue({ data: null, error: new Error('Update failed') }),
+        }),
       }),
-    });
+    };
+    (supabase.from as jest.Mock).mockReturnValue(mockChain);
 
     const { result } = renderHook(() => useGroupMembers());
 

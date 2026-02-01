@@ -106,11 +106,17 @@ const getDefaultMock = (overrides: Record<string, any> = {}) => {
 describe('useResources', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.useFakeTimers();
     mockAuthContext = { user: mockUser };
     mockGroupContext = { currentGroup: mockGroup };
 
     // Default mock that handles all tables fetchContents() queries
     (supabase.from as jest.Mock).mockImplementation(getDefaultMock());
+  });
+
+  afterEach(() => {
+    jest.runOnlyPendingTimers();
+    jest.useRealTimers();
   });
 
   it('should start with loading state', () => {
