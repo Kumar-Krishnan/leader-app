@@ -17,6 +17,7 @@ import ResourceCommentsModal from '../../components/ResourceCommentsModal';
 import ShareResourceModal from '../../components/ShareResourceModal';
 import ScreenHeader from '../../components/ScreenHeader';
 import { showAlert, showDestructiveConfirm } from '../../lib/errors';
+import { colors, spacing, borderRadius, fontSize, fontWeight, shadows } from '../../constants/theme';
 
 const TYPE_ICONS: Record<string, string> = {
   document: '📄',
@@ -317,11 +318,6 @@ export default function ResourcesScreen() {
           <View style={styles.itemInfo}>
             <View style={styles.titleRow}>
               <Text style={styles.itemTitle} numberOfLines={1}>{resource.title}</Text>
-              {resource.visibility === 'leaders_only' && (
-                <View style={styles.leaderBadge}>
-                  <Text style={styles.leaderBadgeText}>Leaders</Text>
-                </View>
-              )}
               {resource.shareCount && resource.shareCount > 0 && (
                 <View style={styles.shareCountBadge}>
                   <Text style={styles.shareCountText}>Shared</Text>
@@ -402,7 +398,7 @@ export default function ResourcesScreen() {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#3B82F6" />
+        <ActivityIndicator size="large" color={colors.primary[500]} />
       </View>
     );
   }
@@ -590,11 +586,11 @@ export default function ResourcesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0F172A',
+    backgroundColor: colors.background.primary,
   },
   loadingContainer: {
     flex: 1,
-    backgroundColor: '#0F172A',
+    backgroundColor: colors.background.primary,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -602,75 +598,76 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    paddingHorizontal: 20,
+    paddingHorizontal: spacing.xl,
     paddingTop: 60,
-    paddingBottom: 16,
+    paddingBottom: spacing.lg,
   },
   title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#F8FAFC',
+    fontSize: fontSize.display,
+    fontWeight: fontWeight.bold,
+    color: colors.text.primary,
   },
   groupName: {
-    fontSize: 14,
-    color: '#3B82F6',
-    marginTop: 4,
+    fontSize: fontSize.md,
+    color: colors.primary[500],
+    marginTop: spacing.xs,
   },
   headerButtons: {
     flexDirection: 'row',
-    gap: 8,
+    gap: spacing.sm,
   },
   folderButton: {
-    backgroundColor: '#334155',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
+    backgroundColor: colors.neutral[700],
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.xl,
   },
   folderButtonText: {
-    fontSize: 16,
+    fontSize: fontSize.lg,
   },
   addButton: {
-    backgroundColor: '#3B82F6',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
+    backgroundColor: colors.primary[500],
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.xl,
   },
   addButtonText: {
-    color: '#fff',
-    fontWeight: '600',
+    color: colors.text.inverse,
+    fontWeight: fontWeight.semibold,
   },
   breadcrumb: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingBottom: 12,
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.md,
     flexWrap: 'wrap',
   },
   breadcrumbLink: {
-    color: '#3B82F6',
-    fontSize: 14,
+    color: colors.primary[500],
+    fontSize: fontSize.md,
   },
   breadcrumbSep: {
-    color: '#64748B',
-    fontSize: 14,
+    color: colors.text.tertiary,
+    fontSize: fontSize.md,
   },
   breadcrumbCurrent: {
-    color: '#94A3B8',
-    fontSize: 14,
+    color: colors.text.secondary,
+    fontSize: fontSize.md,
   },
   list: {
-    padding: 20,
-    gap: 8,
+    padding: spacing.xl,
+    gap: spacing.sm,
   },
   emptyList: {
     flex: 1,
-    padding: 20,
+    padding: spacing.xl,
   },
   itemCard: {
-    backgroundColor: '#1E293B',
-    borderRadius: 12,
+    backgroundColor: colors.card.background,
+    borderRadius: borderRadius.md,
     flexDirection: 'row',
     alignItems: 'center',
+    ...shadows.sm,
   },
   itemContent: {
     flex: 1,
@@ -682,7 +679,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 10,
-    backgroundColor: '#334155',
+    backgroundColor: colors.neutral[700],
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -691,78 +688,67 @@ const styles = StyleSheet.create({
   },
   itemInfo: {
     flex: 1,
-    marginLeft: 12,
+    marginLeft: spacing.md,
   },
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: spacing.sm,
   },
   itemTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#F8FAFC',
+    fontSize: fontSize.lg,
+    fontWeight: fontWeight.semibold,
+    color: colors.text.primary,
     flex: 1,
   },
   itemMeta: {
-    fontSize: 12,
-    color: '#64748B',
+    fontSize: fontSize.sm,
+    color: colors.text.tertiary,
     marginTop: 2,
     textTransform: 'capitalize',
   },
   sharedFromText: {
-    fontSize: 12,
-    color: '#3B82F6',
+    fontSize: fontSize.sm,
+    color: colors.primary[500],
     marginTop: 2,
   },
   shareCountBadge: {
-    backgroundColor: 'rgba(59, 130, 246, 0.2)',
+    backgroundColor: colors.accent.light,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 6,
   },
   shareCountText: {
-    color: '#3B82F6',
+    color: colors.primary[500],
     fontSize: 10,
-    fontWeight: '600',
+    fontWeight: fontWeight.semibold,
   },
   chevron: {
-    color: '#64748B',
-    fontSize: 16,
+    color: colors.text.tertiary,
+    fontSize: fontSize.lg,
   },
   commentButton: {
     padding: 14,
-    paddingLeft: 8,
+    paddingLeft: spacing.sm,
   },
   commentButtonText: {
-    fontSize: 16,
+    fontSize: fontSize.lg,
   },
   shareButton: {
     padding: 14,
-    paddingLeft: 8,
+    paddingLeft: spacing.sm,
   },
   shareButtonText: {
-    fontSize: 18,
-    color: '#3B82F6',
+    fontSize: fontSize.xl,
+    color: colors.primary[500],
   },
   deleteButton: {
     padding: 14,
-    paddingLeft: 8,
+    paddingLeft: spacing.sm,
   },
   deleteButtonText: {
-    fontSize: 18,
+    fontSize: fontSize.xl,
     opacity: 0.7,
-  },
-  leaderBadge: {
-    backgroundColor: '#7C3AED',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  leaderBadgeText: {
-    color: '#E9D5FF',
-    fontSize: 9,
-    fontWeight: '600',
   },
   emptyState: {
     flex: 1,
@@ -772,120 +758,120 @@ const styles = StyleSheet.create({
   },
   emptyIcon: {
     fontSize: 64,
-    marginBottom: 16,
+    marginBottom: spacing.lg,
   },
   emptyTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#F8FAFC',
-    marginBottom: 8,
+    fontSize: fontSize.xxl,
+    fontWeight: fontWeight.semibold,
+    color: colors.text.primary,
+    marginBottom: spacing.sm,
   },
   emptyText: {
-    fontSize: 14,
-    color: '#94A3B8',
+    fontSize: fontSize.md,
+    color: colors.text.secondary,
     textAlign: 'center',
     lineHeight: 22,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    backgroundColor: colors.background.overlay,
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#1E293B',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 24,
+    backgroundColor: colors.card.background,
+    borderTopLeftRadius: borderRadius.xl,
+    borderTopRightRadius: borderRadius.xl,
+    padding: spacing.xxl,
     paddingBottom: 40,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: spacing.xxl,
   },
   modalTitle: {
     fontSize: 22,
-    fontWeight: '700',
-    color: '#F8FAFC',
+    fontWeight: fontWeight.bold,
+    color: colors.text.primary,
   },
   closeButton: {
-    fontSize: 20,
-    color: '#94A3B8',
+    fontSize: fontSize.xxl,
+    color: colors.text.secondary,
   },
   typeSelector: {
     flexDirection: 'row',
-    gap: 12,
-    marginBottom: 16,
+    gap: spacing.md,
+    marginBottom: spacing.lg,
   },
   typeOption: {
     flex: 1,
-    backgroundColor: '#0F172A',
-    borderRadius: 12,
+    backgroundColor: colors.background.primary,
+    borderRadius: borderRadius.md,
     padding: 14,
     alignItems: 'center',
     borderWidth: 2,
     borderColor: 'transparent',
   },
   typeOptionActive: {
-    borderColor: '#3B82F6',
+    borderColor: colors.primary[500],
   },
   typeOptionText: {
-    color: '#F8FAFC',
-    fontSize: 15,
-    fontWeight: '500',
+    color: colors.text.primary,
+    fontSize: fontSize.lg,
+    fontWeight: fontWeight.medium,
   },
   input: {
-    backgroundColor: '#0F172A',
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 16,
-    color: '#F8FAFC',
+    backgroundColor: colors.background.primary,
+    borderRadius: borderRadius.md,
+    padding: spacing.lg,
+    fontSize: fontSize.lg,
+    color: colors.text.primary,
     borderWidth: 1,
-    borderColor: '#334155',
-    marginBottom: 12,
+    borderColor: colors.border.light,
+    marginBottom: spacing.md,
   },
   filePickerButton: {
-    backgroundColor: '#0F172A',
-    borderRadius: 12,
-    padding: 16,
+    backgroundColor: colors.background.primary,
+    borderRadius: borderRadius.md,
+    padding: spacing.lg,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: colors.border.light,
     borderStyle: 'dashed',
-    marginBottom: 12,
+    marginBottom: spacing.md,
     alignItems: 'center',
   },
   filePickerText: {
-    color: '#3B82F6',
-    fontSize: 16,
-    fontWeight: '500',
+    color: colors.primary[500],
+    fontSize: fontSize.lg,
+    fontWeight: fontWeight.medium,
   },
   selectedFile: {
     alignItems: 'center',
   },
   selectedFileName: {
-    color: '#F8FAFC',
-    fontSize: 14,
-    fontWeight: '500',
+    color: colors.text.primary,
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.medium,
   },
   selectedFileSize: {
-    color: '#64748B',
-    fontSize: 12,
-    marginTop: 4,
+    color: colors.text.tertiary,
+    fontSize: fontSize.sm,
+    marginTop: spacing.xs,
   },
   submitButton: {
-    backgroundColor: '#3B82F6',
-    borderRadius: 12,
-    padding: 16,
+    backgroundColor: colors.primary[500],
+    borderRadius: borderRadius.md,
+    padding: spacing.lg,
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: spacing.sm,
   },
   submitButtonDisabled: {
     opacity: 0.7,
   },
   submitButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+    color: colors.text.inverse,
+    fontSize: fontSize.lg,
+    fontWeight: fontWeight.semibold,
   },
 });

@@ -275,7 +275,7 @@ export default function GroupSelectScreen() {
             <Text style={styles.label}>Group Name</Text>
             <TextInput
               style={styles.input}
-              placeholder="e.g., Youth Leaders Group"
+              placeholder="e.g., London Group"
               placeholderTextColor="#64748B"
               value={groupName}
               onChangeText={setGroupName}

@@ -11,15 +11,16 @@ import ResourcesScreen from '../screens/main/ResourcesScreen';
 import ProfileScreen from '../screens/main/ProfileScreen';
 import LeaderResourcesScreen from '../screens/leader/LeaderResourcesScreen';
 import { MainTabParamList } from './types';
+import { colors, spacing, borderRadius, fontSize, fontWeight } from '../constants/theme';
 
 const ThreadsStack = createNativeStackNavigator();
 const ProfileStack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
 const stackScreenOptions = {
-  headerStyle: { backgroundColor: '#1E293B' },
-  headerTintColor: '#F8FAFC',
-  headerTitleStyle: { fontWeight: '600' as const },
+  headerStyle: { backgroundColor: colors.card.background },
+  headerTintColor: colors.text.primary,
+  headerTitleStyle: { fontWeight: fontWeight.semibold },
 };
 
 const TabIcon = ({ icon, focused }: { icon: string; focused: boolean }) => (
@@ -72,8 +73,8 @@ export default function MainNavigator() {
       screenOptions={{
         headerShown: false,
         tabBarStyle: styles.tabBar,
-        tabBarActiveTintColor: '#3B82F6',
-        tabBarInactiveTintColor: '#64748B',
+        tabBarActiveTintColor: colors.primary[500],
+        tabBarInactiveTintColor: colors.text.tertiary,
         tabBarLabelStyle: styles.tabLabel,
       }}
     >
@@ -121,24 +122,24 @@ export default function MainNavigator() {
 
 const styles = StyleSheet.create({
   tabBar: {
-    backgroundColor: '#1E293B',
-    borderTopColor: '#334155',
+    backgroundColor: colors.card.background,
+    borderTopColor: colors.border.light,
     borderTopWidth: 1,
-    paddingTop: 8,
-    paddingBottom: 8,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.sm,
     height: 70,
   },
   tabLabel: {
-    fontSize: 11,
-    fontWeight: '500',
-    marginTop: 4,
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.medium,
+    marginTop: spacing.xs,
   },
   iconContainer: {
-    padding: 8,
-    borderRadius: 12,
+    padding: spacing.sm,
+    borderRadius: borderRadius.md,
   },
   iconContainerActive: {
-    backgroundColor: 'rgba(59, 130, 246, 0.15)',
+    backgroundColor: colors.accent.light,
   },
   icon: {
     fontSize: 22,

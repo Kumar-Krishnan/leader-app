@@ -12,6 +12,7 @@ import {
 import { useAuth } from '../../contexts/AuthContext';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AuthStackParamList } from '../../navigation/types';
+import { colors, spacing, borderRadius, fontSize, fontWeight } from '../../constants/theme';
 
 type Props = {
   navigation: NativeStackNavigationProp<AuthStackParamList, 'SignIn'>;
@@ -48,7 +49,7 @@ export default function SignInScreen({ navigation }: Props) {
     >
       <View style={styles.content}>
         <View style={styles.header}>
-          <Text style={styles.title}>Leader App</Text>
+          <Text style={styles.title}>LeaderImpact</Text>
           <Text style={styles.subtitle}>Sign in to continue</Text>
         </View>
 
@@ -114,95 +115,95 @@ export default function SignInScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0F172A',
+    backgroundColor: colors.background.primary,
   },
   content: {
     flex: 1,
     justifyContent: 'center',
-    padding: 24,
+    padding: spacing.xxl,
   },
   header: {
     marginBottom: 40,
   },
   title: {
     fontSize: 36,
-    fontWeight: '700',
-    color: '#F8FAFC',
+    fontWeight: fontWeight.bold,
+    color: colors.primary[500],
     textAlign: 'center',
   },
   subtitle: {
-    fontSize: 16,
-    color: '#94A3B8',
+    fontSize: fontSize.lg,
+    color: colors.text.secondary,
     textAlign: 'center',
-    marginTop: 8,
+    marginTop: spacing.sm,
   },
   warningContainer: {
-    backgroundColor: '#78350F',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 16,
+    backgroundColor: colors.primary[800],
+    padding: spacing.lg,
+    borderRadius: borderRadius.md,
+    marginBottom: spacing.lg,
   },
   warningTitle: {
-    color: '#FDE68A',
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 8,
+    color: colors.primary[200],
+    fontSize: fontSize.lg,
+    fontWeight: fontWeight.semibold,
+    marginBottom: spacing.sm,
   },
   warningText: {
-    color: '#FEF3C7',
-    fontSize: 14,
+    color: colors.primary[100],
+    fontSize: fontSize.md,
     lineHeight: 20,
   },
   errorContainer: {
-    backgroundColor: '#7F1D1D',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 16,
+    backgroundColor: colors.error.dark,
+    padding: spacing.md,
+    borderRadius: borderRadius.sm,
+    marginBottom: spacing.lg,
   },
   errorText: {
-    color: '#FCA5A5',
+    color: colors.error.light,
     textAlign: 'center',
   },
   form: {
-    gap: 16,
+    gap: spacing.lg,
   },
   input: {
-    backgroundColor: '#1E293B',
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 16,
-    color: '#F8FAFC',
+    backgroundColor: colors.card.background,
+    borderRadius: borderRadius.md,
+    padding: spacing.lg,
+    fontSize: fontSize.lg,
+    color: colors.text.primary,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: colors.border.light,
   },
   button: {
-    backgroundColor: '#3B82F6',
-    borderRadius: 12,
-    padding: 16,
+    backgroundColor: colors.primary[500],
+    borderRadius: borderRadius.md,
+    padding: spacing.lg,
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: spacing.sm,
   },
   buttonDisabled: {
     opacity: 0.7,
   },
   buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+    color: colors.text.inverse,
+    fontSize: fontSize.lg,
+    fontWeight: fontWeight.semibold,
   },
   footer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 8,
-    marginTop: 32,
+    gap: spacing.sm,
+    marginTop: spacing.xxxl,
   },
   footerText: {
-    color: '#94A3B8',
-    fontSize: 14,
+    color: colors.text.secondary,
+    fontSize: fontSize.md,
   },
   linkText: {
-    color: '#3B82F6',
-    fontSize: 14,
-    fontWeight: '600',
+    color: colors.primary[500],
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.semibold,
   },
 });

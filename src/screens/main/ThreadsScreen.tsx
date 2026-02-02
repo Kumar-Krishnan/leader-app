@@ -7,6 +7,7 @@ import ScreenHeader from '../../components/ScreenHeader';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { ThreadsStackParamList } from '../../navigation/types';
+import { colors, spacing, borderRadius, fontSize, fontWeight, shadows } from '../../constants/theme';
 
 type NavigationProp = NativeStackNavigationProp<ThreadsStackParamList>;
 
@@ -65,7 +66,7 @@ export default function ThreadsScreen() {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator testID="activity-indicator" size="large" color="#3B82F6" />
+        <ActivityIndicator testID="activity-indicator" size="large" color={colors.primary[500]} />
       </View>
     );
   }
@@ -100,11 +101,11 @@ export default function ThreadsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0F172A',
+    backgroundColor: colors.background.primary,
   },
   loadingContainer: {
     flex: 1,
-    backgroundColor: '#0F172A',
+    backgroundColor: colors.background.primary,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -112,84 +113,85 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    paddingHorizontal: 20,
+    paddingHorizontal: spacing.xl,
     paddingTop: 60,
-    paddingBottom: 20,
+    paddingBottom: spacing.xl,
   },
   title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#F8FAFC',
+    fontSize: fontSize.display,
+    fontWeight: fontWeight.bold,
+    color: colors.text.primary,
   },
   groupName: {
-    fontSize: 14,
-    color: '#3B82F6',
-    marginTop: 4,
+    fontSize: fontSize.md,
+    color: colors.primary[500],
+    marginTop: spacing.xs,
   },
   newButton: {
-    backgroundColor: '#3B82F6',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
+    backgroundColor: colors.primary[500],
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.xl,
   },
   newButtonText: {
-    color: '#fff',
-    fontWeight: '600',
+    color: colors.text.inverse,
+    fontWeight: fontWeight.semibold,
   },
   list: {
-    padding: 20,
-    gap: 12,
+    padding: spacing.xl,
+    gap: spacing.md,
   },
   emptyList: {
     flex: 1,
-    padding: 20,
+    padding: spacing.xl,
   },
   threadCard: {
-    backgroundColor: '#1E293B',
-    borderRadius: 16,
-    padding: 16,
+    backgroundColor: colors.card.background,
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
     flexDirection: 'row',
     alignItems: 'center',
+    ...shadows.sm,
   },
   avatar: {
     width: 50,
     height: 50,
     borderRadius: 25,
-    backgroundColor: '#3B82F6',
+    backgroundColor: colors.primary[500],
     justifyContent: 'center',
     alignItems: 'center',
   },
   avatarText: {
-    color: '#fff',
-    fontSize: 20,
-    fontWeight: '600',
+    color: colors.text.inverse,
+    fontSize: fontSize.xxl,
+    fontWeight: fontWeight.semibold,
   },
   threadInfo: {
     flex: 1,
-    marginLeft: 12,
+    marginLeft: spacing.md,
   },
   threadName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#F8FAFC',
+    fontSize: fontSize.lg,
+    fontWeight: fontWeight.semibold,
+    color: colors.text.primary,
   },
   lastMessage: {
-    fontSize: 14,
-    color: '#94A3B8',
-    marginTop: 4,
+    fontSize: fontSize.md,
+    color: colors.text.secondary,
+    marginTop: spacing.xs,
   },
   unreadBadge: {
-    backgroundColor: '#3B82F6',
-    borderRadius: 12,
+    backgroundColor: colors.primary[500],
+    borderRadius: borderRadius.md,
     paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingVertical: spacing.xs,
     minWidth: 24,
     alignItems: 'center',
   },
   unreadText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
+    color: colors.text.inverse,
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.semibold,
   },
   emptyState: {
     flex: 1,
@@ -199,30 +201,30 @@ const styles = StyleSheet.create({
   },
   emptyIcon: {
     fontSize: 64,
-    marginBottom: 16,
+    marginBottom: spacing.lg,
   },
   emptyTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#F8FAFC',
-    marginBottom: 8,
+    fontSize: fontSize.xxl,
+    fontWeight: fontWeight.semibold,
+    color: colors.text.primary,
+    marginBottom: spacing.sm,
   },
   emptyText: {
-    fontSize: 14,
-    color: '#94A3B8',
+    fontSize: fontSize.md,
+    color: colors.text.secondary,
     textAlign: 'center',
     lineHeight: 22,
   },
   emptyButton: {
-    marginTop: 24,
-    backgroundColor: '#3B82F6',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 12,
+    marginTop: spacing.xxl,
+    backgroundColor: colors.primary[500],
+    paddingHorizontal: spacing.xxl,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.md,
   },
   emptyButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+    color: colors.text.inverse,
+    fontSize: fontSize.lg,
+    fontWeight: fontWeight.semibold,
   },
 });

@@ -116,7 +116,7 @@ describe('DrawerNavigator', () => {
         expect.objectContaining({
           screenOptions: expect.objectContaining({
             drawerStyle: expect.objectContaining({
-              backgroundColor: '#0F172A',
+              backgroundColor: '#2D2D2D',
             }),
           }),
         })

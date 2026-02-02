@@ -131,16 +131,15 @@ const { url, error } = await storageProvider.upload(path, file);
 // Easy to switch from Supabase to S3 later
 ```
 
-## Styling Conventions
+## Styling Conventions (LeaderImpact Branding)
 
-- Dark theme: Background `#0F172A`, cards `#1E293B`
-- Primary blue: `#3B82F6`
-- Leader purple: `#7C3AED`
-- Admin red: `#DC2626`
-- Text: `#F8FAFC` (primary), `#94A3B8` (secondary)
+- **Theme file**: `src/constants/theme.ts` - centralized colors, spacing, typography
+- Background: `#2D2D2D` (charcoal)
+- Cards/elevated surfaces: `#363636`
+- Primary accent: `#F9C80E` (LeaderImpact yellow/gold)
+- Text: `#FFFFFF` (primary), `#94A3B8` (secondary)
 - All styles use React Native StyleSheet
-- Consistent padding: 20px horizontal, 16px card padding
-- Border radius: 12-16px for cards, 20px for buttons
+- Import from theme: `import { colors, spacing, borderRadius, fontSize } from '../constants/theme'`
 
 ## Context Providers
 
@@ -163,6 +162,23 @@ const { url, error } = await storageProvider.upload(path, file);
 - Native uses SecureStore for auth tokens
 - Platform-specific code guarded with `Platform.OS`
 - Alert.alert replaced with window.confirm on web
+
+## Resource Visibility & Leader Hub
+
+The `useResources` hook supports a visibility filter to separate regular resources from leader-only resources:
+
+```tsx
+// Regular resources (excludes leaders_only)
+const { resources, folders } = useResources(); // default: { visibility: 'all' }
+
+// Leader-only resources (Leader Hub)
+const { resources, folders } = useResources({ visibility: 'leaders_only' });
+```
+
+- Main Resources tab uses default `visibility: 'all'` - excludes leader-only resources
+- Leader Hub uses `visibility: 'leaders_only'` - only shows leader resources
+- Resources created via the hook automatically get the correct visibility
+- No duplication between tabs
 
 ## Resource Sharing
 

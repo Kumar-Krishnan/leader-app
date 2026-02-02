@@ -10,6 +10,7 @@ import { supabase } from '../../lib/supabase';
 import Avatar from '../../components/Avatar';
 import ScreenHeader from '../../components/ScreenHeader';
 import { showAlert } from '../../lib/errors';
+import { colors, spacing, borderRadius, fontSize, fontWeight, shadows } from '../../constants/theme';
 
 export default function ProfileScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<ProfileStackParamList>>();
@@ -33,9 +34,9 @@ export default function ProfileScreen() {
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   const getRoleBadge = () => {
-    if (isAdmin) return { text: 'Admin', color: '#DC2626' };
-    if (isLeader) return { text: 'Leader', color: '#7C3AED' };
-    return { text: 'Member', color: '#3B82F6' };
+    if (isAdmin) return { text: 'Admin', color: colors.error.main };
+    if (isLeader) return { text: 'Leader', color: colors.primary[600] };
+    return { text: 'Member', color: colors.primary[500] };
   };
 
   const roleBadge = getRoleBadge();
@@ -213,7 +214,7 @@ export default function ProfileScreen() {
           <Switch
             value={notificationsEnabled}
             onValueChange={setNotificationsEnabled}
-            trackColor={{ false: '#374151', true: '#3B82F6' }}
+            trackColor={{ false: colors.neutral[700], true: colors.primary[500] }}
             thumbColor="#fff"
           />
         </View>
@@ -226,7 +227,7 @@ export default function ProfileScreen() {
           <Switch
             value={profile?.notification_preferences?.messages ?? true}
             onValueChange={() => {}}
-            trackColor={{ false: '#374151', true: '#3B82F6' }}
+            trackColor={{ false: colors.neutral[700], true: colors.primary[500] }}
             thumbColor="#fff"
           />
         </View>
@@ -239,7 +240,7 @@ export default function ProfileScreen() {
           <Switch
             value={profile?.notification_preferences?.meetings ?? true}
             onValueChange={() => {}}
-            trackColor={{ false: '#374151', true: '#3B82F6' }}
+            trackColor={{ false: colors.neutral[700], true: colors.primary[500] }}
             thumbColor="#fff"
           />
         </View>
@@ -286,37 +287,38 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0F172A',
+    backgroundColor: colors.background.primary,
   },
   content: {
     paddingBottom: 40,
   },
   header: {
-    paddingHorizontal: 20,
+    paddingHorizontal: spacing.xl,
     paddingTop: 60,
-    paddingBottom: 20,
+    paddingBottom: spacing.xl,
   },
   title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#F8FAFC',
+    fontSize: fontSize.display,
+    fontWeight: fontWeight.bold,
+    color: colors.text.primary,
   },
   profileSection: {
     alignItems: 'center',
-    paddingVertical: 24,
-    marginHorizontal: 20,
-    backgroundColor: '#1E293B',
-    borderRadius: 20,
+    paddingVertical: spacing.xxl,
+    marginHorizontal: spacing.xl,
+    backgroundColor: colors.card.background,
+    borderRadius: borderRadius.xl,
+    ...shadows.sm,
   },
   avatarContainer: {
     position: 'relative',
-    marginBottom: 16,
+    marginBottom: spacing.lg,
   },
   avatarLoading: {
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#334155',
+    backgroundColor: colors.neutral[700],
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -324,216 +326,217 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 0,
     right: 0,
-    backgroundColor: '#1E293B',
+    backgroundColor: colors.card.background,
     borderRadius: 12,
     width: 24,
     height: 24,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#0F172A',
+    borderColor: colors.background.primary,
   },
   editBadgeText: {
-    fontSize: 12,
+    fontSize: fontSize.sm,
   },
   name: {
     fontSize: 22,
-    fontWeight: '600',
-    color: '#F8FAFC',
+    fontWeight: fontWeight.semibold,
+    color: colors.text.primary,
   },
   email: {
-    fontSize: 14,
-    color: '#94A3B8',
-    marginTop: 4,
+    fontSize: fontSize.md,
+    color: colors.text.secondary,
+    marginTop: spacing.xs,
   },
   roleBadge: {
-    marginTop: 12,
-    paddingHorizontal: 16,
+    marginTop: spacing.md,
+    paddingHorizontal: spacing.lg,
     paddingVertical: 6,
-    borderRadius: 20,
+    borderRadius: borderRadius.xl,
   },
   roleBadgeText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
+    color: colors.text.inverse,
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.semibold,
   },
   section: {
-    marginTop: 24,
-    marginHorizontal: 20,
-    backgroundColor: '#1E293B',
-    borderRadius: 16,
-    padding: 16,
+    marginTop: spacing.xxl,
+    marginHorizontal: spacing.xl,
+    backgroundColor: colors.card.background,
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
+    ...shadows.sm,
   },
   sectionTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#94A3B8',
-    marginBottom: 16,
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.semibold,
+    color: colors.text.secondary,
+    marginBottom: spacing.lg,
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
   groupSelector: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#0F172A',
-    borderRadius: 12,
-    padding: 12,
+    backgroundColor: colors.background.primary,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
   },
   groupIcon: {
     width: 40,
     height: 40,
     borderRadius: 10,
-    backgroundColor: '#334155',
+    backgroundColor: colors.neutral[700],
     justifyContent: 'center',
     alignItems: 'center',
   },
   groupIconText: {
-    fontSize: 20,
+    fontSize: fontSize.xxl,
   },
   groupInfo: {
     flex: 1,
-    marginLeft: 12,
+    marginLeft: spacing.md,
   },
   groupName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#F8FAFC',
+    fontSize: fontSize.lg,
+    fontWeight: fontWeight.semibold,
+    color: colors.text.primary,
   },
   groupRole: {
-    fontSize: 13,
-    color: '#64748B',
+    fontSize: fontSize.sm,
+    color: colors.text.tertiary,
     textTransform: 'capitalize',
   },
   switchText: {
-    fontSize: 14,
-    color: '#3B82F6',
-    fontWeight: '600',
+    fontSize: fontSize.md,
+    color: colors.primary[500],
+    fontWeight: fontWeight.semibold,
   },
   codeContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 12,
-    paddingTop: 12,
+    marginTop: spacing.md,
+    paddingTop: spacing.md,
     borderTopWidth: 1,
-    borderTopColor: '#334155',
+    borderTopColor: colors.border.light,
   },
   codeLabel: {
-    fontSize: 14,
-    color: '#64748B',
+    fontSize: fontSize.md,
+    color: colors.text.tertiary,
   },
   codeValue: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#3B82F6',
-    marginLeft: 8,
+    fontSize: fontSize.lg,
+    fontWeight: fontWeight.bold,
+    color: colors.primary[500],
+    marginLeft: spacing.sm,
     letterSpacing: 2,
   },
   manageButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 16,
-    backgroundColor: '#7C3AED',
-    borderRadius: 12,
+    marginTop: spacing.lg,
+    backgroundColor: colors.primary[600],
+    borderRadius: borderRadius.md,
     padding: 14,
   },
   manageButtonText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '600',
+    color: colors.text.inverse,
+    fontSize: fontSize.lg,
+    fontWeight: fontWeight.semibold,
   },
   pendingBadge: {
-    backgroundColor: '#F59E0B',
+    backgroundColor: colors.warning.main,
     borderRadius: 10,
-    paddingHorizontal: 8,
+    paddingHorizontal: spacing.sm,
     paddingVertical: 2,
-    marginLeft: 8,
+    marginLeft: spacing.sm,
   },
   pendingBadgeText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
+    color: colors.text.inverse,
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.semibold,
   },
   settingRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: '#334155',
+    borderBottomColor: colors.border.light,
   },
   settingLabel: {
-    fontSize: 16,
-    color: '#F8FAFC',
-    fontWeight: '500',
+    fontSize: fontSize.lg,
+    color: colors.text.primary,
+    fontWeight: fontWeight.medium,
   },
   settingDescription: {
-    fontSize: 13,
-    color: '#64748B',
+    fontSize: fontSize.sm,
+    color: colors.text.tertiary,
     marginTop: 2,
   },
   signOutButton: {
-    marginTop: 24,
-    marginHorizontal: 20,
-    backgroundColor: '#7F1D1D',
-    borderRadius: 12,
-    padding: 16,
+    marginTop: spacing.xxl,
+    marginHorizontal: spacing.xl,
+    backgroundColor: colors.error.dark,
+    borderRadius: borderRadius.md,
+    padding: spacing.lg,
     alignItems: 'center',
   },
   signOutText: {
-    color: '#FCA5A5',
-    fontSize: 16,
-    fontWeight: '600',
+    color: colors.error.light,
+    fontSize: fontSize.lg,
+    fontWeight: fontWeight.semibold,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    backgroundColor: colors.background.overlay,
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#1E293B',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 24,
+    backgroundColor: colors.card.background,
+    borderTopLeftRadius: borderRadius.xl,
+    borderTopRightRadius: borderRadius.xl,
+    padding: spacing.xxl,
     paddingBottom: 40,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: spacing.xxl,
   },
   modalTitle: {
     fontSize: 22,
-    fontWeight: '700',
-    color: '#F8FAFC',
+    fontWeight: fontWeight.bold,
+    color: colors.text.primary,
   },
   closeButton: {
-    fontSize: 20,
-    color: '#94A3B8',
+    fontSize: fontSize.xxl,
+    color: colors.text.secondary,
   },
   groupOption: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
-    backgroundColor: '#0F172A',
-    borderRadius: 12,
-    marginBottom: 8,
+    padding: spacing.lg,
+    backgroundColor: colors.background.primary,
+    borderRadius: borderRadius.md,
+    marginBottom: spacing.sm,
     borderWidth: 2,
     borderColor: 'transparent',
   },
   groupOptionActive: {
-    borderColor: '#3B82F6',
+    borderColor: colors.primary[500],
   },
   groupOptionName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#F8FAFC',
+    fontSize: fontSize.lg,
+    fontWeight: fontWeight.semibold,
+    color: colors.text.primary,
   },
   groupOptionRole: {
-    fontSize: 14,
-    color: '#64748B',
+    fontSize: fontSize.md,
+    color: colors.text.tertiary,
     textTransform: 'capitalize',
   },
 });

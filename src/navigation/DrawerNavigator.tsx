@@ -4,6 +4,7 @@ import { createDrawerNavigator } from '@react-navigation/drawer';
 import MainNavigator from './MainNavigator';
 import GroupSidebar from '../components/GroupSidebar';
 import { DrawerParamList } from './types';
+import { colors } from '../constants/theme';
 
 const Drawer = createDrawerNavigator<DrawerParamList>();
 
@@ -25,7 +26,7 @@ export default function DrawerNavigator() {
         drawerType: isWideScreen ? 'permanent' : 'front',
         drawerStyle: {
           width: isWideScreen ? 280 : 300,
-          backgroundColor: '#0F172A',
+          backgroundColor: colors.background.primary,
         },
         overlayColor: 'rgba(0, 0, 0, 0.5)',
         swipeEnabled: Platform.OS !== 'web',

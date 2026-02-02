@@ -21,6 +21,7 @@ A mobile/web app for community leaders to manage:
 | Hosting | Netlify | Auto-deploy from GitHub |
 | Navigation | React Navigation | Nested stacks within tabs |
 | State | React Context | AuthContext + GroupContext |
+| Theme | Centralized | `src/constants/theme.ts` |
 
 ## Current Focus
 
@@ -30,20 +31,21 @@ A mobile/web app for community leaders to manage:
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| Authentication | ✅ Complete | Email/password via Supabase |
-| User Roles | ✅ Complete | user/leader/admin in profiles table |
-| Group System | ✅ Complete | Users belong to groups, join via codes |
-| Join Approval | ✅ Complete | Leaders approve join requests |
-| Threads | ✅ Complete | Create, view, real-time messages |
-| Message Edit/Delete | ✅ Complete | Users can edit/delete own messages |
-| Resources | ✅ Complete | Folders, file uploads, links |
-| Resource Sharing | ✅ Complete | Share resources across groups |
-| Netlify Deploy | ✅ Complete | Auto-deploy on push |
-| Meetings | ✅ Complete | Full CRUD, series, RSVP, skip |
-| Meeting Series | ✅ Complete | Recurring meetings with series editor |
-| Push Notifications | ❌ Not started | expo-notifications installed |
-| Email Reminders | ❌ Not started | Future: Supabase Edge Function + Resend |
-| HubSpot File Sync | 🟡 Partial | File sync works, runs every 8 hours |
+| Authentication | Complete | Email/password via Supabase |
+| User Roles | Complete | user/leader/admin in profiles table |
+| Group System | Complete | Users belong to groups, join via codes |
+| Join Approval | Complete | Leaders approve join requests |
+| Threads | Complete | Create, view, real-time messages |
+| Message Edit/Delete | Complete | Users can edit/delete own messages |
+| Resources | Complete | Folders, file uploads, links |
+| Resource Sharing | Complete | Share resources across groups |
+| Leader Hub | Complete | Separate tab with leader-only resources |
+| Netlify Deploy | Complete | Auto-deploy on push |
+| Meetings | Complete | Full CRUD, series, RSVP, skip |
+| Meeting Series | Complete | Recurring meetings with series editor |
+| Push Notifications | Not started | expo-notifications installed |
+| Email Reminders | Not started | Future: Supabase Edge Function + Resend |
+| HubSpot File Sync | Partial | File sync works, runs every 8 hours |
 
 ## Group System
 
@@ -156,44 +158,49 @@ curl -X POST "https://PROJECT.supabase.co/functions/v1/hubspot-sync" \
 - `src/components/CreateMeetingModal.tsx` - Create single or series meetings
 - `src/components/MeetingSeriesEditorModal.tsx` - Edit series descriptions
 
+## Leader Hub
+
+The Leader Hub is a separate tab visible only to leaders, containing resources with `visibility: 'leaders_only'`.
+
+### Separation from Main Resources
+- Main Resources tab shows resources with `visibility: 'all'`
+- Leader Hub shows only resources with `visibility: 'leaders_only'`
+- No overlap - leader-only resources do NOT appear in the main Resources tab
+
+### Features
+- Full folder navigation with breadcrumbs
+- Create folders, upload files, add links
+- All resources created here automatically have `visibility: 'leaders_only'`
+- Comments and sharing functionality
+- Same UI/UX as main Resources tab
+
+### Files
+- `src/screens/leader/LeaderResourcesScreen.tsx` - Leader Hub screen
+- `src/hooks/useResources.ts` - Accepts `{ visibility: 'leaders_only' }` option
+
 ---
 
 ## Test Coverage
 
-### Well-Tested Areas ✅
+**Total: 321 tests passing**
+
+### Well-Tested Areas
 | Area | Test File | Tests |
 |------|-----------|-------|
 | useMeetings hook | `__tests__/hooks/useMeetings.test.tsx` | 17 |
 | MeetingSeriesEditorModal | `__tests__/components/MeetingSeriesEditorModal.test.tsx` | 17 |
-| useThreads hook | `__tests__/hooks/useThreads.test.tsx` | ✓ |
-| useMessages hook | `__tests__/hooks/useMessages.test.tsx` | ✓ |
-| useResources hook | `__tests__/hooks/useResources.test.tsx` | ✓ |
-| useGroupMembers hook | `__tests__/hooks/useGroupMembers.test.tsx` | ✓ |
-| AuthContext | `__tests__/contexts/AuthContext.test.tsx` | ✓ |
-| GroupContext | `__tests__/contexts/GroupContext.test.tsx` | ✓ |
-| Auth screens | `__tests__/screens/auth/*.test.tsx` | ✓ |
-
-### Needs Testing 🔴
-
-**Components (no tests):**
-- `CreateMeetingModal.tsx` - Meeting/series creation flow
-- `ResourceCommentsModal.tsx` - Comment functionality
-- `Avatar.tsx` - Avatar rendering
-- `ErrorBoundary.tsx` - Error handling
-
-**Screens (no tests):**
-- `GroupSelectScreen.tsx` - Group selection/switching
-- `ManageMembersScreen.tsx` - Member management, approvals
-- `LeaderResourcesScreen.tsx` - Leader-only resources
-- `ResourcesScreen.tsx` - Resource browsing (partial, failing)
-
-### Failing Tests 🟡
-
-Screen tests failing due to missing `SafeAreaProvider` wrapper:
-- `ThreadsScreen.test.tsx`
-- `MeetingsScreen.test.tsx`
-
-**Fix needed:** Add SafeAreaProvider to test utilities or mock `useSafeAreaInsets`.
+| useThreads hook | `__tests__/hooks/useThreads.test.tsx` | 11 |
+| useMessages hook | `__tests__/hooks/useMessages.test.tsx` | 10 |
+| useResources hook | `__tests__/hooks/useResources.test.tsx` | 12 |
+| useGroupMembers hook | `__tests__/hooks/useGroupMembers.test.tsx` | 9 |
+| AuthContext | `__tests__/contexts/AuthContext.test.tsx` | 9 |
+| GroupContext | `__tests__/contexts/GroupContext.test.tsx` | 9 |
+| Auth screens | `__tests__/screens/auth/*.test.tsx` | 34 |
+| ProfileScreen | `__tests__/screens/main/ProfileScreen.test.tsx` | 24 |
+| MeetingsScreen | `__tests__/screens/main/MeetingsScreen.test.tsx` | 17 |
+| ThreadsScreen | `__tests__/screens/main/ThreadsScreen.test.tsx` | 21 |
+| GroupSidebar | `__tests__/components/GroupSidebar.test.tsx` | 28 |
+| DrawerNavigator | `__tests__/navigation/DrawerNavigator.test.tsx` | 9 |
 
 ---
 
@@ -201,8 +208,8 @@ Screen tests failing due to missing `SafeAreaProvider` wrapper:
 
 | Feature | Priority | Notes |
 |---------|----------|-------|
+| Push Notifications | High | expo-notifications already installed |
 | Email Reminders | Medium | Supabase Edge Function + Resend, 2-3 days before meetings |
-| Push Notifications | Medium | expo-notifications already installed |
 | Meeting Attachments | Low | Link resources/files to meetings |
 | Calendar Integration | Low | Export to Google/Apple Calendar |
 

@@ -47,6 +47,14 @@ export interface ShareInfo {
 }
 
 /**
+ * Options for the useResources hook
+ */
+export interface UseResourcesOptions {
+  /** Filter resources by visibility. 'all' excludes leaders_only, 'leaders_only' only shows leaders_only */
+  visibility?: 'all' | 'leaders_only';
+}
+
+/**
  * Return type for the useResources hook
  */
 export interface UseResourcesResult {
@@ -131,7 +139,8 @@ export interface UseResourcesResult {
  * }
  * ```
  */
-export function useResources(): UseResourcesResult {
+export function useResources(options: UseResourcesOptions = {}): UseResourcesResult {
+  const { visibility = 'all' } = options;
   const { user } = useAuth();
   const { currentGroup, groups } = useGroup();
 
@@ -173,11 +182,19 @@ export function useResources(): UseResourcesResult {
       const { data: folderData, error: folderError } = await folderQuery.order('name');
       if (folderError) throw folderError;
 
-      // Fetch own resources
+      // Fetch own resources filtered by visibility
       let resourceQuery = supabase
         .from('resources')
         .select('*')
         .eq('group_id', currentGroup.id);
+
+      // Apply visibility filter
+      if (visibility === 'leaders_only') {
+        resourceQuery = resourceQuery.eq('visibility', 'leaders_only');
+      } else {
+        // Default: exclude leaders_only resources (they go to Leader Hub)
+        resourceQuery = resourceQuery.neq('visibility', 'leaders_only');
+      }
 
       if (currentFolderId === null) {
         resourceQuery = resourceQuery.is('folder_id', null);
@@ -281,7 +298,14 @@ export function useResources(): UseResourcesResult {
           .eq('shared_with_group_id', currentGroup.id);
 
         sharedResources = ((sharedResourceData || []) as any[])
-          .filter((item) => item.resource && item.resource.folder_id === null)
+          .filter((item) => {
+            if (!item.resource || item.resource.folder_id !== null) return false;
+            // Apply visibility filter to shared resources too
+            if (visibility === 'leaders_only') {
+              return item.resource.visibility === 'leaders_only';
+            }
+            return item.resource.visibility !== 'leaders_only';
+          })
           .map((item) => ({
             ...item.resource,
             isShared: true,
@@ -312,11 +336,19 @@ export function useResources(): UseResourcesResult {
               sourceGroupName: f.group?.name,
             }));
 
-            // Fetch resources in the current shared folder
-            const { data: subResourceData } = await supabase
+            // Fetch resources in the current shared folder with visibility filter
+            let subResourceQuery = supabase
               .from('resources')
               .select('*, group:groups!group_id (id, name)')
               .eq('folder_id', currentFolderId);
+
+            if (visibility === 'leaders_only') {
+              subResourceQuery = subResourceQuery.eq('visibility', 'leaders_only');
+            } else {
+              subResourceQuery = subResourceQuery.neq('visibility', 'leaders_only');
+            }
+
+            const { data: subResourceData } = await subResourceQuery;
 
             sharedResources = ((subResourceData || []) as any[]).map((r) => ({
               ...r,
@@ -337,7 +369,7 @@ export function useResources(): UseResourcesResult {
     } finally {
       setLoading(false);
     }
-  }, [currentGroup, currentFolderId, folderPath]);
+  }, [currentGroup, currentFolderId, folderPath, visibility]);
 
   /**
    * Navigate into a folder
@@ -443,7 +475,7 @@ export function useResources(): UseResourcesResult {
           file_path: storagePath,
           file_size: file.size || null,
           mime_type: file.type || null,
-          visibility: 'all',
+          visibility: visibility === 'leaders_only' ? 'leaders_only' : 'all',
           shared_by: user.id,
           tags: [],
         });
@@ -459,7 +491,7 @@ export function useResources(): UseResourcesResult {
     } finally {
       setUploading(false);
     }
-  }, [currentGroup, currentFolderId, user, fetchContents]);
+  }, [currentGroup, currentFolderId, user, fetchContents, visibility]);
 
   /**
    * Create a link resource
@@ -487,7 +519,7 @@ export function useResources(): UseResourcesResult {
           url: url.trim(),
           group_id: currentGroup.id,
           folder_id: currentFolderId,
-          visibility: 'all',
+          visibility: visibility === 'leaders_only' ? 'leaders_only' : 'all',
           shared_by: user.id,
           tags: [],
         });
@@ -501,7 +533,7 @@ export function useResources(): UseResourcesResult {
       setError(getUserErrorMessage(err));
       return false;
     }
-  }, [currentGroup, currentFolderId, user, fetchContents]);
+  }, [currentGroup, currentFolderId, user, fetchContents, visibility]);
 
   /**
    * Delete a folder

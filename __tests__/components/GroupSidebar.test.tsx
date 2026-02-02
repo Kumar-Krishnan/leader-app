@@ -354,7 +354,7 @@ describe('GroupSidebar', () => {
       fireEvent.press(getByText('Create Group'));
 
       expect(getByText('Group Name')).toBeTruthy();
-      expect(getByPlaceholderText('e.g., Youth Leaders Group')).toBeTruthy();
+      expect(getByPlaceholderText('e.g., London Group')).toBeTruthy();
     });
 
     it('should show error when creating with empty name', async () => {
@@ -381,7 +381,7 @@ describe('GroupSidebar', () => {
 
       fireEvent.press(getByText('Create Group'));
 
-      const nameInput = getByPlaceholderText('e.g., Youth Leaders Group');
+      const nameInput = getByPlaceholderText('e.g., London Group');
       const descInput = getByPlaceholderText('A brief description...');
 
       fireEvent.changeText(nameInput, 'New Test Group');
@@ -407,14 +407,14 @@ describe('GroupSidebar', () => {
 
       fireEvent.press(getByText('Create Group'));
 
-      const nameInput = getByPlaceholderText('e.g., Youth Leaders Group');
+      const nameInput = getByPlaceholderText('e.g., London Group');
       fireEvent.changeText(nameInput, 'New Test Group');
 
       const createButtons = getAllByText('Create Group');
       fireEvent.press(createButtons[createButtons.length - 1]);
 
       await waitFor(() => {
-        expect(queryByPlaceholderText('e.g., Youth Leaders Group')).toBeNull();
+        expect(queryByPlaceholderText('e.g., London Group')).toBeNull();
       });
     });
 
@@ -430,7 +430,7 @@ describe('GroupSidebar', () => {
 
       fireEvent.press(getByText('Create Group'));
 
-      const nameInput = getByPlaceholderText('e.g., Youth Leaders Group');
+      const nameInput = getByPlaceholderText('e.g., London Group');
       fireEvent.changeText(nameInput, 'New Test Group');
 
       const createButtons = getAllByText('Create Group');
@@ -447,11 +447,11 @@ describe('GroupSidebar', () => {
       const { getByText, queryByPlaceholderText } = render(<GroupSidebar {...mockDrawerProps} />);
 
       fireEvent.press(getByText('Create Group'));
-      expect(queryByPlaceholderText('e.g., Youth Leaders Group')).toBeTruthy();
+      expect(queryByPlaceholderText('e.g., London Group')).toBeTruthy();
 
       fireEvent.press(getByText('X'));
 
-      expect(queryByPlaceholderText('e.g., Youth Leaders Group')).toBeNull();
+      expect(queryByPlaceholderText('e.g., London Group')).toBeNull();
     });
   });
 

@@ -1,53 +1,49 @@
 # Next Steps & TODO
 
-## Current State (January 2026)
+## Current State (February 2026)
 
 **Target: Demo Org** - Building toward organizational pilot.
 
 The app is deployed on Netlify with core features working:
-- ✅ Authentication
-- ✅ Group system with join codes
-- ✅ Real-time messaging
-- ✅ Resources with folders/uploads
-- ✅ Resource sharing across groups
-- ✅ Role-based access
-- ✅ HubSpot file sync (every 8 hours)
+- Authentication
+- Group system with join codes
+- Real-time messaging
+- Resources with folders/uploads
+- Resource sharing across groups
+- Role-based access
+- HubSpot file sync (every 8 hours)
+- Meetings with full CRUD, series, RSVP, skip
+- Leader Hub with separated leader-only resources
 
 ## Immediate Priorities
 
-### 1. Meetings CRUD (High Priority)
-The list view exists but needs full functionality.
-
-- [ ] Create meeting form (title, date, location, topics)
-- [ ] Edit meeting
-- [ ] Delete meeting
-- [ ] Meeting detail view
-- [ ] Link meeting to thread for discussion
-
-### 2. Push Notifications (High Priority)
+### 1. Push Notifications (High Priority)
 - [ ] Register for push tokens (expo-notifications installed)
 - [ ] Store push tokens in profiles table
 - [ ] Supabase Edge Function to send on new message
 - [ ] Notification preferences UI (already in profile type)
 
-### 3. Leader Features (Medium Priority)
-- [x] Share resources/folders with other groups (✅ Implemented)
-- [ ] Leader-to-leader messaging
-- [ ] Member management improvements
+### 2. Email Reminders (Medium Priority)
+- [ ] Supabase Edge Function for meeting reminders
+- [ ] Send 2-3 days before meetings
+- [ ] Integration with Resend or similar
 
-### 4. HubSpot Integration (In Progress)
-- [x] HubSpot File Manager sync (Edge Function)
-- [x] Auto-sync every 8 hours via GitHub Actions
-- [x] System group for HubSpot resources
-- [x] Auto-add leaders to HubSpot group
-- [ ] Sync contacts to profiles
-- [ ] Activity tracking
-
-### 5. Polish & UX
+### 3. Polish & UX
 - [ ] Loading skeletons instead of spinners
-- [ ] Error handling improvements
 - [ ] Empty state illustrations
 - [ ] Pull-to-refresh everywhere
+
+## Completed Features
+
+- [x] Meetings CRUD (full functionality)
+- [x] Meeting series with editor
+- [x] Meeting RSVP (single and series)
+- [x] Skip meeting functionality
+- [x] Resource sharing between groups
+- [x] Leader Hub with leader-only resources
+- [x] LeaderImpact branding/theme
+- [x] Error handling improvements (logger, showAlert, ErrorBoundary)
+- [x] Comprehensive test coverage (321 tests)
 
 ## iOS Deployment
 

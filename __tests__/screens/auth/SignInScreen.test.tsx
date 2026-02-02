@@ -32,7 +32,7 @@ describe('SignInScreen', () => {
       <SignInScreen navigation={mockNavigation} />
     );
 
-    expect(getByText('Leader App')).toBeTruthy();
+    expect(getByText('LeaderImpact')).toBeTruthy();
     expect(getByText('Sign in to continue')).toBeTruthy();
     expect(getByPlaceholderText('Email')).toBeTruthy();
     expect(getByPlaceholderText('Password')).toBeTruthy();

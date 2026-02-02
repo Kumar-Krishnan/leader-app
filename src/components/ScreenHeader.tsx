@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native
 import { useNavigation, DrawerActions } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useGroup } from '../contexts/GroupContext';
+import { colors, spacing, fontSize, fontWeight, borderRadius } from '../constants/theme';
 
 interface ScreenHeaderProps {
   title: string;
@@ -67,9 +68,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-    backgroundColor: '#0F172A',
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.lg,
+    backgroundColor: colors.background.primary,
   },
   leftSection: {
     flexDirection: 'row',
@@ -77,8 +78,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   menuButton: {
-    padding: 8,
-    marginRight: 8,
+    padding: spacing.sm,
+    marginRight: spacing.sm,
     marginTop: 2,
   },
   menuIcon: {
@@ -89,36 +90,36 @@ const styles = StyleSheet.create({
   menuLine: {
     width: 22,
     height: 2,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.text.primary,
     borderRadius: 1,
   },
   titleContainer: {
     flex: 1,
   },
   title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#F8FAFC',
+    fontSize: fontSize.display,
+    fontWeight: fontWeight.bold,
+    color: colors.text.primary,
   },
   groupName: {
-    fontSize: 14,
-    color: '#3B82F6',
-    marginTop: 4,
+    fontSize: fontSize.md,
+    color: colors.primary[500],
+    marginTop: spacing.xs,
   },
   subtitle: {
-    fontSize: 14,
-    color: '#7C3AED',
-    marginTop: 4,
+    fontSize: fontSize.md,
+    color: colors.primary[500],
+    marginTop: spacing.xs,
   },
   rightButton: {
-    backgroundColor: '#3B82F6',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    marginTop: 4,
+    backgroundColor: colors.primary[500],
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.xl,
+    marginTop: spacing.xs,
   },
   rightButtonText: {
-    color: '#fff',
-    fontWeight: '600',
+    color: colors.text.inverse,
+    fontWeight: fontWeight.semibold,
   },
 });
