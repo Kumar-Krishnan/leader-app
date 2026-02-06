@@ -375,6 +375,33 @@ export interface HubSpotFile {
 }
 
 /**
+ * Meeting reminder token record
+ * Stores secure tokens for meeting reminder email confirmation flow
+ */
+export interface MeetingReminderToken {
+  id: string;
+  /** Meeting this token is for */
+  meeting_id: string;
+  /** Leader who will confirm the reminder */
+  leader_id: string;
+  /** Secure 64-character hex token */
+  token: string;
+  /** When the reminder email was sent to the leader */
+  reminder_sent_at: string | null;
+  /** When the leader confirmed and triggered attendee emails */
+  confirmed_at: string | null;
+  /** When emails were sent to attendees */
+  attendee_email_sent_at: string | null;
+  /** Leader-customized description for the reminder */
+  custom_description: string | null;
+  /** Personal message from leader to attendees */
+  custom_message: string | null;
+  /** Token expiration time (7 days from creation) */
+  expires_at: string;
+  created_at: string;
+}
+
+/**
  * Supabase Database type definition for the TypeScript client.
  * Used for typed queries and mutations.
  *
@@ -453,6 +480,11 @@ export interface Database {
         Row: HubSpotFile;
         Insert: Omit<HubSpotFile, 'id' | 'created_at'>;
         Update: Partial<Omit<HubSpotFile, 'id' | 'created_at'>>;
+      };
+      meeting_reminder_tokens: {
+        Row: MeetingReminderToken;
+        Insert: Omit<MeetingReminderToken, 'id' | 'created_at'>;
+        Update: Partial<Omit<MeetingReminderToken, 'id' | 'created_at'>>;
       };
     };
   };

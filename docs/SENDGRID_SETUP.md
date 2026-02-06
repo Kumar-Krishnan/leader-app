@@ -8,6 +8,23 @@ This guide covers how to configure SendGrid for sending meeting notification ema
 - Supabase CLI installed
 - Access to your Supabase project
 
+## Step 0: Initialize and Link Supabase Project
+
+If you haven't already set up the Supabase CLI for this project:
+
+```bash
+# Initialize Supabase in your project (creates config.toml)
+supabase init
+
+# Login to Supabase CLI (opens browser for authentication)
+supabase login
+
+# Link to your Supabase project
+# Get your project reference ID from your dashboard URL: 
+# https://supabase.com/dashboard/project/<project-ref>
+supabase link --project-ref <your-project-ref>
+```
+
 ## Step 1: Create SendGrid Account
 
 1. Go to [SendGrid](https://sendgrid.com/) and sign up for a free account
@@ -77,6 +94,32 @@ supabase functions list
 4. Check that attendees receive the email
 
 ## Troubleshooting
+
+### "Entrypoint path does not exist" or "failed to read file" error
+
+This error occurs when the Supabase CLI can't find your function files. Make sure you've:
+
+1. **Initialized Supabase in your project:**
+   ```bash
+   supabase init
+   ```
+
+2. **Linked to your Supabase project:**
+   ```bash
+   supabase login
+   supabase link --project-ref <your-project-ref>
+   ```
+
+3. **Verified the function file exists:**
+   ```bash
+   ls supabase/functions/send-meeting-email/index.ts
+   ```
+
+4. **Run the deploy command from the project root:**
+   ```bash
+   cd /path/to/leader_app
+   supabase functions deploy send-meeting-email
+   ```
 
 ### Emails not sending
 

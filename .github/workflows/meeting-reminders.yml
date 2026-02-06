@@ -1,0 +1,66 @@
+# Meeting Reminder Scheduler
+# Runs daily at 9 AM UTC to send reminder emails to meeting leaders
+# 2 days before their scheduled meetings
+
+name: Meeting Reminder Scheduler
+
+on:
+  # Run daily at 9 AM UTC
+  schedule:
+    - cron: '0 9 * * *'
+
+  # Allow manual trigger for testing
+  workflow_dispatch:
+
+jobs:
+  send-reminders:
+    name: Send Meeting Reminders
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Trigger Reminder Generation
+        run: |
+          echo "Triggering meeting reminder generation..."
+
+          response=$(curl -s -w "\n%{http_code}" -X POST \
+            "${{ secrets.SUPABASE_URL }}/functions/v1/generate-meeting-reminders" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            -H "Content-Type: application/json")
+
+          # Extract body and status code
+          body=$(echo "$response" | sed '$d')
+          status=$(echo "$response" | tail -1)
+
+          echo "Response status: $status"
+          echo "Response body: $body"
+
+          # Check for success
+          if [ "$status" -ge 200 ] && [ "$status" -lt 300 ]; then
+            echo "Reminder generation completed successfully"
+
+            # Parse and display results
+            processed=$(echo "$body" | jq -r '.processed // 0')
+            skipped=$(echo "$body" | jq -r '.skipped // 0')
+            message=$(echo "$body" | jq -r '.message // "No message"')
+
+            echo "Results:"
+            echo "  - Processed: $processed"
+            echo "  - Skipped: $skipped"
+            echo "  - Message: $message"
+
+            # Check for errors in response
+            errors=$(echo "$body" | jq -r '.errors // empty')
+            if [ -n "$errors" ]; then
+              echo "Warnings/Errors:"
+              echo "$errors" | jq -r '.[]'
+            fi
+          else
+            echo "Reminder generation failed with status $status"
+            echo "Error: $(echo "$body" | jq -r '.error // "Unknown error"')"
+            exit 1
+          fi
+
+      - name: Log Completion
+        if: always()
+        run: |
+          echo "Meeting reminder workflow completed at $(date -u)"
