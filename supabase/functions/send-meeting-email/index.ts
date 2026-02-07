@@ -15,10 +15,13 @@ interface MeetingEmailRequest {
   meetingId: string;
   title: string;
   description: string | null;
+  customMessage?: string | null; // Personal message from leader
+  descriptionFirst?: boolean; // Whether description comes before custom message (default: true)
   date: string; // ISO date string
   location: string | null;
   attendees: Attendee[];
   senderName: string;
+  senderEmail?: string; // Optional custom sender email (e.g., "JonSnow@manatee.link")
   groupName: string;
   rsvpBaseUrl?: string; // Optional deep link base URL
 }
@@ -138,15 +141,30 @@ function generateEmailHtml(meeting: MeetingEmailRequest): string {
                 ` : ''}
               </table>
 
-              ${meeting.description ? `
-              <!-- Description -->
-              <div style="margin-bottom: 32px;">
-                <p style="margin: 0 0 8px 0; color: #6B7280; font-size: 12px; text-transform: uppercase;">Details</p>
-                <p style="margin: 0; color: #374151; font-size: 16px; line-height: 1.6;">
-                  ${meeting.description.replace(/\n/g, '<br>')}
-                </p>
-              </div>
-              ` : ''}
+              ${(() => {
+                const descriptionBlock = meeting.description ? `
+                <div style="margin-bottom: 24px;">
+                  <p style="margin: 0 0 8px 0; color: #6B7280; font-size: 12px; text-transform: uppercase;">Details</p>
+                  <p style="margin: 0; color: #374151; font-size: 16px; line-height: 1.6;">
+                    ${meeting.description.replace(/\n/g, '<br>')}
+                  </p>
+                </div>
+                ` : '';
+
+                const messageBlock = meeting.customMessage ? `
+                <div style="margin-bottom: 24px; background-color: #F0F9FF; border-left: 4px solid #4F46E5; padding: 16px; border-radius: 0 8px 8px 0;">
+                  <p style="margin: 0 0 8px 0; color: #6B7280; font-size: 12px; text-transform: uppercase;">Message from ${meeting.senderName}</p>
+                  <p style="margin: 0; color: #374151; font-size: 16px; line-height: 1.6;">
+                    ${meeting.customMessage.replace(/\n/g, '<br>')}
+                  </p>
+                </div>
+                ` : '';
+
+                const descriptionFirst = meeting.descriptionFirst !== false;
+                return descriptionFirst
+                  ? descriptionBlock + messageBlock
+                  : messageBlock + descriptionBlock;
+              })()}
 
               <!-- CTA Button -->
               <table role="presentation" style="width: 100%;">
@@ -191,9 +209,15 @@ function generateEmailText(meeting: MeetingEmailRequest): string {
   if (meeting.location) {
     text += `Location: ${meeting.location}\n`;
   }
-  if (meeting.description) {
-    text += `\nDetails:\n${meeting.description}\n`;
-  }
+
+  const descriptionText = meeting.description ? `\nDetails:\n${meeting.description}\n` : '';
+  const messageText = meeting.customMessage ? `\nMessage from ${meeting.senderName}:\n${meeting.customMessage}\n` : '';
+
+  const descriptionFirst = meeting.descriptionFirst !== false;
+  text += descriptionFirst
+    ? descriptionText + messageText
+    : messageText + descriptionText;
+
   text += `\nOpen the app to RSVP and see more details.\n`;
   text += `\n---\nSent by ${meeting.senderName} via ${meeting.groupName}`;
 
@@ -214,18 +238,22 @@ serve(async (req) => {
 
   try {
     const sendgridApiKey = Deno.env.get('SENDGRID_API_KEY');
-    const fromEmail = Deno.env.get('SENDGRID_FROM_EMAIL');
-    const fromName = Deno.env.get('SENDGRID_FROM_NAME') || 'Leader App';
+    const defaultFromEmail = Deno.env.get('SENDGRID_FROM_EMAIL');
+    const defaultFromName = Deno.env.get('SENDGRID_FROM_NAME') || 'Leader App';
 
     if (!sendgridApiKey) {
       throw new Error('SENDGRID_API_KEY not configured');
     }
 
-    if (!fromEmail) {
+    if (!defaultFromEmail) {
       throw new Error('SENDGRID_FROM_EMAIL not configured');
     }
 
     const body: MeetingEmailRequest = await req.json();
+
+    // Use custom sender email if provided, otherwise use default
+    const fromEmail = body.senderEmail || defaultFromEmail;
+    const fromName = body.senderName || defaultFromName;
 
     // Validate required fields
     if (!body.meetingId || !body.title || !body.date || !body.attendees?.length) {

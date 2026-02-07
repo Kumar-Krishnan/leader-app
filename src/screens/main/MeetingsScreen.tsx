@@ -6,6 +6,7 @@ import { useMeetings, RSVPStatus } from '../../hooks/useMeetings';
 import { MeetingWithAttendees } from '../../types/database';
 import CreateMeetingModal from '../../components/CreateMeetingModal';
 import MeetingSeriesEditorModal from '../../components/MeetingSeriesEditorModal';
+import SendMeetingEmailModal from '../../components/SendMeetingEmailModal';
 import Avatar from '../../components/Avatar';
 import ScreenHeader from '../../components/ScreenHeader';
 import { showAlert, showDestructiveConfirm } from '../../lib/errors';
@@ -89,6 +90,10 @@ export default function MeetingsScreen() {
     seriesTitle: '',
     meetings: [],
   });
+  const [emailModal, setEmailModal] = useState<{
+    visible: boolean;
+    meeting: MeetingWithAttendees | null;
+  }>({ visible: false, meeting: null });
 
   // Group meetings: standalone meetings + one entry per series (showing next upcoming meeting)
   const displayItems = useMemo((): DisplayItem[] => {
@@ -221,14 +226,25 @@ export default function MeetingsScreen() {
     }
   };
 
-  // Send email notification for a meeting
-  const handleSendEmail = async (meetingId: string) => {
-    const success = await sendMeetingEmail(meetingId);
+  // Open email compose modal for a meeting
+  const openEmailModal = (meeting: MeetingWithAttendees) => {
+    setEmailModal({ visible: true, meeting });
+  };
+
+  // Send email with custom content
+  const handleSendEmail = async (
+    meetingId: string,
+    customDescription: string,
+    customMessage: string,
+    descriptionFirst: boolean
+  ) => {
+    const success = await sendMeetingEmail(meetingId, customDescription, customMessage, descriptionFirst);
     if (success) {
       showAlert('Email Sent', 'Meeting notification has been sent to all attendees.');
     } else {
       showAlert('Error', 'Failed to send email. Please try again.');
     }
+    return success;
   };
 
   // Handle meeting created - refetch and optionally open series editor
@@ -273,14 +289,13 @@ export default function MeetingsScreen() {
                   </View>
                 )}
               </View>
-              {isGroupLeader && !isSeries && (
+              {isGroupLeader && (
                 <View style={styles.actionButtons}>
                   <TouchableOpacity
-                    onPress={() => handleSendEmail(meeting.id)}
+                    onPress={() => openEmailModal(meeting)}
                     style={styles.emailButton}
-                    disabled={sendingEmail}
                   >
-                    <Text style={styles.emailButtonText}>{sendingEmail ? '...' : '✉️'}</Text>
+                    <Text style={styles.emailButtonText}>✉️</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     onPress={() => initiateDelete(meeting)}
@@ -549,6 +564,15 @@ export default function MeetingsScreen() {
         onRefresh={refetch}
       />
 
+      {/* Send Email Modal */}
+      <SendMeetingEmailModal
+        visible={emailModal.visible}
+        onClose={() => setEmailModal({ visible: false, meeting: null })}
+        meeting={emailModal.meeting}
+        onSend={handleSendEmail}
+        sending={sendingEmail}
+      />
+
       {/* Series View Modal */}
       <Modal
         visible={seriesViewModal.visible}
@@ -611,19 +635,30 @@ export default function MeetingsScreen() {
                         <Text style={styles.seriesViewMeetingDescription}>{meeting.description}</Text>
                       )}
                     </View>
-                    {/* Skip button for organizers */}
+                    {/* Action buttons for organizers */}
                     {meeting.created_by === user?.id && isGroupLeader && (
-                      <TouchableOpacity
-                        style={styles.seriesViewSkipButton}
-                        onPress={async () => {
-                          const success = await skipMeeting(meeting.id);
-                          if (success) {
-                            refetch();
-                          }
-                        }}
-                      >
-                        <Text style={styles.seriesViewSkipButtonText}>Skip</Text>
-                      </TouchableOpacity>
+                      <View style={styles.seriesViewActionButtons}>
+                        <TouchableOpacity
+                          style={styles.seriesViewEmailButton}
+                          onPress={() => {
+                            setSeriesViewModal(prev => ({ ...prev, visible: false }));
+                            openEmailModal(meeting);
+                          }}
+                        >
+                          <Text style={styles.seriesViewEmailButtonText}>✉️</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={styles.seriesViewSkipButton}
+                          onPress={async () => {
+                            const success = await skipMeeting(meeting.id);
+                            if (success) {
+                              refetch();
+                            }
+                          }}
+                        >
+                          <Text style={styles.seriesViewSkipButtonText}>Skip</Text>
+                        </TouchableOpacity>
+                      </View>
                     )}
                   </View>
 
@@ -1138,6 +1173,22 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.border.light,
   },
+  seriesViewActionButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  seriesViewEmailButton: {
+    backgroundColor: colors.primary[100],
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.sm,
+    borderWidth: 1,
+    borderColor: colors.primary[500],
+  },
+  seriesViewEmailButtonText: {
+    fontSize: fontSize.md,
+  },
   seriesViewSkipButton: {
     backgroundColor: colors.rsvp.maybeBg,
     paddingHorizontal: spacing.md,
@@ -1145,7 +1196,6 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.sm,
     borderWidth: 1,
     borderColor: colors.warning.main,
-    marginLeft: spacing.sm,
   },
   seriesViewSkipButtonText: {
     color: colors.warning.dark,

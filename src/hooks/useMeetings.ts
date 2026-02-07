@@ -40,7 +40,12 @@ export interface UseMeetingsResult {
   /** Skip a meeting - moves it and all subsequent meetings forward by one frequency interval */
   skipMeeting: (meetingId: string) => Promise<boolean>;
   /** Send email notification for a meeting to all attendees */
-  sendMeetingEmail: (meetingId: string) => Promise<boolean>;
+  sendMeetingEmail: (
+    meetingId: string,
+    customDescription?: string,
+    customMessage?: string,
+    descriptionFirst?: boolean
+  ) => Promise<boolean>;
 }
 
 /**
@@ -64,7 +69,7 @@ export interface UseMeetingsResult {
  * ```
  */
 export function useMeetings(): UseMeetingsResult {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { currentGroup } = useGroup();
   
   const [meetings, setMeetings] = useState<MeetingWithAttendees[]>([]);
@@ -427,7 +432,12 @@ export function useMeetings(): UseMeetingsResult {
   /**
    * Send email notification for a meeting to all attendees
    */
-  const sendMeetingEmail = useCallback(async (meetingId: string): Promise<boolean> => {
+  const sendMeetingEmail = useCallback(async (
+    meetingId: string,
+    customDescription?: string,
+    customMessage?: string,
+    descriptionFirst: boolean = true
+  ): Promise<boolean> => {
     if (!user || !currentGroup) {
       setError('Not authenticated or no group selected');
       return false;
@@ -455,16 +465,23 @@ export function useMeetings(): UseMeetingsResult {
     setSendingEmail(true);
     setError(null);
 
+    // Generate sender email from leader's name (e.g., "Jon Snow" -> "JonSnow@manatee.link")
+    const senderName = profile?.full_name || 'Leader';
+    const senderEmail = senderName.replace(/\s+/g, '') + '@manatee.link';
+
     try {
       const { data, error: fnError } = await supabase.functions.invoke('send-meeting-email', {
         body: {
           meetingId: meeting.id,
           title: meeting.title,
-          description: meeting.description,
+          description: customDescription !== undefined ? customDescription : meeting.description,
+          customMessage: customMessage || null,
+          descriptionFirst,
           date: meeting.date,
           location: meeting.location,
           attendees,
-          senderName: user.email || 'A group leader',
+          senderName,
+          senderEmail,
           groupName: currentGroup.name,
         },
       });
@@ -484,7 +501,7 @@ export function useMeetings(): UseMeetingsResult {
     } finally {
       setSendingEmail(false);
     }
-  }, [user, currentGroup, meetings]);
+  }, [user, profile, currentGroup, meetings]);
 
   // Fetch meetings when group changes
   useEffect(() => {
