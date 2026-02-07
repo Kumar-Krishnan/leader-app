@@ -31,7 +31,7 @@ const linking = {
                 },
               },
               Meetings: 'meetings',
-              Resources: 'resources',
+              MemberHub: 'member-hub',
               LeaderHub: 'leader-hub',
               Profile: {
                 screens: {

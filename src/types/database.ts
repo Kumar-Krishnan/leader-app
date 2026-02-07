@@ -239,8 +239,8 @@ export interface Resource {
   url: string | null;
   /** Tags for categorization */
   tags: string[];
-  /** Visibility level - 'leaders_only' restricts to leaders/admins */
-  visibility: 'all' | 'leaders_only';
+  /** Visibility level - controls who can see this resource */
+  visibility: 'all' | 'leaders_only' | 'members_only';
   /** Group this resource belongs to */
   group_id: string;
   /** Parent folder ID (null for root level) */

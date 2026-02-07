@@ -21,7 +21,7 @@ export type ProfileStackParamList = {
 export type MainTabParamList = {
   Threads: undefined;
   Meetings: undefined;
-  Resources: undefined;
+  MemberHub: undefined;
   LeaderHub: undefined;
   Profile: undefined;
 };

@@ -58,7 +58,7 @@ export default function ResourcesScreen() {
     getResourceShares,
     getFolderShares,
     getShareableGroups,
-  } = useResources();
+  } = useResources({ visibility: 'members_only' });
 
   // Modals
   const [showAddModal, setShowAddModal] = useState(false);
@@ -375,9 +375,9 @@ export default function ResourcesScreen() {
 
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
-      <Text style={styles.emptyIcon}>📚</Text>
+      <Text style={styles.emptyIcon}>⭐</Text>
       <Text style={styles.emptyTitle}>
-        {currentFolderId ? 'This folder is empty' : 'No resources yet'}
+        {currentFolderId ? 'This folder is empty' : 'No member resources yet'}
       </Text>
       <Text style={styles.emptyText}>
         {canApproveRequests
@@ -406,7 +406,7 @@ export default function ResourcesScreen() {
   return (
     <View style={styles.container}>
       <ScreenHeader
-        title="Resources"
+        title="Member Hub"
         rightContent={canApproveRequests ? (
           <View style={styles.headerButtons}>
             <TouchableOpacity
@@ -429,7 +429,7 @@ export default function ResourcesScreen() {
       {folderPath.length > 0 && (
         <View style={styles.breadcrumb}>
           <TouchableOpacity onPress={goToRoot}>
-            <Text style={styles.breadcrumbLink}>Resources</Text>
+            <Text style={styles.breadcrumbLink}>Member Hub</Text>
           </TouchableOpacity>
           {folderPath.map((folder, index) => (
             <React.Fragment key={folder.id}>

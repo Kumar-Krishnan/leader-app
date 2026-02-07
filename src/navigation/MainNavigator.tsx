@@ -2,7 +2,7 @@ import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Text, View, StyleSheet } from 'react-native';
-import { useAuth } from '../contexts/AuthContext';
+import { useGroup } from '../contexts/GroupContext';
 import ThreadsScreen from '../screens/main/ThreadsScreen';
 import ThreadDetailScreen from '../screens/main/ThreadDetailScreen';
 import ManageMembersScreen from '../screens/group/ManageMembersScreen';
@@ -66,7 +66,7 @@ function ProfileStackScreen() {
 }
 
 export default function MainNavigator() {
-  const { isLeader } = useAuth();
+  const { canApproveRequests } = useGroup();
 
   return (
     <Tab.Navigator
@@ -93,13 +93,14 @@ export default function MainNavigator() {
         }}
       />
       <Tab.Screen
-        name="Resources"
+        name="MemberHub"
         component={ResourcesScreen}
         options={{
-          tabBarIcon: ({ focused }) => <TabIcon icon="📚" focused={focused} />,
+          tabBarLabel: 'Member Hub',
+          tabBarIcon: ({ focused }) => <TabIcon icon="⭐" focused={focused} />,
         }}
       />
-      {isLeader && (
+      {canApproveRequests && (
         <Tab.Screen
           name="LeaderHub"
           component={LeaderResourcesScreen}

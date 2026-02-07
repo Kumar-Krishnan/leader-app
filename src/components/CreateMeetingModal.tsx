@@ -27,7 +27,7 @@ interface Props {
   onCreated: (seriesInfo?: SeriesInfo) => void;
 }
 
-type RecurrenceType = 'none' | 'weekly' | 'monthly';
+type RecurrenceType = 'none' | 'weekly' | 'biweekly' | 'monthly';
 
 export default function CreateMeetingModal({ visible, onClose, onCreated }: Props) {
   const { user } = useAuth();
@@ -121,19 +121,21 @@ export default function CreateMeetingModal({ visible, onClose, onCreated }: Prop
   // Generate dates for recurring events
   const generateRecurringDates = (startDate: Date, type: RecurrenceType, count: number): Date[] => {
     const dates: Date[] = [startDate];
-    
+
     if (type === 'none') return dates;
-    
+
     for (let i = 1; i < count; i++) {
       const newDate = new Date(startDate);
       if (type === 'weekly') {
         newDate.setDate(startDate.getDate() + (i * 7));
+      } else if (type === 'biweekly') {
+        newDate.setDate(startDate.getDate() + (i * 14));
       } else if (type === 'monthly') {
         newDate.setMonth(startDate.getMonth() + i);
       }
       dates.push(newDate);
     }
-    
+
     return dates;
   };
 
@@ -452,6 +454,14 @@ export default function CreateMeetingModal({ visible, onClose, onCreated }: Prop
                 >
                   <Text style={[styles.recurrenceOptionText, recurrence === 'weekly' && styles.recurrenceOptionTextActive]}>
                     Weekly
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.recurrenceOption, recurrence === 'biweekly' && styles.recurrenceOptionActive]}
+                  onPress={() => setRecurrence('biweekly')}
+                >
+                  <Text style={[styles.recurrenceOptionText, recurrence === 'biweekly' && styles.recurrenceOptionTextActive]}>
+                    Bi-weekly
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity

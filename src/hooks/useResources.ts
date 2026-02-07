@@ -50,8 +50,12 @@ export interface ShareInfo {
  * Options for the useResources hook
  */
 export interface UseResourcesOptions {
-  /** Filter resources by visibility. 'all' excludes leaders_only, 'leaders_only' only shows leaders_only */
-  visibility?: 'all' | 'leaders_only';
+  /** Filter resources by visibility.
+   * - 'all': excludes leaders_only and members_only (general resources)
+   * - 'leaders_only': only shows leaders_only resources (Leader Hub)
+   * - 'members_only': only shows members_only resources (Member Hub)
+   */
+  visibility?: 'all' | 'leaders_only' | 'members_only';
 }
 
 /**
@@ -191,9 +195,11 @@ export function useResources(options: UseResourcesOptions = {}): UseResourcesRes
       // Apply visibility filter
       if (visibility === 'leaders_only') {
         resourceQuery = resourceQuery.eq('visibility', 'leaders_only');
+      } else if (visibility === 'members_only') {
+        resourceQuery = resourceQuery.eq('visibility', 'members_only');
       } else {
-        // Default: exclude leaders_only resources (they go to Leader Hub)
-        resourceQuery = resourceQuery.neq('visibility', 'leaders_only');
+        // Default: exclude hub-specific resources (they go to their respective hubs)
+        resourceQuery = resourceQuery.eq('visibility', 'all');
       }
 
       if (currentFolderId === null) {
@@ -303,8 +309,10 @@ export function useResources(options: UseResourcesOptions = {}): UseResourcesRes
             // Apply visibility filter to shared resources too
             if (visibility === 'leaders_only') {
               return item.resource.visibility === 'leaders_only';
+            } else if (visibility === 'members_only') {
+              return item.resource.visibility === 'members_only';
             }
-            return item.resource.visibility !== 'leaders_only';
+            return item.resource.visibility === 'all';
           })
           .map((item) => ({
             ...item.resource,
@@ -344,8 +352,10 @@ export function useResources(options: UseResourcesOptions = {}): UseResourcesRes
 
             if (visibility === 'leaders_only') {
               subResourceQuery = subResourceQuery.eq('visibility', 'leaders_only');
+            } else if (visibility === 'members_only') {
+              subResourceQuery = subResourceQuery.eq('visibility', 'members_only');
             } else {
-              subResourceQuery = subResourceQuery.neq('visibility', 'leaders_only');
+              subResourceQuery = subResourceQuery.eq('visibility', 'all');
             }
 
             const { data: subResourceData } = await subResourceQuery;
@@ -475,7 +485,7 @@ export function useResources(options: UseResourcesOptions = {}): UseResourcesRes
           file_path: storagePath,
           file_size: file.size || null,
           mime_type: file.type || null,
-          visibility: visibility === 'leaders_only' ? 'leaders_only' : 'all',
+          visibility: visibility === 'leaders_only' ? 'leaders_only' : (visibility === 'members_only' ? 'members_only' : 'all'),
           shared_by: user.id,
           tags: [],
         });
@@ -519,7 +529,7 @@ export function useResources(options: UseResourcesOptions = {}): UseResourcesRes
           url: url.trim(),
           group_id: currentGroup.id,
           folder_id: currentFolderId,
-          visibility: visibility === 'leaders_only' ? 'leaders_only' : 'all',
+          visibility: visibility === 'leaders_only' ? 'leaders_only' : (visibility === 'members_only' ? 'members_only' : 'all'),
           shared_by: user.id,
           tags: [],
         });
