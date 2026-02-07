@@ -59,35 +59,37 @@ export const corsHeaders = (origin: string | null) => ({
 
 ---
 
-### 2. No Authentication on Edge Functions
+### 2. Limited Authentication on Edge Functions
 
 **Locations:**
-- `supabase/functions/hubspot-sync/index.ts`
-- `supabase/functions/send-meeting-email/index.ts`
-- `supabase/functions/generate-meeting-reminders/index.ts`
+- `supabase/functions/hubspot-sync/index.ts` - No auth
+- `supabase/functions/send-meeting-email/index.ts` - Partial auth (see below)
+- `supabase/functions/generate-meeting-reminders/index.ts` - No auth (cron job)
 
-**Issue:** Edge Functions only check HTTP method, not caller identity:
+**Current State of `send-meeting-email`:**
+The function now requires a Bearer token in the Authorization header:
 
 ```typescript
-serve(async (req) => {
-  const corsResponse = handleCors(req);
-  if (corsResponse) return corsResponse;
-
-  if (req.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
-      status: 405,
-    });
-  }
-  // No authentication check!
+const authHeader = req.headers.get('Authorization');
+if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  return new Response(
+    JSON.stringify({ error: 'Invalid authorization header' }),
+    { status: 401, ... }
+  );
+}
 ```
 
-**Risk:** Anyone who discovers the function URLs can:
-- Trigger HubSpot syncs arbitrarily (rate limiting, billing issues)
-- Send emails to arbitrary attendees (email bombing)
-- Abuse SendGrid quota
-- Generate meeting reminders for any meeting
+However, the JWT is not cryptographically verified server-side. Role-based authorization (leader/admin check) is enforced client-side only.
 
-**Impact:** High - All Edge Functions are publicly accessible
+**Mitigating Factors:**
+- The function is deployed with `--no-verify-jwt` but requires a Bearer token
+- Only leaders see the "Send Email" button in the UI
+- Emails can only be sent to attendees provided in the request body
+- No database access from the function (just forwards to SendGrid)
+
+**Remaining Risk:** Someone with a valid JWT (any authenticated user) could potentially call the function directly if they discover the endpoint and craft the request.
+
+**Impact:** Medium - Requires authentication but role check is client-side only
 
 **Recommendation:**
 ```typescript

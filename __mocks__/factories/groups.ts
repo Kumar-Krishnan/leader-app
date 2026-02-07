@@ -33,7 +33,8 @@ export function createMockGroupMember(overrides: Partial<GroupMember> = {}): Gro
   return {
     id: 'test-member-id',
     group_id: 'test-group-id',
-    user_id: 'test-user-id',
+    user_id: overrides.placeholder_id ? null : 'test-user-id',
+    placeholder_id: null,
     role: 'member' as GroupRole,
     joined_at: '2024-01-01T00:00:00Z',
     ...overrides,
@@ -49,11 +50,13 @@ export function createMockGroupMemberWithDetails(
   return {
     id: overrides.id || 'test-member-id',
     group_id: overrides.group_id || 'test-group-id',
-    user_id: overrides.user_id || 'test-user-id',
+    user_id: overrides.placeholder_id ? null : (overrides.user_id || 'test-user-id'),
+    placeholder_id: overrides.placeholder_id || null,
     role: (overrides.role || 'member') as GroupRole,
     joined_at: overrides.joined_at || '2024-01-01T00:00:00Z',
     group: overrides.group ? createMockGroup(overrides.group as Partial<Group>) : undefined,
     user: overrides.user ? createMockProfile(overrides.user) : undefined,
+    placeholder: overrides.placeholder || undefined,
   };
 }
 

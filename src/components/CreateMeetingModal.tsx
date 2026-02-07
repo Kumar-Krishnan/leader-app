@@ -14,11 +14,20 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { useAuth } from '../contexts/AuthContext';
 import { useGroup } from '../contexts/GroupContext';
 import { supabase } from '../lib/supabase';
-import { Profile } from '../types/database';
+import { Profile, PlaceholderProfile } from '../types/database';
 
 interface SeriesInfo {
   seriesId: string;
   seriesTitle: string;
+}
+
+/** Member that can be invited (either real user or placeholder) */
+interface InvitableMember {
+  id: string; // user_id or placeholder_id
+  type: 'user' | 'placeholder';
+  displayName: string;
+  email: string;
+  avatarUrl?: string | null;
 }
 
 interface Props {
@@ -51,8 +60,8 @@ export default function CreateMeetingModal({ visible, onClose, onCreated }: Prop
   const [recurrence, setRecurrence] = useState<RecurrenceType>('none');
   const [recurrenceCount, setRecurrenceCount] = useState('4'); // Number of occurrences
   
-  // Group members for invitation
-  const [groupMembers, setGroupMembers] = useState<Profile[]>([]);
+  // Group members for invitation (includes placeholders)
+  const [groupMembers, setGroupMembers] = useState<InvitableMember[]>([]);
   const [selectedMembers, setSelectedMembers] = useState<Set<string>>(new Set());
   const [loadingMembers, setLoadingMembers] = useState(false);
 
@@ -70,25 +79,46 @@ export default function CreateMeetingModal({ visible, onClose, onCreated }: Prop
 
   const fetchGroupMembers = async () => {
     if (!currentGroup) return;
-    
+
     setLoadingMembers(true);
     try {
+      // Query group members with joined profile/placeholder data
       const { data, error } = await supabase
         .from('group_members')
         .select(`
           user_id,
-          user:profiles(*)
+          placeholder_id,
+          user:profiles(*),
+          placeholder:placeholder_profiles(*)
         `)
         .eq('group_id', currentGroup.id);
 
       if (error) throw error;
 
-      const members = (data || [])
-        .map((item: any) => item.user)
-        .filter((u: Profile | null) => u !== null) as Profile[];
-      
+      // Transform to InvitableMember format
+      const members: InvitableMember[] = [];
+      for (const item of (data || []) as any[]) {
+        if (item.user_id && item.user) {
+          members.push({
+            id: item.user_id,
+            type: 'user',
+            displayName: item.user.full_name || item.user.email,
+            email: item.user.email,
+            avatarUrl: item.user.avatar_url,
+          });
+        } else if (item.placeholder_id && item.placeholder) {
+          members.push({
+            id: item.placeholder_id,
+            type: 'placeholder',
+            displayName: item.placeholder.full_name,
+            email: item.placeholder.email,
+            avatarUrl: null,
+          });
+        }
+      }
+
       setGroupMembers(members);
-      
+
       // Select all members by default
       setSelectedMembers(new Set(members.map(m => m.id)));
     } catch (err) {
@@ -233,26 +263,44 @@ export default function CreateMeetingModal({ visible, onClose, onCreated }: Prop
 
       const { data: meetings, error: meetingError } = await supabase
         .from('meetings')
-        .insert(eventsToCreate)
+        .insert(eventsToCreate as any)
         .select();
 
       if (meetingError) throw meetingError;
 
       // Add attendees to all created meetings
       if (selectedMembers.size > 0 && meetings) {
-        const allAttendees = meetings.flatMap(meeting => 
-          Array.from(selectedMembers).map(userId => ({
-            meeting_id: meeting.id,
-            user_id: userId,
-            status: 'invited' as const,
-          }))
+        const allAttendees = (meetings as any[]).flatMap((meeting: any) =>
+          Array.from(selectedMembers).map(memberId => {
+            // Find the member to determine if it's a user or placeholder
+            const member = groupMembers.find(m => m.id === memberId);
+            if (!member) return null;
+
+            if (member.type === 'user') {
+              return {
+                meeting_id: meeting.id,
+                user_id: memberId,
+                placeholder_id: null,
+                status: 'invited' as const,
+              };
+            } else {
+              return {
+                meeting_id: meeting.id,
+                user_id: null,
+                placeholder_id: memberId,
+                status: 'invited' as const,
+              };
+            }
+          }).filter((a): a is NonNullable<typeof a> => a !== null)
         );
 
-        const { error: attendeesError } = await supabase
-          .from('meeting_attendees')
-          .insert(allAttendees);
+        if (allAttendees.length > 0) {
+          const { error: attendeesError } = await supabase
+            .from('meeting_attendees')
+            .insert(allAttendees as any);
 
-        if (attendeesError) throw attendeesError;
+          if (attendeesError) throw attendeesError;
+        }
       }
 
       // Capture series info before resetting form
@@ -525,18 +573,29 @@ export default function CreateMeetingModal({ visible, onClose, onCreated }: Prop
                     ]}
                     onPress={() => toggleMember(member.id)}
                   >
-                    <View style={styles.memberAvatar}>
-                      <Text style={styles.memberAvatarText}>
-                        {member.full_name?.[0] || member.email[0].toUpperCase()}
-                      </Text>
-                    </View>
+                    {member.type === 'placeholder' ? (
+                      <View style={styles.placeholderAvatar}>
+                        <Text style={styles.placeholderAvatarText}>?</Text>
+                      </View>
+                    ) : (
+                      <View style={styles.memberAvatar}>
+                        <Text style={styles.memberAvatarText}>
+                          {member.displayName?.[0] || member.email[0].toUpperCase()}
+                        </Text>
+                      </View>
+                    )}
                     <View style={styles.memberInfo}>
-                      <Text style={styles.memberName}>
-                        {member.full_name || member.email}
-                      </Text>
-                      {member.full_name && (
-                        <Text style={styles.memberEmail}>{member.email}</Text>
-                      )}
+                      <View style={styles.memberNameRow}>
+                        <Text style={styles.memberName}>
+                          {member.displayName}
+                        </Text>
+                        {member.type === 'placeholder' && (
+                          <View style={styles.placeholderBadge}>
+                            <Text style={styles.placeholderBadgeText}>Placeholder</Text>
+                          </View>
+                        )}
+                      </View>
+                      <Text style={styles.memberEmail}>{member.email}</Text>
                     </View>
                     <View style={[
                       styles.checkbox,
@@ -707,14 +766,43 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  placeholderAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#475569',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  placeholderAvatarText: {
+    color: '#94A3B8',
+    fontSize: 18,
+    fontWeight: '600',
+  },
   memberInfo: {
     flex: 1,
     marginLeft: 12,
+  },
+  memberNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   memberName: {
     fontSize: 15,
     fontWeight: '500',
     color: '#F8FAFC',
+  },
+  placeholderBadge: {
+    backgroundColor: '#F59E0B',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  placeholderBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '600',
   },
   memberEmail: {
     fontSize: 13,

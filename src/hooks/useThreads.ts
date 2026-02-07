@@ -3,8 +3,7 @@ import { supabase } from '../lib/supabase';
 import { Thread } from '../types/database';
 import { useAuth } from '../contexts/AuthContext';
 import { useGroup } from '../contexts/GroupContext';
-import { logger } from '../lib/logger';
-import { getUserErrorMessage } from '../lib/errors';
+import { useErrorHandler } from './useErrorHandler';
 
 /**
  * Extended thread interface with optional UI-specific fields
@@ -56,10 +55,12 @@ export interface UseThreadsResult {
 export function useThreads(): UseThreadsResult {
   const { user } = useAuth();
   const { currentGroup } = useGroup();
-  
+  const { error, setError, handleError, clearError } = useErrorHandler({
+    context: 'useThreads'
+  });
+
   const [threads, setThreads] = useState<ThreadWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   /**
    * Fetch all non-archived threads for the current group
@@ -71,7 +72,7 @@ export function useThreads(): UseThreadsResult {
     }
 
     setLoading(true);
-    setError(null);
+    clearError();
 
     try {
       const { data, error: fetchError } = await supabase
@@ -82,21 +83,20 @@ export function useThreads(): UseThreadsResult {
         .order('updated_at', { ascending: false });
 
       if (fetchError) throw fetchError;
-      
+
       setThreads(data || []);
-    } catch (err: any) {
-      logger.error('useThreads', 'Error fetching threads', { error: err });
-      setError(getUserErrorMessage(err));
+    } catch (err) {
+      handleError(err, 'fetchThreads');
     } finally {
       setLoading(false);
     }
-  }, [user, currentGroup]);
+  }, [user, currentGroup, clearError, handleError]);
 
   /**
    * Create a new thread in the current group
    */
   const createThread = useCallback(async (
-    name: string, 
+    name: string,
     description?: string
   ): Promise<Thread | null> => {
     if (!user || !currentGroup) {
@@ -125,12 +125,11 @@ export function useThreads(): UseThreadsResult {
       }
 
       return data;
-    } catch (err: any) {
-      logger.error('useThreads', 'Error creating thread', { error: err });
-      setError(getUserErrorMessage(err));
+    } catch (err) {
+      handleError(err, 'createThread');
       return null;
     }
-  }, [user, currentGroup]);
+  }, [user, currentGroup, handleError, setError]);
 
   /**
    * Archive a thread (soft delete)
@@ -148,12 +147,11 @@ export function useThreads(): UseThreadsResult {
       setThreads(prev => prev.filter(t => t.id !== threadId));
 
       return true;
-    } catch (err: any) {
-      logger.error('useThreads', 'Error archiving thread', { error: err });
-      setError(getUserErrorMessage(err));
+    } catch (err) {
+      handleError(err, 'archiveThread');
       return false;
     }
-  }, []);
+  }, [handleError]);
 
   // Fetch threads when user or group changes
   useEffect(() => {

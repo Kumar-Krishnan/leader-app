@@ -1,15 +1,21 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
-import { GroupMember, Profile, GroupRole } from '../types/database';
+import { GroupMember, Profile, GroupRole, PlaceholderProfile } from '../types/database';
 import { useGroup } from '../contexts/GroupContext';
-import { logger } from '../lib/logger';
-import { getUserErrorMessage } from '../lib/errors';
+import { useErrorHandler } from './useErrorHandler';
 
 /**
- * Member with profile information
+ * Member with profile information (either real user or placeholder)
  */
 export interface MemberWithProfile extends GroupMember {
-  user: Profile;
+  user: Profile | null;
+  placeholder: PlaceholderProfile | null;
+  /** Convenience flag to check if this is a placeholder */
+  isPlaceholder: boolean;
+  /** Display name (from user or placeholder) */
+  displayName: string;
+  /** Email (from user or placeholder) */
+  displayEmail: string;
 }
 
 /**
@@ -30,6 +36,8 @@ export interface UseGroupMembersResult {
   updateRole: (memberId: string, newRole: GroupRole) => Promise<boolean>;
   /** Remove a member from the group */
   removeMember: (memberId: string) => Promise<boolean>;
+  /** Create a placeholder member (for users who haven't signed up yet) */
+  createPlaceholder: (email: string, fullName: string, role?: GroupRole) => Promise<boolean>;
 }
 
 /**
@@ -56,14 +64,16 @@ export interface UseGroupMembersResult {
  */
 export function useGroupMembers(): UseGroupMembersResult {
   const { currentGroup } = useGroup();
-  
+  const { error, setError, handleError, clearError } = useErrorHandler({
+    context: 'useGroupMembers'
+  });
+
   const [members, setMembers] = useState<MemberWithProfile[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [processingId, setProcessingId] = useState<string | null>(null);
 
   /**
-   * Fetch all members in the current group
+   * Fetch all members in the current group (including placeholders)
    */
   const fetchMembers = useCallback(async () => {
     if (!currentGroup) {
@@ -73,33 +83,44 @@ export function useGroupMembers(): UseGroupMembersResult {
     }
 
     setLoading(true);
-    setError(null);
+    clearError();
 
     try {
       const { data, error: fetchError } = await supabase
         .from('group_members')
         .select(`
           *,
-          user:profiles!user_id(*)
+          user:profiles!user_id(*),
+          placeholder:placeholder_profiles!placeholder_id(*)
         `)
         .eq('group_id', currentGroup.id)
         .order('role', { ascending: true });
 
       if (fetchError) throw fetchError;
-      setMembers(data || []);
-    } catch (err: any) {
-      logger.error('useGroupMembers', 'Error fetching members', { error: err });
-      setError(getUserErrorMessage(err));
+
+      // Transform data to add convenience properties
+      const transformedMembers: MemberWithProfile[] = (data || []).map((member: any) => ({
+        ...member,
+        user: member.user || null,
+        placeholder: member.placeholder || null,
+        isPlaceholder: member.placeholder_id !== null,
+        displayName: member.user?.full_name || member.placeholder?.full_name || 'Unknown',
+        displayEmail: member.user?.email || member.placeholder?.email || '',
+      }));
+
+      setMembers(transformedMembers);
+    } catch (err) {
+      handleError(err, 'fetchMembers');
     } finally {
       setLoading(false);
     }
-  }, [currentGroup]);
+  }, [currentGroup, clearError, handleError]);
 
   /**
    * Update a member's role
    */
   const updateRole = useCallback(async (
-    memberId: string, 
+    memberId: string,
     newRole: GroupRole
   ): Promise<boolean> => {
     if (!currentGroup) {
@@ -108,7 +129,7 @@ export function useGroupMembers(): UseGroupMembersResult {
     }
 
     setProcessingId(memberId);
-    setError(null);
+    clearError();
 
     try {
       const { error: updateError } = await supabase
@@ -120,19 +141,18 @@ export function useGroupMembers(): UseGroupMembersResult {
       if (updateError) throw updateError;
 
       // Update local state
-      setMembers(prev => prev.map(m => 
+      setMembers(prev => prev.map(m =>
         m.id === memberId ? { ...m, role: newRole } : m
       ));
 
       return true;
-    } catch (err: any) {
-      logger.error('useGroupMembers', 'Error updating role', { error: err });
-      setError(getUserErrorMessage(err));
+    } catch (err) {
+      handleError(err, 'updateRole');
       return false;
     } finally {
       setProcessingId(null);
     }
-  }, [currentGroup]);
+  }, [currentGroup, clearError, handleError, setError]);
 
   /**
    * Remove a member from the group
@@ -144,7 +164,7 @@ export function useGroupMembers(): UseGroupMembersResult {
     }
 
     setProcessingId(memberId);
-    setError(null);
+    clearError();
 
     try {
       const { error: deleteError } = await supabase
@@ -159,14 +179,48 @@ export function useGroupMembers(): UseGroupMembersResult {
       setMembers(prev => prev.filter(m => m.id !== memberId));
 
       return true;
-    } catch (err: any) {
-      logger.error('useGroupMembers', 'Error removing member', { error: err });
-      setError(getUserErrorMessage(err));
+    } catch (err) {
+      handleError(err, 'removeMember');
       return false;
     } finally {
       setProcessingId(null);
     }
-  }, [currentGroup]);
+  }, [currentGroup, clearError, handleError, setError]);
+
+  /**
+   * Create a placeholder member (for users who haven't signed up yet)
+   */
+  const createPlaceholder = useCallback(async (
+    email: string,
+    fullName: string,
+    role: GroupRole = 'member'
+  ): Promise<boolean> => {
+    if (!currentGroup) {
+      setError('No group selected');
+      return false;
+    }
+
+    clearError();
+
+    try {
+      const { data, error: rpcError } = await supabase.rpc('create_placeholder_member', {
+        p_group_id: currentGroup.id,
+        p_email: email,
+        p_full_name: fullName,
+        p_role: role as string,
+      } as any);
+
+      if (rpcError) throw rpcError;
+
+      // Refetch members to get the updated list
+      await fetchMembers();
+
+      return true;
+    } catch (err) {
+      handleError(err, 'createPlaceholder');
+      return false;
+    }
+  }, [currentGroup, fetchMembers, clearError, handleError, setError]);
 
   // Fetch members when group changes
   useEffect(() => {
@@ -181,6 +235,7 @@ export function useGroupMembers(): UseGroupMembersResult {
     refetch: fetchMembers,
     updateRole,
     removeMember,
+    createPlaceholder,
   };
 }
 

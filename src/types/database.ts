@@ -79,12 +79,28 @@ export interface Group {
 }
 
 /**
+ * Placeholder profile for users who haven't signed up yet
+ * Created by group admins to pre-add members before they have accounts
+ */
+export interface PlaceholderProfile {
+  id: string;
+  email: string;
+  full_name: string;
+  created_by: string | null;
+  created_at: string;
+}
+
+/**
  * User membership in a group
+ * Either user_id OR placeholder_id will be set (not both)
  */
 export interface GroupMember {
   id: string;
   group_id: string;
-  user_id: string;
+  /** Real user ID (null if this is a placeholder member) */
+  user_id: string | null;
+  /** Placeholder profile ID (null if this is a real user) */
+  placeholder_id: string | null;
   /** User's role within this specific group */
   role: GroupRole;
   joined_at: string;
@@ -96,6 +112,7 @@ export interface GroupMember {
 export interface GroupMemberWithDetails extends GroupMember {
   group?: Group;
   user?: Profile;
+  placeholder?: PlaceholderProfile;
 }
 
 /**
@@ -180,11 +197,15 @@ export type AttendeeStatus = 'invited' | 'accepted' | 'declined' | 'maybe';
 
 /**
  * Meeting attendance record
+ * Either user_id OR placeholder_id will be set (not both)
  */
 export interface MeetingAttendee {
   id: string;
   meeting_id: string;
-  user_id: string;
+  /** Real user ID (null if this is a placeholder attendee) */
+  user_id: string | null;
+  /** Placeholder profile ID (null if this is a real user) */
+  placeholder_id: string | null;
   /** RSVP status */
   status: AttendeeStatus;
   invited_at: string;
@@ -198,6 +219,7 @@ export interface MeetingAttendee {
  */
 export interface MeetingAttendeeWithProfile extends MeetingAttendee {
   user?: Profile;
+  placeholder?: PlaceholderProfile;
 }
 
 /**
@@ -485,6 +507,37 @@ export interface Database {
         Row: MeetingReminderToken;
         Insert: Omit<MeetingReminderToken, 'id' | 'created_at'>;
         Update: Partial<Omit<MeetingReminderToken, 'id' | 'created_at'>>;
+      };
+      placeholder_profiles: {
+        Row: PlaceholderProfile;
+        Insert: Omit<PlaceholderProfile, 'id' | 'created_at'>;
+        Update: Partial<Omit<PlaceholderProfile, 'id' | 'created_at'>>;
+      };
+    };
+    Functions: {
+      request_to_join_group: {
+        Args: { group_code: string };
+        Returns: void;
+      };
+      approve_join_request: {
+        Args: { request_id: string };
+        Returns: void;
+      };
+      reject_join_request: {
+        Args: { request_id: string };
+        Returns: void;
+      };
+      update_member_role: {
+        Args: { member_id: string; new_role: string };
+        Returns: void;
+      };
+      create_placeholder_member: {
+        Args: { p_group_id: string; p_email: string; p_full_name: string; p_role: string };
+        Returns: string;
+      };
+      migrate_placeholder_to_user: {
+        Args: { p_user_id: string; p_user_email: string };
+        Returns: void;
       };
     };
   };

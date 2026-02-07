@@ -47,7 +47,8 @@ export function createMockMeetingAttendee(
   return {
     id: 'test-attendee-id',
     meeting_id: 'test-meeting-id',
-    user_id: 'test-user-id',
+    user_id: overrides.placeholder_id ? null : 'test-user-id',
+    placeholder_id: null,
     status: 'invited' as AttendeeStatus,
     invited_at: '2024-01-01T00:00:00Z',
     responded_at: null,
@@ -65,12 +66,14 @@ export function createMockMeetingAttendeeWithProfile(
   return {
     id: overrides.id || 'test-attendee-id',
     meeting_id: overrides.meeting_id || 'test-meeting-id',
-    user_id: overrides.user_id || 'test-user-id',
+    user_id: overrides.placeholder_id ? null : (overrides.user_id || 'test-user-id'),
+    placeholder_id: overrides.placeholder_id || null,
     status: (overrides.status || 'invited') as AttendeeStatus,
     invited_at: overrides.invited_at || '2024-01-01T00:00:00Z',
     responded_at: overrides.responded_at || null,
     is_series_rsvp: overrides.is_series_rsvp || false,
     user: overrides.user ? createMockProfile(overrides.user) : createMockProfile(),
+    placeholder: overrides.placeholder || undefined,
   };
 }
 
@@ -105,6 +108,7 @@ export function createMockMeetingWithMultipleAttendees(
     id: `attendee-${i + 1}`,
     meeting_id: meeting.id,
     user_id: `user-${i + 1}`,
+    placeholder_id: null,
     status: statuses[i % statuses.length],
     invited_at: '2024-01-01T00:00:00Z',
     responded_at: i < 3 ? '2024-01-02T00:00:00Z' : null,
@@ -114,6 +118,7 @@ export function createMockMeetingWithMultipleAttendees(
       email: `user${i + 1}@example.com`,
       full_name: `User ${i + 1}`,
     }),
+    placeholder: undefined,
   }));
 
   return { ...meeting, attendees };

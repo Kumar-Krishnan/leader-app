@@ -15,9 +15,14 @@ export function createMockMemberWithProfile(
   overrides: Partial<MemberWithProfile> = {}
 ): MemberWithProfile {
   const member = createMockGroupMember(overrides);
+  const user = overrides.user || createMockProfile({ id: member.user_id || 'test-user-id' });
   return {
     ...member,
-    user: overrides.user || createMockProfile({ id: member.user_id }),
+    user: member.user_id ? user : null,
+    placeholder: overrides.placeholder || null,
+    isPlaceholder: member.placeholder_id !== null,
+    displayName: user?.full_name || overrides.placeholder?.full_name || 'Unknown',
+    displayEmail: user?.email || overrides.placeholder?.email || '',
   };
 }
 
@@ -35,6 +40,7 @@ export function createMockUseGroupMembers(
     refetch: jest.fn().mockResolvedValue(undefined),
     updateRole: jest.fn().mockResolvedValue(true),
     removeMember: jest.fn().mockResolvedValue(true),
+    createPlaceholder: jest.fn().mockResolvedValue(true),
     ...overrides,
   };
 }
@@ -113,6 +119,7 @@ export function createMockUseGroupMembersUpdateFails(): UseGroupMembersResult {
   return createMockUseGroupMembers({
     updateRole: jest.fn().mockResolvedValue(false),
     removeMember: jest.fn().mockResolvedValue(false),
+    createPlaceholder: jest.fn().mockResolvedValue(false),
   });
 }
 
@@ -124,6 +131,7 @@ export function createMockUseGroupMembersWithSpies() {
     refetch: jest.fn().mockResolvedValue(undefined),
     updateRole: jest.fn().mockResolvedValue(true),
     removeMember: jest.fn().mockResolvedValue(true),
+    createPlaceholder: jest.fn().mockResolvedValue(true),
   };
 
   const mock = createMockUseGroupMembers(spies);
@@ -138,4 +146,5 @@ export function resetUseGroupMembersMock(mock: UseGroupMembersResult): void {
   if (jest.isMockFunction(mock.refetch)) mock.refetch.mockClear();
   if (jest.isMockFunction(mock.updateRole)) mock.updateRole.mockClear();
   if (jest.isMockFunction(mock.removeMember)) mock.removeMember.mockClear();
+  if (jest.isMockFunction(mock.createPlaceholder)) mock.createPlaceholder.mockClear();
 }

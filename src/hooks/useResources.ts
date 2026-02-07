@@ -4,8 +4,8 @@ import { storage, RESOURCES_BUCKET, generateFilePath } from '../lib/storage';
 import { Resource, ResourceFolder } from '../types/database';
 import { useAuth } from '../contexts/AuthContext';
 import { useGroup } from '../contexts/GroupContext';
+import { useErrorHandler } from './useErrorHandler';
 import { logger } from '../lib/logger';
-import { getUserErrorMessage } from '../lib/errors';
 
 /**
  * File to upload
@@ -147,6 +147,9 @@ export function useResources(options: UseResourcesOptions = {}): UseResourcesRes
   const { visibility = 'all' } = options;
   const { user } = useAuth();
   const { currentGroup, groups } = useGroup();
+  const { error, setError, handleError, clearError } = useErrorHandler({
+    context: 'useResources'
+  });
 
   const [folders, setFolders] = useState<ResourceFolderWithSharing[]>([]);
   const [resources, setResources] = useState<ResourceWithSharing[]>([]);
@@ -154,7 +157,6 @@ export function useResources(options: UseResourcesOptions = {}): UseResourcesRes
   const [folderPath, setFolderPath] = useState<ResourceFolder[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   /**
    * Fetch folders and resources for the current folder, including shared items
@@ -168,7 +170,7 @@ export function useResources(options: UseResourcesOptions = {}): UseResourcesRes
     }
 
     setLoading(true);
-    setError(null);
+    clearError();
 
     try {
       // Fetch own folders
@@ -373,13 +375,12 @@ export function useResources(options: UseResourcesOptions = {}): UseResourcesRes
       // Combine own and shared items
       setFolders([...ownFolders, ...sharedFolders]);
       setResources([...ownResources, ...sharedResources]);
-    } catch (err: any) {
-      logger.error('useResources', 'Error fetching contents', { error: err });
-      setError(getUserErrorMessage(err));
+    } catch (err) {
+      handleError(err, 'fetchContents');
     } finally {
       setLoading(false);
     }
-  }, [currentGroup, currentFolderId, folderPath, visibility]);
+  }, [currentGroup, currentFolderId, folderPath, visibility, clearError, handleError]);
 
   /**
    * Navigate into a folder
@@ -432,12 +433,11 @@ export function useResources(options: UseResourcesOptions = {}): UseResourcesRes
 
       await fetchContents();
       return true;
-    } catch (err: any) {
-      logger.error('useResources', 'Error creating folder', { error: err });
-      setError(getUserErrorMessage(err));
+    } catch (err) {
+      handleError(err, 'createFolder');
       return false;
     }
-  }, [currentGroup, currentFolderId, user, fetchContents]);
+  }, [currentGroup, currentFolderId, user, fetchContents, handleError, setError]);
 
   /**
    * Upload a file resource
@@ -457,7 +457,7 @@ export function useResources(options: UseResourcesOptions = {}): UseResourcesRes
     }
 
     setUploading(true);
-    setError(null);
+    clearError();
 
     try {
       const storagePath = generateFilePath(currentGroup.id, file.name);
@@ -494,14 +494,13 @@ export function useResources(options: UseResourcesOptions = {}): UseResourcesRes
 
       await fetchContents();
       return true;
-    } catch (err: any) {
-      logger.error('useResources', 'Error uploading file', { error: err });
-      setError(getUserErrorMessage(err));
+    } catch (err) {
+      handleError(err, 'uploadFileResource');
       return false;
     } finally {
       setUploading(false);
     }
-  }, [currentGroup, currentFolderId, user, fetchContents, visibility]);
+  }, [currentGroup, currentFolderId, user, fetchContents, visibility, clearError, handleError, setError]);
 
   /**
    * Create a link resource
@@ -538,12 +537,11 @@ export function useResources(options: UseResourcesOptions = {}): UseResourcesRes
 
       await fetchContents();
       return true;
-    } catch (err: any) {
-      logger.error('useResources', 'Error creating link', { error: err });
-      setError(getUserErrorMessage(err));
+    } catch (err) {
+      handleError(err, 'createLinkResource');
       return false;
     }
-  }, [currentGroup, currentFolderId, user, fetchContents, visibility]);
+  }, [currentGroup, currentFolderId, user, fetchContents, visibility, handleError, setError]);
 
   /**
    * Delete a folder
@@ -559,12 +557,11 @@ export function useResources(options: UseResourcesOptions = {}): UseResourcesRes
 
       setFolders(prev => prev.filter(f => f.id !== folderId));
       return true;
-    } catch (err: any) {
-      logger.error('useResources', 'Error deleting folder', { error: err });
-      setError(getUserErrorMessage(err));
+    } catch (err) {
+      handleError(err, 'deleteFolder');
       return false;
     }
-  }, []);
+  }, [handleError]);
 
   /**
    * Delete a resource
@@ -588,12 +585,11 @@ export function useResources(options: UseResourcesOptions = {}): UseResourcesRes
 
       setResources(prev => prev.filter(r => r.id !== resourceId));
       return true;
-    } catch (err: any) {
-      logger.error('useResources', 'Error deleting resource', { error: err });
-      setError(getUserErrorMessage(err));
+    } catch (err) {
+      handleError(err, 'deleteResource');
       return false;
     }
-  }, []);
+  }, [handleError]);
 
   /**
    * Get download URL for a resource file
@@ -602,7 +598,8 @@ export function useResources(options: UseResourcesOptions = {}): UseResourcesRes
     try {
       const result = await storage.getDownloadUrl(RESOURCES_BUCKET, filePath, 3600);
       return result.url || null;
-    } catch (err: any) {
+    } catch (err) {
+      // Log but don't set error state - this is a silent failure
       logger.error('useResources', 'Error getting download URL', { error: err });
       return null;
     }
@@ -636,12 +633,11 @@ export function useResources(options: UseResourcesOptions = {}): UseResourcesRes
 
       await fetchContents();
       return true;
-    } catch (err: any) {
-      logger.error('useResources', 'Error sharing resource', { error: err });
-      setError(getUserErrorMessage(err));
+    } catch (err) {
+      handleError(err, 'shareResource');
       return false;
     }
-  }, [user, fetchContents]);
+  }, [user, fetchContents, handleError, setError]);
 
   /**
    * Unshare a resource from specified groups
@@ -663,12 +659,11 @@ export function useResources(options: UseResourcesOptions = {}): UseResourcesRes
 
       await fetchContents();
       return true;
-    } catch (err: any) {
-      logger.error('useResources', 'Error unsharing resource', { error: err });
-      setError(getUserErrorMessage(err));
+    } catch (err) {
+      handleError(err, 'unshareResource');
       return false;
     }
-  }, [fetchContents]);
+  }, [fetchContents, handleError]);
 
   /**
    * Share a folder with specified groups
@@ -698,12 +693,11 @@ export function useResources(options: UseResourcesOptions = {}): UseResourcesRes
 
       await fetchContents();
       return true;
-    } catch (err: any) {
-      logger.error('useResources', 'Error sharing folder', { error: err });
-      setError(getUserErrorMessage(err));
+    } catch (err) {
+      handleError(err, 'shareFolder');
       return false;
     }
-  }, [user, fetchContents]);
+  }, [user, fetchContents, handleError, setError]);
 
   /**
    * Unshare a folder from specified groups
@@ -725,12 +719,11 @@ export function useResources(options: UseResourcesOptions = {}): UseResourcesRes
 
       await fetchContents();
       return true;
-    } catch (err: any) {
-      logger.error('useResources', 'Error unsharing folder', { error: err });
-      setError(getUserErrorMessage(err));
+    } catch (err) {
+      handleError(err, 'unshareFolder');
       return false;
     }
-  }, [fetchContents]);
+  }, [fetchContents, handleError]);
 
   /**
    * Get current shares for a resource
@@ -755,7 +748,8 @@ export function useResources(options: UseResourcesOptions = {}): UseResourcesRes
           groupName: item.group.name,
           sharedAt: item.shared_at,
         }));
-    } catch (err: any) {
+    } catch (err) {
+      // Log but don't set error state - this is a silent failure
       logger.error('useResources', 'Error getting resource shares', { error: err });
       return [];
     }
@@ -784,7 +778,8 @@ export function useResources(options: UseResourcesOptions = {}): UseResourcesRes
           groupName: item.group.name,
           sharedAt: item.shared_at,
         }));
-    } catch (err: any) {
+    } catch (err) {
+      // Log but don't set error state - this is a silent failure
       logger.error('useResources', 'Error getting folder shares', { error: err });
       return [];
     }
@@ -808,7 +803,8 @@ export function useResources(options: UseResourcesOptions = {}): UseResourcesRes
       if (error) throw error;
 
       return (data || []).map(g => ({ id: g.id, name: g.name }));
-    } catch (err: any) {
+    } catch (err) {
+      // Log but don't set error state - this is a silent failure
       logger.error('useResources', 'Error fetching shareable groups', { error: err });
       return [];
     }

@@ -228,23 +228,26 @@ describe('MeetingsScreen', () => {
     expect(queryByText('✉️')).toBeNull();
   });
 
-  it('should call sendMeetingEmail when email button is pressed', async () => {
-    const sendMeetingEmail = jest.fn().mockResolvedValue(true);
+  it('should open email modal when email button is pressed', async () => {
     mockGroupContext = createMockGroupContext({
       currentGroup: mockGroup,
       isGroupLeader: true,
     });
     mockUseMeetingsResult = createMockUseMeetings({
       meetings: [mockMeeting],
-      sendMeetingEmail,
     });
 
-    const { getByText } = render(<MeetingsScreen />);
+    const { getByText, getAllByText, queryByText } = render(<MeetingsScreen />);
 
     fireEvent.press(getByText('✉️'));
 
+    // The SendMeetingEmailModal should now be visible
     await waitFor(() => {
-      expect(sendMeetingEmail).toHaveBeenCalledWith('meeting-1');
+      // The modal shows a "Send" button and attendee count
+      expect(queryByText('Send')).toBeTruthy();
+      expect(queryByText(/Will be sent to/)).toBeTruthy();
+      // Meeting title appears twice: once in the list, once in the modal header
+      expect(getAllByText('Team Meeting')).toHaveLength(2);
     });
   });
 

@@ -53,7 +53,11 @@ export default function SendMeetingEmailModal({
     setDescriptionFirst(!descriptionFirst);
   };
 
-  const attendeeCount = meeting?.attendees?.filter(a => a.user?.email).length || 0;
+  // Count all attendees with emails (both real users and placeholders)
+  const attendeeCount = meeting?.attendees?.filter(a => {
+    const email = a.user?.email || (a as any).placeholder?.email;
+    return !!email;
+  }).length || 0;
 
   if (!meeting) return null;
 

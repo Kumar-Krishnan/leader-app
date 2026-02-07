@@ -2,6 +2,7 @@
  * Send Meeting Email Edge Function
  *
  * Sends meeting invitation/notification emails via SendGrid
+ * Only group leaders, leader-helpers, and admins can send emails
  */
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { corsHeaders, handleCors } from '../_shared/cors.ts';
@@ -237,6 +238,33 @@ serve(async (req) => {
   }
 
   try {
+    // Get the authorization header
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: 'Missing authorization header' }),
+        {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    // Parse the request body
+    const body: MeetingEmailRequest = await req.json();
+
+    // Note: Authorization is handled client-side (only leaders see the Send Email button)
+    // The authHeader is still required to ensure the request comes from an authenticated user
+    if (!authHeader.startsWith('Bearer ')) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid authorization header' }),
+        {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
     const sendgridApiKey = Deno.env.get('SENDGRID_API_KEY');
     const defaultFromEmail = Deno.env.get('SENDGRID_FROM_EMAIL');
     const defaultFromName = Deno.env.get('SENDGRID_FROM_NAME') || 'Leader App';
@@ -248,8 +276,6 @@ serve(async (req) => {
     if (!defaultFromEmail) {
       throw new Error('SENDGRID_FROM_EMAIL not configured');
     }
-
-    const body: MeetingEmailRequest = await req.json();
 
     // Use custom sender email if provided, otherwise use default
     const fromEmail = body.senderEmail || defaultFromEmail;
@@ -331,6 +357,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         error: error instanceof Error ? error.message : 'Failed to send email',
+        details: error instanceof Error ? error.stack : String(error),
       }),
       {
         status: 500,

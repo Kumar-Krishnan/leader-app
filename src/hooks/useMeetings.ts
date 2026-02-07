@@ -3,8 +3,8 @@ import { supabase } from '../lib/supabase';
 import { MeetingWithAttendees } from '../types/database';
 import { useAuth } from '../contexts/AuthContext';
 import { useGroup } from '../contexts/GroupContext';
+import { useErrorHandler } from './useErrorHandler';
 import { logger } from '../lib/logger';
-import { getUserErrorMessage } from '../lib/errors';
 
 /**
  * RSVP status type
@@ -71,10 +71,12 @@ export interface UseMeetingsResult {
 export function useMeetings(): UseMeetingsResult {
   const { user, profile } = useAuth();
   const { currentGroup } = useGroup();
-  
+  const { error, setError, handleError, clearError } = useErrorHandler({
+    context: 'useMeetings'
+  });
+
   const [meetings, setMeetings] = useState<MeetingWithAttendees[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [sendingEmail, setSendingEmail] = useState(false);
 
   /**
@@ -87,7 +89,7 @@ export function useMeetings(): UseMeetingsResult {
     }
 
     setLoading(true);
-    setError(null);
+    clearError();
 
     try {
       const { data, error: fetchError } = await supabase
@@ -97,9 +99,11 @@ export function useMeetings(): UseMeetingsResult {
           attendees:meeting_attendees(
             id,
             user_id,
+            placeholder_id,
             status,
             is_series_rsvp,
-            user:profiles(id, full_name, email)
+            user:profiles(id, full_name, email),
+            placeholder:placeholder_profiles(id, full_name, email)
           )
         `)
         .eq('group_id', currentGroup.id)
@@ -107,15 +111,14 @@ export function useMeetings(): UseMeetingsResult {
         .order('date', { ascending: true });
 
       if (fetchError) throw fetchError;
-      
+
       setMeetings(data || []);
-    } catch (err: any) {
-      logger.error('useMeetings', 'Error fetching meetings', { error: err });
-      setError(getUserErrorMessage(err));
+    } catch (err) {
+      handleError(err, 'fetchMeetings');
     } finally {
       setLoading(false);
     }
-  }, [currentGroup]);
+  }, [currentGroup, clearError, handleError]);
 
   /**
    * RSVP to a single meeting
@@ -151,12 +154,11 @@ export function useMeetings(): UseMeetingsResult {
       }));
 
       return true;
-    } catch (err: any) {
-      logger.error('useMeetings', 'Error updating RSVP', { error: err });
-      setError(getUserErrorMessage(err));
+    } catch (err) {
+      handleError(err, 'rsvpToMeeting');
       return false;
     }
-  }, []);
+  }, [handleError]);
 
   /**
    * RSVP to all meetings in a series
@@ -208,12 +210,11 @@ export function useMeetings(): UseMeetingsResult {
       }));
 
       return true;
-    } catch (err: any) {
-      logger.error('useMeetings', 'Error updating series RSVP', { error: err });
-      setError(getUserErrorMessage(err));
+    } catch (err) {
+      handleError(err, 'rsvpToSeries');
       return false;
     }
-  }, [user, meetings]);
+  }, [user, meetings, handleError]);
 
   /**
    * Delete a single meeting
@@ -231,12 +232,11 @@ export function useMeetings(): UseMeetingsResult {
       setMeetings(prev => prev.filter(m => m.id !== meetingId));
 
       return true;
-    } catch (err: any) {
-      logger.error('useMeetings', 'Error deleting meeting', { error: err });
-      setError(getUserErrorMessage(err));
+    } catch (err) {
+      handleError(err, 'deleteMeeting');
       return false;
     }
-  }, []);
+  }, [handleError]);
 
   /**
    * Delete all meetings in a series
@@ -254,12 +254,11 @@ export function useMeetings(): UseMeetingsResult {
       setMeetings(prev => prev.filter(m => m.series_id !== seriesId));
 
       return true;
-    } catch (err: any) {
-      logger.error('useMeetings', 'Error deleting series', { error: err });
-      setError(getUserErrorMessage(err));
+    } catch (err) {
+      handleError(err, 'deleteSeries');
       return false;
     }
-  }, []);
+  }, [handleError]);
 
   /**
    * Update a single meeting's fields (e.g., description)
@@ -291,12 +290,11 @@ export function useMeetings(): UseMeetingsResult {
       }));
 
       return true;
-    } catch (err: any) {
-      logger.error('useMeetings', 'Error updating meeting', { error: err });
-      setError(getUserErrorMessage(err));
+    } catch (err) {
+      handleError(err, 'updateMeeting');
       return false;
     }
-  }, []);
+  }, [handleError]);
 
   /**
    * Get all meetings in a series, sorted by series_index
@@ -422,12 +420,11 @@ export function useMeetings(): UseMeetingsResult {
       }));
 
       return true;
-    } catch (err: any) {
-      logger.error('useMeetings', 'Error skipping meeting', { error: err });
-      setError(getUserErrorMessage(err));
+    } catch (err) {
+      handleError(err, 'skipMeeting');
       return false;
     }
-  }, [meetings]);
+  }, [meetings, handleError]);
 
   /**
    * Send email notification for a meeting to all attendees
@@ -450,12 +447,22 @@ export function useMeetings(): UseMeetingsResult {
     }
 
     // Get attendees with email addresses (exclude the sender)
+    // Include both real users and placeholders
     const attendees = meeting.attendees
-      ?.filter(a => a.user?.email && a.user_id !== user.id)
-      .map(a => ({
-        email: a.user!.email!,
-        name: a.user?.full_name || null,
-      })) || [];
+      ?.filter(a => {
+        // Exclude the sender (only real users can be the sender)
+        if (a.user_id === user.id) return false;
+        // Must have an email from either user or placeholder
+        const email = a.user?.email || (a as any).placeholder?.email;
+        return !!email;
+      })
+      .map(a => {
+        const placeholder = (a as any).placeholder;
+        return {
+          email: a.user?.email || placeholder?.email,
+          name: a.user?.full_name || placeholder?.full_name || null,
+        };
+      }) || [];
 
     if (attendees.length === 0) {
       setError('No attendees with email addresses to send to');
@@ -463,7 +470,7 @@ export function useMeetings(): UseMeetingsResult {
     }
 
     setSendingEmail(true);
-    setError(null);
+    clearError();
 
     // Generate sender email from leader's name (e.g., "Jon Snow" -> "JonSnow@manatee.link")
     const senderName = profile?.full_name || 'Leader';
@@ -486,7 +493,14 @@ export function useMeetings(): UseMeetingsResult {
         },
       });
 
-      if (fnError) throw fnError;
+      if (fnError) {
+        throw fnError;
+      }
+
+      // Check if the response indicates an error
+      if (data?.error) {
+        throw new Error(data.error);
+      }
 
       logger.info('useMeetings', 'Meeting email sent successfully', {
         meetingId,
@@ -494,14 +508,13 @@ export function useMeetings(): UseMeetingsResult {
       });
 
       return true;
-    } catch (err: any) {
-      logger.error('useMeetings', 'Error sending meeting email', { error: err });
-      setError(getUserErrorMessage(err));
+    } catch (err) {
+      handleError(err, 'sendMeetingEmail');
       return false;
     } finally {
       setSendingEmail(false);
     }
-  }, [user, profile, currentGroup, meetings]);
+  }, [user, profile, currentGroup, meetings, clearError, handleError]);
 
   // Fetch meetings when group changes
   useEffect(() => {

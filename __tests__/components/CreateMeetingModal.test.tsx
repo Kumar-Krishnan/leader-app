@@ -361,3 +361,242 @@ describe('Skip meeting compatibility', () => {
     expect(shiftedDates[3].toISOString()).toBe('2024-05-10T19:00:00.000Z');
   });
 });
+
+/**
+ * InvitableMember type for placeholder testing
+ */
+interface InvitableMember {
+  id: string;
+  type: 'user' | 'placeholder';
+  displayName: string;
+  email: string;
+  avatarUrl?: string | null;
+}
+
+/**
+ * Tests for placeholder member handling in CreateMeetingModal
+ */
+describe('Placeholder member handling', () => {
+  /**
+   * Transform group_members data (simulating fetchGroupMembers logic)
+   */
+  function transformGroupMembers(data: any[]): InvitableMember[] {
+    const members: InvitableMember[] = [];
+    for (const item of data) {
+      if (item.user_id && item.user) {
+        members.push({
+          id: item.user_id,
+          type: 'user',
+          displayName: item.user.full_name || item.user.email,
+          email: item.user.email,
+          avatarUrl: item.user.avatar_url,
+        });
+      } else if (item.placeholder_id && item.placeholder) {
+        members.push({
+          id: item.placeholder_id,
+          type: 'placeholder',
+          displayName: item.placeholder.full_name,
+          email: item.placeholder.email,
+          avatarUrl: null,
+        });
+      }
+    }
+    return members;
+  }
+
+  it('should transform regular user members correctly', () => {
+    const data = [
+      {
+        user_id: 'user-1',
+        placeholder_id: null,
+        user: {
+          id: 'user-1',
+          email: 'user@example.com',
+          full_name: 'John Doe',
+          avatar_url: 'https://example.com/avatar.jpg',
+        },
+        placeholder: null,
+      },
+    ];
+
+    const members = transformGroupMembers(data);
+
+    expect(members).toHaveLength(1);
+    expect(members[0]).toEqual({
+      id: 'user-1',
+      type: 'user',
+      displayName: 'John Doe',
+      email: 'user@example.com',
+      avatarUrl: 'https://example.com/avatar.jpg',
+    });
+  });
+
+  it('should transform placeholder members correctly', () => {
+    const data = [
+      {
+        user_id: null,
+        placeholder_id: 'placeholder-1',
+        user: null,
+        placeholder: {
+          id: 'placeholder-1',
+          email: 'placeholder@example.com',
+          full_name: 'Placeholder User',
+        },
+      },
+    ];
+
+    const members = transformGroupMembers(data);
+
+    expect(members).toHaveLength(1);
+    expect(members[0]).toEqual({
+      id: 'placeholder-1',
+      type: 'placeholder',
+      displayName: 'Placeholder User',
+      email: 'placeholder@example.com',
+      avatarUrl: null,
+    });
+  });
+
+  it('should handle mixed regular and placeholder members', () => {
+    const data = [
+      {
+        user_id: 'user-1',
+        placeholder_id: null,
+        user: { id: 'user-1', email: 'user@example.com', full_name: 'John', avatar_url: null },
+        placeholder: null,
+      },
+      {
+        user_id: null,
+        placeholder_id: 'placeholder-1',
+        user: null,
+        placeholder: { id: 'placeholder-1', email: 'placeholder@example.com', full_name: 'Placeholder' },
+      },
+    ];
+
+    const members = transformGroupMembers(data);
+
+    expect(members).toHaveLength(2);
+    expect(members[0].type).toBe('user');
+    expect(members[1].type).toBe('placeholder');
+  });
+
+  it('should skip invalid entries without user or placeholder', () => {
+    const data = [
+      {
+        user_id: null,
+        placeholder_id: null,
+        user: null,
+        placeholder: null,
+      },
+    ];
+
+    const members = transformGroupMembers(data);
+
+    expect(members).toHaveLength(0);
+  });
+
+  it('should use email as displayName when full_name is missing for user', () => {
+    const data = [
+      {
+        user_id: 'user-1',
+        placeholder_id: null,
+        user: { id: 'user-1', email: 'user@example.com', full_name: null, avatar_url: null },
+        placeholder: null,
+      },
+    ];
+
+    const members = transformGroupMembers(data);
+
+    expect(members[0].displayName).toBe('user@example.com');
+  });
+
+  /**
+   * Generate meeting attendees (simulating handleCreate logic)
+   */
+  function generateAttendees(
+    meetingId: string,
+    selectedMemberIds: string[],
+    groupMembers: InvitableMember[]
+  ) {
+    return selectedMemberIds
+      .map(memberId => {
+        const member = groupMembers.find(m => m.id === memberId);
+        if (!member) return null;
+
+        if (member.type === 'user') {
+          return {
+            meeting_id: meetingId,
+            user_id: memberId,
+            placeholder_id: null,
+            status: 'invited' as const,
+          };
+        } else {
+          return {
+            meeting_id: meetingId,
+            user_id: null,
+            placeholder_id: memberId,
+            status: 'invited' as const,
+          };
+        }
+      })
+      .filter((a): a is NonNullable<typeof a> => a !== null);
+  }
+
+  it('should generate correct attendee record for regular user', () => {
+    const groupMembers: InvitableMember[] = [
+      { id: 'user-1', type: 'user', displayName: 'John', email: 'john@example.com' },
+    ];
+
+    const attendees = generateAttendees('meeting-1', ['user-1'], groupMembers);
+
+    expect(attendees).toHaveLength(1);
+    expect(attendees[0]).toEqual({
+      meeting_id: 'meeting-1',
+      user_id: 'user-1',
+      placeholder_id: null,
+      status: 'invited',
+    });
+  });
+
+  it('should generate correct attendee record for placeholder', () => {
+    const groupMembers: InvitableMember[] = [
+      { id: 'placeholder-1', type: 'placeholder', displayName: 'Placeholder', email: 'placeholder@example.com' },
+    ];
+
+    const attendees = generateAttendees('meeting-1', ['placeholder-1'], groupMembers);
+
+    expect(attendees).toHaveLength(1);
+    expect(attendees[0]).toEqual({
+      meeting_id: 'meeting-1',
+      user_id: null,
+      placeholder_id: 'placeholder-1',
+      status: 'invited',
+    });
+  });
+
+  it('should handle mixed selection of users and placeholders', () => {
+    const groupMembers: InvitableMember[] = [
+      { id: 'user-1', type: 'user', displayName: 'John', email: 'john@example.com' },
+      { id: 'placeholder-1', type: 'placeholder', displayName: 'Placeholder', email: 'placeholder@example.com' },
+    ];
+
+    const attendees = generateAttendees('meeting-1', ['user-1', 'placeholder-1'], groupMembers);
+
+    expect(attendees).toHaveLength(2);
+    expect(attendees[0].user_id).toBe('user-1');
+    expect(attendees[0].placeholder_id).toBeNull();
+    expect(attendees[1].user_id).toBeNull();
+    expect(attendees[1].placeholder_id).toBe('placeholder-1');
+  });
+
+  it('should skip invalid member IDs', () => {
+    const groupMembers: InvitableMember[] = [
+      { id: 'user-1', type: 'user', displayName: 'John', email: 'john@example.com' },
+    ];
+
+    const attendees = generateAttendees('meeting-1', ['user-1', 'non-existent-id'], groupMembers);
+
+    expect(attendees).toHaveLength(1);
+    expect(attendees[0].user_id).toBe('user-1');
+  });
+});

@@ -1,4 +1,5 @@
 import { Alert, Platform } from 'react-native';
+import { PostgrestError } from '@supabase/supabase-js';
 import { logger } from './logger';
 
 /**
@@ -266,4 +267,209 @@ export function showDestructiveConfirm(
       { text: destructiveText, style: 'destructive', onPress: () => resolve(true) },
     ]);
   });
+}
+
+// ============================================================================
+// Centralized Error Handler
+// ============================================================================
+
+/**
+ * Options for handleError function
+ */
+export interface HandleErrorOptions {
+  /** Context tag for logging (e.g., 'useMeetings', 'useResources') */
+  context: string;
+  /** Operation being performed (e.g., 'fetchMeetings', 'createResource') */
+  operation?: string;
+  /** Whether to show an alert to the user */
+  showAlert?: boolean;
+  /** Additional context for logging */
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Structured error result from handleError
+ */
+export interface HandledError {
+  /** Error code for programmatic handling */
+  code: ErrorCode;
+  /** User-friendly message */
+  userMessage: string;
+  /** Original error message (for debugging) */
+  originalMessage: string;
+  /** Whether this error is recoverable (user can retry) */
+  recoverable: boolean;
+}
+
+/**
+ * Determines if an error is recoverable (user can retry the action)
+ */
+function isRecoverable(code: ErrorCode): boolean {
+  const nonRecoverableErrors = [
+    ErrorCode.NOT_AUTHENTICATED,
+    ErrorCode.SESSION_EXPIRED,
+    ErrorCode.NOT_AUTHORIZED,
+    ErrorCode.INSUFFICIENT_PERMISSIONS,
+  ];
+  return !nonRecoverableErrors.includes(code);
+}
+
+/**
+ * Parse Supabase PostgrestError for better error messages
+ */
+function parsePostgrestError(error: PostgrestError): { code: ErrorCode; message: string } {
+  const { code: pgCode, message, details } = error;
+
+  // Map Postgres error codes to our error codes
+  if (pgCode === '23505') {
+    return { code: ErrorCode.ALREADY_EXISTS, message: 'This item already exists.' };
+  }
+  if (pgCode === '23503') {
+    return { code: ErrorCode.NOT_FOUND, message: 'Referenced item not found.' };
+  }
+  if (pgCode === '42501' || message.includes('permission denied')) {
+    return { code: ErrorCode.INSUFFICIENT_PERMISSIONS, message: 'You don\'t have permission to do this.' };
+  }
+  if (pgCode === 'PGRST116') {
+    return { code: ErrorCode.NOT_FOUND, message: 'Item not found.' };
+  }
+
+  return { code: ErrorCode.SERVER_ERROR, message: message || 'A database error occurred.' };
+}
+
+/**
+ * Centralized error handler that logs, categorizes, and returns structured error info.
+ *
+ * @example
+ * ```typescript
+ * try {
+ *   await someOperation();
+ * } catch (err) {
+ *   const handled = handleError(err, { context: 'useMeetings', operation: 'fetchMeetings' });
+ *   setError(handled.userMessage);
+ * }
+ * ```
+ */
+export function handleError(error: unknown, options: HandleErrorOptions): HandledError {
+  const { context, operation, showAlert: shouldShowAlert = false, metadata } = options;
+
+  // Determine error code and messages
+  let code: ErrorCode;
+  let userMessage: string;
+  let originalMessage: string;
+
+  if (error instanceof AppError) {
+    code = error.code;
+    userMessage = error.getUserMessage();
+    originalMessage = error.message;
+  } else if (error instanceof PostgrestError || (error && typeof error === 'object' && 'code' in error && 'message' in error && 'details' in error)) {
+    const parsed = parsePostgrestError(error as PostgrestError);
+    code = parsed.code;
+    userMessage = parsed.message;
+    originalMessage = (error as PostgrestError).message;
+  } else if (error instanceof Error) {
+    code = getErrorCode(error);
+    userMessage = getUserErrorMessage(error);
+    originalMessage = error.message;
+  } else {
+    code = ErrorCode.UNKNOWN;
+    userMessage = USER_MESSAGES[ErrorCode.UNKNOWN];
+    originalMessage = String(error);
+  }
+
+  const recoverable = isRecoverable(code);
+
+  // Log the error with full context
+  logger.error(context, `${operation ? `[${operation}] ` : ''}${originalMessage}`, {
+    code,
+    recoverable,
+    stack: error instanceof Error ? error.stack : undefined,
+    ...metadata,
+  });
+
+  // Optionally show alert
+  if (shouldShowAlert) {
+    showErrorAlert(error);
+  }
+
+  return {
+    code,
+    userMessage,
+    originalMessage,
+    recoverable,
+  };
+}
+
+/**
+ * Wrapper for async operations with standardized error handling.
+ * Returns a tuple of [result, error] similar to Go-style error handling.
+ *
+ * @example
+ * ```typescript
+ * const [meetings, error] = await withErrorHandling(
+ *   () => supabase.from('meetings').select('*'),
+ *   { context: 'useMeetings', operation: 'fetch' }
+ * );
+ *
+ * if (error) {
+ *   setError(error.userMessage);
+ *   return;
+ * }
+ *
+ * setMeetings(meetings);
+ * ```
+ */
+export async function withErrorHandling<T>(
+  fn: () => Promise<T>,
+  options: HandleErrorOptions
+): Promise<[T | null, HandledError | null]> {
+  try {
+    const result = await fn();
+    return [result, null];
+  } catch (error) {
+    const handled = handleError(error, options);
+    return [null, handled];
+  }
+}
+
+/**
+ * Type guard to check if a Supabase response has an error
+ */
+export function hasSupabaseError<T>(
+  response: { data: T | null; error: PostgrestError | null }
+): response is { data: null; error: PostgrestError } {
+  return response.error !== null;
+}
+
+/**
+ * Process a Supabase response and throw if there's an error.
+ * Useful for cleaner async/await patterns.
+ *
+ * @example
+ * ```typescript
+ * try {
+ *   const data = await unwrapSupabaseResponse(
+ *     supabase.from('meetings').select('*')
+ *   );
+ *   // data is guaranteed to be non-null here
+ * } catch (error) {
+ *   // error is an AppError with proper code
+ * }
+ * ```
+ */
+export async function unwrapSupabaseResponse<T>(
+  promise: Promise<{ data: T | null; error: PostgrestError | null }>
+): Promise<T> {
+  const { data, error } = await promise;
+
+  if (error) {
+    const parsed = parsePostgrestError(error);
+    throw new AppError(parsed.code, parsed.message, error);
+  }
+
+  if (data === null) {
+    throw new AppError(ErrorCode.NOT_FOUND, 'No data returned');
+  }
+
+  return data;
 }

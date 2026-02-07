@@ -7,11 +7,13 @@ import {
   FlatList,
   ActivityIndicator,
   Modal,
+  ScrollView,
 } from 'react-native';
 import { useGroup } from '../../contexts/GroupContext';
 import { useGroupMembers, MemberWithProfile } from '../../hooks/useGroupMembers';
 import { GroupRole } from '../../types/database';
 import Avatar from '../../components/Avatar';
+import AddPlaceholderModal from '../../components/AddPlaceholderModal';
 import { showAlert } from '../../lib/errors';
 
 export default function ManageMembersScreen() {
@@ -32,10 +34,12 @@ export default function ManageMembersScreen() {
     processingId,
     updateRole,
     refetch,
+    createPlaceholder,
   } = useGroupMembers();
-  
+
   const [selectedMember, setSelectedMember] = useState<MemberWithProfile | null>(null);
   const [localProcessingId, setLocalProcessingId] = useState<string | null>(null);
+  const [showPlaceholderModal, setShowPlaceholderModal] = useState(false);
 
   const handleApprove = async (requestId: string) => {
     setLocalProcessingId(requestId);
@@ -115,19 +119,32 @@ export default function ManageMembersScreen() {
   );
 
   const renderMember = ({ item }: { item: MemberWithProfile }) => (
-    <TouchableOpacity 
+    <TouchableOpacity
       style={styles.memberCard}
       onPress={() => isGroupLeader ? setSelectedMember(item) : null}
       disabled={!isGroupLeader || item.role === 'admin'}
     >
-      <Avatar 
-        uri={item.user?.avatar_url} 
-        name={item.user?.full_name} 
-        size={44}
-      />
+      {item.isPlaceholder ? (
+        <View style={styles.placeholderAvatar}>
+          <Text style={styles.placeholderAvatarText}>?</Text>
+        </View>
+      ) : (
+        <Avatar
+          uri={item.user?.avatar_url}
+          name={item.displayName}
+          size={44}
+        />
+      )}
       <View style={styles.memberInfo}>
-        <Text style={styles.memberName}>{item.user?.full_name || 'Unknown'}</Text>
-        <Text style={styles.memberEmail}>{item.user?.email}</Text>
+        <View style={styles.memberNameRow}>
+          <Text style={styles.memberName}>{item.displayName}</Text>
+          {item.isPlaceholder && (
+            <View style={styles.placeholderBadge}>
+              <Text style={styles.placeholderBadgeText}>Placeholder</Text>
+            </View>
+          )}
+        </View>
+        <Text style={styles.memberEmail}>{item.displayEmail}</Text>
       </View>
       <View style={[styles.roleBadge, { backgroundColor: getRoleBadgeColor(item.role) }]}>
         <Text style={styles.roleBadgeText}>{item.role.replace('-', ' ')}</Text>
@@ -143,11 +160,32 @@ export default function ManageMembersScreen() {
     );
   }
 
+  const handleCreatePlaceholder = async (email: string, fullName: string, role: GroupRole) => {
+    const success = await createPlaceholder(email, fullName, role);
+    if (!success) {
+      // Error is already set in the hook
+      return false;
+    }
+    return true;
+  };
+
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Manage Members</Text>
-        <Text style={styles.subtitle}>{currentGroup?.name}</Text>
+        <View style={styles.headerRow}>
+          <View>
+            <Text style={styles.title}>Manage Members</Text>
+            <Text style={styles.subtitle}>{currentGroup?.name}</Text>
+          </View>
+          {isGroupLeader && (
+            <TouchableOpacity
+              style={styles.addPlaceholderButton}
+              onPress={() => setShowPlaceholderModal(true)}
+            >
+              <Text style={styles.addPlaceholderButtonText}>+ Add Placeholder</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {canApproveRequests && pendingRequests.length > 0 && (
@@ -189,7 +227,7 @@ export default function ManageMembersScreen() {
             </View>
 
             <Text style={styles.modalSubtitle}>
-              {selectedMember?.user?.full_name}
+              {selectedMember?.displayName}
             </Text>
 
             <View style={styles.roleOptions}>
@@ -236,7 +274,15 @@ export default function ManageMembersScreen() {
           </View>
         </View>
       </Modal>
-    </View>
+
+      {/* Add Placeholder Modal */}
+      <AddPlaceholderModal
+        visible={showPlaceholderModal}
+        onClose={() => setShowPlaceholderModal(false)}
+        onSubmit={handleCreatePlaceholder}
+        groupName={currentGroup?.name}
+      />
+    </ScrollView>
   );
 }
 
@@ -256,6 +302,11 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     paddingBottom: 20,
   },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
   title: {
     fontSize: 24,
     fontWeight: '700',
@@ -265,6 +316,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#3B82F6',
     marginTop: 4,
+  },
+  addPlaceholderButton: {
+    backgroundColor: '#334155',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  addPlaceholderButtonText: {
+    color: '#3B82F6',
+    fontSize: 14,
+    fontWeight: '600',
   },
   section: {
     paddingHorizontal: 20,
@@ -366,14 +428,43 @@ const styles = StyleSheet.create({
     color: '#F59E0B',
     marginTop: 4,
   },
+  placeholderAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#475569',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  placeholderAvatarText: {
+    color: '#94A3B8',
+    fontSize: 20,
+    fontWeight: '600',
+  },
   memberInfo: {
     flex: 1,
     marginLeft: 12,
+  },
+  memberNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   memberName: {
     fontSize: 16,
     fontWeight: '600',
     color: '#F8FAFC',
+  },
+  placeholderBadge: {
+    backgroundColor: '#F59E0B',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  placeholderBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '600',
   },
   memberEmail: {
     fontSize: 13,

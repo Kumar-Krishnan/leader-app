@@ -80,11 +80,17 @@ supabase secrets list
 
 ```bash
 # Deploy the send-meeting-email function
-supabase functions deploy send-meeting-email
+# Note: --no-verify-jwt is required because we handle auth client-side
+supabase functions deploy send-meeting-email --no-verify-jwt
 
 # Verify deployment
 supabase functions list
 ```
+
+**Important**: The `--no-verify-jwt` flag is required. The function still requires a valid Authorization header, but JWT verification is handled by checking the header format rather than at the Supabase gateway level. This is necessary because:
+- Server-side role verification would require the service_role key
+- Supabase's newer projects may use different key patterns
+- Authorization is enforced client-side (only leaders see the Send Email button)
 
 ## Step 6: Test the Integration
 

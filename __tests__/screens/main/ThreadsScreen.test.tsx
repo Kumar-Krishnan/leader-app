@@ -329,10 +329,11 @@ describe('ThreadsScreen', () => {
     render(<ThreadsScreen />);
 
     await waitFor(() => {
-      // Logger formats output as: '[color][ERROR][reset] [tag] message'
+      // Logger formats output as: '[color][ERROR][reset] [context] [operation] message'
+      // The new centralized error handler includes operation name and error code
       expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('[useThreads] Error fetching threads'),
-        expect.objectContaining({ error: expect.any(Error) })
+        expect.stringContaining('[useThreads] [fetchThreads]'),
+        expect.objectContaining({ code: 'NETWORK_ERROR', recoverable: true })
       );
     });
 
