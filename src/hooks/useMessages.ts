@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { supabase } from '../lib/supabase';
+import * as messagesRepo from '../repositories/messagesRepo';
+import { realtimeService } from '../services/realtime';
+import { RealtimeSubscription } from '../services/realtime/types';
 import { Message, Profile } from '../types/database';
 import { useAuth } from '../contexts/AuthContext';
 import { logger } from '../lib/logger';
@@ -36,34 +38,34 @@ export interface UseMessagesResult {
 
 /**
  * Hook for managing messages in a thread
- * 
+ *
  * Encapsulates all message-related state and operations:
  * - Fetching messages with sender information
  * - Real-time subscription for new messages
  * - Sending, editing, and deleting messages
  * - Error handling
- * 
+ *
  * @param threadId - The ID of the thread to load messages for
- * 
+ *
  * @example
  * ```tsx
  * function ThreadDetailScreen({ threadId }) {
  *   const { messages, loading, sendMessage, editMessage, deleteMessage } = useMessages(threadId);
- *   
+ *
  *   if (loading) return <LoadingSpinner />;
- *   
+ *
  *   return <MessageList messages={messages} />;
  * }
  * ```
  */
 export function useMessages(threadId: string): UseMessagesResult {
   const { user } = useAuth();
-  
+
   const [messages, setMessages] = useState<MessageWithSender[]>([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const channelRef = useRef<any>(null);
+  const subscriptionRef = useRef<RealtimeSubscription | null>(null);
 
   /**
    * Fetch all messages for the thread with sender info
@@ -78,17 +80,10 @@ export function useMessages(threadId: string): UseMessagesResult {
     setError(null);
 
     try {
-      const { data, error: fetchError } = await supabase
-        .from('messages')
-        .select(`
-          *,
-          sender:profiles!sender_id(*)
-        `)
-        .eq('thread_id', threadId)
-        .order('created_at', { ascending: true });
+      const { data, error: fetchError } = await messagesRepo.fetchMessages(threadId);
 
       if (fetchError) throw fetchError;
-      
+
       setMessages(data || []);
     } catch (err: any) {
       logger.error('useMessages', 'Error fetching messages', { error: err });
@@ -110,14 +105,9 @@ export function useMessages(threadId: string): UseMessagesResult {
     setError(null);
 
     try {
-      const { error: insertError } = await supabase
-        .from('messages')
-        .insert({
-          thread_id: threadId,
-          sender_id: user.id,
-          content: content.trim(),
-          attachments: [],
-        });
+      const { error: insertError } = await messagesRepo.insertMessage(
+        threadId, user.id, content.trim()
+      );
 
       if (insertError) throw insertError;
 
@@ -136,7 +126,7 @@ export function useMessages(threadId: string): UseMessagesResult {
    * Edit an existing message
    */
   const editMessage = useCallback(async (
-    messageId: string, 
+    messageId: string,
     content: string
   ): Promise<boolean> => {
     if (!content.trim()) {
@@ -144,16 +134,15 @@ export function useMessages(threadId: string): UseMessagesResult {
     }
 
     try {
-      const { error: updateError } = await supabase
-        .from('messages')
-        .update({ content: content.trim() })
-        .eq('id', messageId);
+      const { error: updateError } = await messagesRepo.updateMessage(
+        messageId, content.trim()
+      );
 
       if (updateError) throw updateError;
 
       // Update local state immediately
-      setMessages(prev => prev.map(msg => 
-        msg.id === messageId 
+      setMessages(prev => prev.map(msg =>
+        msg.id === messageId
           ? { ...msg, content: content.trim() }
           : msg
       ));
@@ -171,10 +160,7 @@ export function useMessages(threadId: string): UseMessagesResult {
    */
   const deleteMessage = useCallback(async (messageId: string): Promise<boolean> => {
     try {
-      const { error: deleteError } = await supabase
-        .from('messages')
-        .delete()
-        .eq('id', messageId);
+      const { error: deleteError } = await messagesRepo.deleteMessage(messageId);
 
       if (deleteError) throw deleteError;
 
@@ -196,53 +182,33 @@ export function useMessages(threadId: string): UseMessagesResult {
     // Fetch initial messages
     fetchMessages();
 
-    // Subscribe to new messages
-    const channel = supabase
-      .channel(`messages:${threadId}`)
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'messages',
-        filter: `thread_id=eq.${threadId}`,
-      }, async (payload) => {
-        // Fetch the sender info for the new message
-        const newMsg = payload.new as Message;
-        const { data: sender } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', newMsg.sender_id)
-          .single();
-        
-        setMessages(prev => [...prev, { ...newMsg, sender: sender || undefined }]);
-      })
-      .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'messages',
-        filter: `thread_id=eq.${threadId}`,
-      }, (payload) => {
-        const updatedMsg = payload.new as Message;
-        setMessages(prev => prev.map(msg => 
-          msg.id === updatedMsg.id ? { ...msg, ...updatedMsg } : msg
-        ));
-      })
-      .on('postgres_changes', {
-        event: 'DELETE',
-        schema: 'public',
-        table: 'messages',
-        filter: `thread_id=eq.${threadId}`,
-      }, (payload) => {
-        const deletedMsg = payload.old as Message;
-        setMessages(prev => prev.filter(msg => msg.id !== deletedMsg.id));
-      })
-      .subscribe();
+    // Subscribe to message changes via realtime service
+    const subscription = realtimeService.subscribeToTable(
+      'messages',
+      `thread_id=eq.${threadId}`,
+      {
+        onInsert: async (newMsg: Message) => {
+          // Fetch the sender info for the new message
+          const { data: sender } = await messagesRepo.fetchProfile(newMsg.sender_id);
+          setMessages(prev => [...prev, { ...newMsg, sender: sender || undefined }]);
+        },
+        onUpdate: (updatedMsg: Message) => {
+          setMessages(prev => prev.map(msg =>
+            msg.id === updatedMsg.id ? { ...msg, ...updatedMsg } : msg
+          ));
+        },
+        onDelete: (deletedMsg: Message) => {
+          setMessages(prev => prev.filter(msg => msg.id !== deletedMsg.id));
+        },
+      }
+    );
 
-    channelRef.current = channel;
+    subscriptionRef.current = subscription;
 
     // Cleanup subscription on unmount
     return () => {
-      if (channelRef.current) {
-        supabase.removeChannel(channelRef.current);
+      if (subscriptionRef.current) {
+        subscriptionRef.current.unsubscribe();
       }
     };
   }, [threadId, fetchMessages]);
@@ -258,4 +224,3 @@ export function useMessages(threadId: string): UseMessagesResult {
     deleteMessage,
   };
 }
-

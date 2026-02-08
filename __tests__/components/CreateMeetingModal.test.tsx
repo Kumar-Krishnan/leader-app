@@ -600,3 +600,77 @@ describe('Placeholder member handling', () => {
     expect(attendees[0].user_id).toBe('user-1');
   });
 });
+
+/**
+ * formatDateForInput - same logic as the component
+ * Uses local date components (not UTC) to avoid timezone issues
+ */
+function formatDateForInput(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+/**
+ * getDefaultDate - same logic as the component
+ * Returns today's date with time zeroed out
+ */
+function getDefaultDate(): Date {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+describe('formatDateForInput', () => {
+  it('should return local YYYY-MM-DD format', () => {
+    // Create a date explicitly in local time
+    const date = new Date(2024, 2, 15, 10, 30); // March 15, 2024 10:30 AM local
+    expect(formatDateForInput(date)).toBe('2024-03-15');
+  });
+
+  it('should pad single-digit month and day', () => {
+    const date = new Date(2024, 0, 5, 12, 0); // Jan 5, 2024
+    expect(formatDateForInput(date)).toBe('2024-01-05');
+  });
+
+  it('should not shift date for late evening times (UTC midnight crossing)', () => {
+    // 11:30 PM local time — if using .toISOString() (UTC), this could
+    // show the next day for US timezones (UTC-5 to UTC-8)
+    const date = new Date(2024, 2, 15, 23, 30); // March 15 at 11:30 PM local
+    expect(formatDateForInput(date)).toBe('2024-03-15');
+  });
+
+  it('should not shift date for early morning times', () => {
+    const date = new Date(2024, 2, 15, 0, 15); // March 15 at 12:15 AM local
+    expect(formatDateForInput(date)).toBe('2024-03-15');
+  });
+
+  it('should handle year boundaries correctly', () => {
+    const date = new Date(2024, 11, 31, 23, 59); // Dec 31, 2024 at 11:59 PM local
+    expect(formatDateForInput(date)).toBe('2024-12-31');
+  });
+
+  it('should handle New Year start correctly', () => {
+    const date = new Date(2025, 0, 1, 0, 1); // Jan 1, 2025 at 12:01 AM local
+    expect(formatDateForInput(date)).toBe('2025-01-01');
+  });
+});
+
+describe('getDefaultDate', () => {
+  it('should return today\'s date', () => {
+    const defaultDate = getDefaultDate();
+    const now = new Date();
+    expect(defaultDate.getFullYear()).toBe(now.getFullYear());
+    expect(defaultDate.getMonth()).toBe(now.getMonth());
+    expect(defaultDate.getDate()).toBe(now.getDate());
+  });
+
+  it('should have time zeroed out', () => {
+    const defaultDate = getDefaultDate();
+    expect(defaultDate.getHours()).toBe(0);
+    expect(defaultDate.getMinutes()).toBe(0);
+    expect(defaultDate.getSeconds()).toBe(0);
+    expect(defaultDate.getMilliseconds()).toBe(0);
+  });
+});

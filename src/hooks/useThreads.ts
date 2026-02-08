@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '../lib/supabase';
+import * as threadsRepo from '../repositories/threadsRepo';
 import { Thread } from '../types/database';
 import { useAuth } from '../contexts/AuthContext';
 import { useGroup } from '../contexts/GroupContext';
@@ -33,21 +33,21 @@ export interface UseThreadsResult {
 
 /**
  * Hook for managing threads in the current group
- * 
+ *
  * Encapsulates all thread-related state and operations:
  * - Fetching threads for the current group
  * - Creating new threads
  * - Archiving threads
  * - Error handling
- * 
+ *
  * @example
  * ```tsx
  * function ThreadsScreen() {
  *   const { threads, loading, error, refetch, createThread } = useThreads();
- *   
+ *
  *   if (loading) return <LoadingSpinner />;
  *   if (error) return <ErrorMessage message={error} />;
- *   
+ *
  *   return <ThreadList threads={threads} />;
  * }
  * ```
@@ -75,12 +75,7 @@ export function useThreads(): UseThreadsResult {
     clearError();
 
     try {
-      const { data, error: fetchError } = await supabase
-        .from('threads')
-        .select('*')
-        .eq('group_id', currentGroup.id)
-        .eq('is_archived', false)
-        .order('updated_at', { ascending: false });
+      const { data, error: fetchError } = await threadsRepo.fetchThreads(currentGroup.id);
 
       if (fetchError) throw fetchError;
 
@@ -105,17 +100,13 @@ export function useThreads(): UseThreadsResult {
     }
 
     try {
-      const { data, error: createError } = await supabase
-        .from('threads')
-        .insert({
-          name: name.trim(),
-          description: description?.trim() || null,
-          group_id: currentGroup.id,
-          created_by: user.id,
-          is_archived: false,
-        })
-        .select()
-        .single();
+      const { data, error: createError } = await threadsRepo.createThread({
+        name: name.trim(),
+        description: description?.trim() || null,
+        group_id: currentGroup.id,
+        created_by: user.id,
+        is_archived: false,
+      });
 
       if (createError) throw createError;
 
@@ -136,10 +127,7 @@ export function useThreads(): UseThreadsResult {
    */
   const archiveThread = useCallback(async (threadId: string): Promise<boolean> => {
     try {
-      const { error: archiveError } = await supabase
-        .from('threads')
-        .update({ is_archived: true })
-        .eq('id', threadId);
+      const { error: archiveError } = await threadsRepo.archiveThread(threadId);
 
       if (archiveError) throw archiveError;
 
@@ -167,4 +155,3 @@ export function useThreads(): UseThreadsResult {
     archiveThread,
   };
 }
-

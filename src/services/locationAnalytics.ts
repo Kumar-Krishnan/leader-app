@@ -1,10 +1,10 @@
 import * as Location from 'expo-location';
 import { Platform } from 'react-native';
-import { supabase } from '../lib/supabase';
+import * as analyticsRepo from '../repositories/analyticsRepo';
 
 /**
  * Location Analytics Service
- * 
+ *
  * Records ANONYMOUS location events for analytics purposes.
  * - NO user identification is stored
  * - Location is rounded to ~1km accuracy
@@ -12,13 +12,6 @@ import { supabase } from '../lib/supabase';
  */
 
 type EventType = 'app_open' | 'login' | 'signup';
-
-interface LocationEvent {
-  lat: number;
-  lng: number;
-  event_type: EventType;
-  platform: string;
-}
 
 /**
  * Round coordinates to 2 decimal places (~1km grid)
@@ -48,9 +41,9 @@ async function getApproximateLocation(): Promise<{ lat: number; lng: number } | 
   try {
     // Check if we already have permission
     const { status: existingStatus } = await Location.getForegroundPermissionsAsync();
-    
+
     let finalStatus = existingStatus;
-    
+
     // Request permission if not already granted
     if (existingStatus !== 'granted') {
       const { status } = await Location.requestForegroundPermissionsAsync();
@@ -80,9 +73,9 @@ async function getApproximateLocation(): Promise<{ lat: number; lng: number } | 
 
 /**
  * Record an anonymous location event
- * 
+ *
  * @param eventType - Type of event ('app_open', 'login', 'signup')
- * 
+ *
  * This function:
  * 1. Gets approximate location (if permitted)
  * 2. Rounds to ~1km grid
@@ -91,13 +84,13 @@ async function getApproximateLocation(): Promise<{ lat: number; lng: number } | 
 export async function recordLocationEvent(eventType: EventType): Promise<void> {
   try {
     const location = await getApproximateLocation();
-    
+
     if (!location) {
       // No location available - that's fine, just skip
       return;
     }
 
-    const event: LocationEvent = {
+    const event = {
       lat: location.lat,
       lng: location.lng,
       event_type: eventType,
@@ -105,9 +98,7 @@ export async function recordLocationEvent(eventType: EventType): Promise<void> {
     };
 
     // Insert anonymous event (no user_id)
-    const { error } = await supabase
-      .from('location_events')
-      .insert(event);
+    const { error } = await analyticsRepo.insertLocationEvent(event);
 
     if (error) {
       console.log('[LocationAnalytics] Error recording event:', error.message);
@@ -156,4 +147,3 @@ export async function hasLocationPermission(): Promise<boolean> {
     return false;
   }
 }
-

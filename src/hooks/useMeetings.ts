@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '../lib/supabase';
+import * as meetingsRepo from '../repositories/meetingsRepo';
+import { emailService } from '../services/email';
 import { MeetingWithAttendees } from '../types/database';
 import { useAuth } from '../contexts/AuthContext';
 import { useGroup } from '../contexts/GroupContext';
@@ -15,7 +16,7 @@ export type RSVPStatus = 'invited' | 'accepted' | 'declined' | 'maybe';
  * Return type for the useMeetings hook
  */
 export interface UseMeetingsResult {
-  /** List of upcoming meetings for the current group */
+  /** List of meetings for the current group (upcoming only unless includePast is set) */
   meetings: MeetingWithAttendees[];
   /** Whether meetings are currently being fetched */
   loading: boolean;
@@ -50,25 +51,26 @@ export interface UseMeetingsResult {
 
 /**
  * Hook for managing meetings in the current group
- * 
+ *
  * Encapsulates all meeting-related state and operations:
- * - Fetching upcoming meetings with attendees
+ * - Fetching all meetings with attendees
  * - RSVP functionality (single and series)
  * - Delete functionality (single and series)
  * - Error handling
- * 
+ *
  * @example
  * ```tsx
  * function MeetingsScreen() {
  *   const { meetings, loading, rsvpToMeeting, deleteMeeting } = useMeetings();
- *   
+ *
  *   if (loading) return <LoadingSpinner />;
- *   
+ *
  *   return <MeetingList meetings={meetings} />;
  * }
  * ```
  */
-export function useMeetings(): UseMeetingsResult {
+export function useMeetings(options?: { includePast?: boolean }): UseMeetingsResult {
+  const includePast = options?.includePast ?? false;
   const { user, profile } = useAuth();
   const { currentGroup } = useGroup();
   const { error, setError, handleError, clearError } = useErrorHandler({
@@ -80,7 +82,8 @@ export function useMeetings(): UseMeetingsResult {
   const [sendingEmail, setSendingEmail] = useState(false);
 
   /**
-   * Fetch all upcoming meetings for the current group with attendees
+   * Fetch meetings for the current group with attendees.
+   * When includePast is false (default), only fetches upcoming meetings.
    */
   const fetchMeetings = useCallback(async () => {
     if (!currentGroup) {
@@ -92,23 +95,7 @@ export function useMeetings(): UseMeetingsResult {
     clearError();
 
     try {
-      const { data, error: fetchError } = await supabase
-        .from('meetings')
-        .select(`
-          *,
-          attendees:meeting_attendees(
-            id,
-            user_id,
-            placeholder_id,
-            status,
-            is_series_rsvp,
-            user:profiles(id, full_name, email),
-            placeholder:placeholder_profiles(id, full_name, email)
-          )
-        `)
-        .eq('group_id', currentGroup.id)
-        .gte('date', new Date().toISOString())
-        .order('date', { ascending: true });
+      const { data, error: fetchError } = await meetingsRepo.fetchMeetings(currentGroup.id, includePast);
 
       if (fetchError) throw fetchError;
 
@@ -118,25 +105,18 @@ export function useMeetings(): UseMeetingsResult {
     } finally {
       setLoading(false);
     }
-  }, [currentGroup, clearError, handleError]);
+  }, [currentGroup, includePast, clearError, handleError]);
 
   /**
    * RSVP to a single meeting
    */
   const rsvpToMeeting = useCallback(async (
-    meetingId: string, 
-    attendeeId: string, 
+    meetingId: string,
+    attendeeId: string,
     status: RSVPStatus
   ): Promise<boolean> => {
     try {
-      const { error: updateError } = await supabase
-        .from('meeting_attendees')
-        .update({ 
-          status, 
-          responded_at: new Date().toISOString(),
-          is_series_rsvp: false,
-        })
-        .eq('id', attendeeId);
+      const { error: updateError } = await meetingsRepo.updateAttendeeStatus(attendeeId, status, false);
 
       if (updateError) throw updateError;
 
@@ -145,7 +125,7 @@ export function useMeetings(): UseMeetingsResult {
         if (meeting.id === meetingId) {
           return {
             ...meeting,
-            attendees: meeting.attendees?.map(a => 
+            attendees: meeting.attendees?.map(a =>
               a.id === attendeeId ? { ...a, status, is_series_rsvp: false } : a
             ),
           };
@@ -164,7 +144,7 @@ export function useMeetings(): UseMeetingsResult {
    * RSVP to all meetings in a series
    */
   const rsvpToSeries = useCallback(async (
-    seriesId: string, 
+    seriesId: string,
     status: RSVPStatus
   ): Promise<boolean> => {
     if (!user) {
@@ -184,15 +164,9 @@ export function useMeetings(): UseMeetingsResult {
       }
 
       // Update all attendee records for this user in this series
-      const { error: updateError } = await supabase
-        .from('meeting_attendees')
-        .update({ 
-          status, 
-          responded_at: new Date().toISOString(),
-          is_series_rsvp: true,
-        })
-        .eq('user_id', user.id)
-        .in('meeting_id', seriesMeetingIds);
+      const { error: updateError } = await meetingsRepo.updateAttendeesBatch(
+        seriesMeetingIds, user.id, status, true
+      );
 
       if (updateError) throw updateError;
 
@@ -201,7 +175,7 @@ export function useMeetings(): UseMeetingsResult {
         if (meeting.series_id === seriesId) {
           return {
             ...meeting,
-            attendees: meeting.attendees?.map(a => 
+            attendees: meeting.attendees?.map(a =>
               a.user_id === user.id ? { ...a, status, is_series_rsvp: true } : a
             ),
           };
@@ -221,10 +195,7 @@ export function useMeetings(): UseMeetingsResult {
    */
   const deleteMeeting = useCallback(async (meetingId: string): Promise<boolean> => {
     try {
-      const { error: deleteError } = await supabase
-        .from('meetings')
-        .delete()
-        .eq('id', meetingId);
+      const { error: deleteError } = await meetingsRepo.deleteMeeting(meetingId);
 
       if (deleteError) throw deleteError;
 
@@ -243,10 +214,7 @@ export function useMeetings(): UseMeetingsResult {
    */
   const deleteSeries = useCallback(async (seriesId: string): Promise<boolean> => {
     try {
-      const { error: deleteError } = await supabase
-        .from('meetings')
-        .delete()
-        .eq('series_id', seriesId);
+      const { error: deleteError } = await meetingsRepo.deleteSeries(seriesId);
 
       if (deleteError) throw deleteError;
 
@@ -268,13 +236,7 @@ export function useMeetings(): UseMeetingsResult {
     updates: { description?: string }
   ): Promise<boolean> => {
     try {
-      const { error: updateError } = await supabase
-        .from('meetings')
-        .update({
-          ...updates,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', meetingId);
+      const { error: updateError } = await meetingsRepo.updateMeeting(meetingId, updates);
 
       if (updateError) throw updateError;
 
@@ -363,13 +325,9 @@ export function useMeetings(): UseMeetingsResult {
         const newDate = new Date(currentDate.getTime() + frequencyMs);
 
         // Update meeting date
-        const { error: updateError } = await supabase
-          .from('meetings')
-          .update({
-            date: newDate.toISOString(),
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', meeting.id);
+        const { error: updateError } = await meetingsRepo.updateMeetingDate(
+          meeting.id, newDate.toISOString()
+        );
 
         if (updateError) throw updateError;
 
@@ -379,15 +337,12 @@ export function useMeetings(): UseMeetingsResult {
             const seriesStatus = seriesPreferences.get(attendee.user_id);
             const newStatus = seriesStatus || 'invited';
 
-            const { error: rsvpError } = await supabase
-              .from('meeting_attendees')
-              .update({
-                status: newStatus,
-                // If reverting to series preference, mark as series RSVP; otherwise reset
-                is_series_rsvp: seriesStatus ? true : false,
-                responded_at: seriesStatus ? new Date().toISOString() : null,
-              })
-              .eq('id', attendee.id);
+            const { error: rsvpError } = await meetingsRepo.updateAttendeeRsvp(
+              attendee.id,
+              newStatus,
+              seriesStatus ? true : false,
+              seriesStatus ? new Date().toISOString() : null
+            );
 
             if (rsvpError) throw rsvpError;
           }
@@ -477,29 +432,22 @@ export function useMeetings(): UseMeetingsResult {
     const senderEmail = senderName.replace(/\s+/g, '') + '@manatee.link';
 
     try {
-      const { data, error: fnError } = await supabase.functions.invoke('send-meeting-email', {
-        body: {
-          meetingId: meeting.id,
-          title: meeting.title,
-          description: customDescription !== undefined ? customDescription : meeting.description,
-          customMessage: customMessage || null,
-          descriptionFirst,
-          date: meeting.date,
-          location: meeting.location,
-          attendees,
-          senderName,
-          senderEmail,
-          groupName: currentGroup.name,
-        },
+      const result = await emailService.sendMeetingEmail({
+        meetingId: meeting.id,
+        title: meeting.title,
+        description: customDescription !== undefined ? customDescription : meeting.description,
+        customMessage: customMessage || null,
+        descriptionFirst,
+        date: meeting.date,
+        location: meeting.location,
+        attendees,
+        senderName,
+        senderEmail,
+        groupName: currentGroup.name,
       });
 
-      if (fnError) {
-        throw fnError;
-      }
-
-      // Check if the response indicates an error
-      if (data?.error) {
-        throw new Error(data.error);
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to send email');
       }
 
       logger.info('useMeetings', 'Meeting email sent successfully', {
@@ -537,4 +485,3 @@ export function useMeetings(): UseMeetingsResult {
     sendMeetingEmail,
   };
 }
-

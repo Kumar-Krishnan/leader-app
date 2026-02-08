@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '../lib/supabase';
+import * as membersRepo from '../repositories/membersRepo';
 import { GroupMember, Profile, GroupRole, PlaceholderProfile } from '../types/database';
 import { useGroup } from '../contexts/GroupContext';
 import { useErrorHandler } from './useErrorHandler';
@@ -42,22 +42,22 @@ export interface UseGroupMembersResult {
 
 /**
  * Hook for managing group members
- * 
+ *
  * Encapsulates all member-related state and operations:
  * - Fetching members with profile info
  * - Role updates
  * - Member removal
- * 
+ *
  * Note: Join request handling is in GroupContext as it's
  * needed across multiple screens (badge count, etc.)
- * 
+ *
  * @example
  * ```tsx
  * function ManageMembersScreen() {
  *   const { members, loading, updateRole, removeMember } = useGroupMembers();
- *   
+ *
  *   if (loading) return <LoadingSpinner />;
- *   
+ *
  *   return <MemberList members={members} onRoleChange={updateRole} />;
  * }
  * ```
@@ -86,15 +86,7 @@ export function useGroupMembers(): UseGroupMembersResult {
     clearError();
 
     try {
-      const { data, error: fetchError } = await supabase
-        .from('group_members')
-        .select(`
-          *,
-          user:profiles!user_id(*),
-          placeholder:placeholder_profiles!placeholder_id(*)
-        `)
-        .eq('group_id', currentGroup.id)
-        .order('role', { ascending: true });
+      const { data, error: fetchError } = await membersRepo.fetchMembers(currentGroup.id);
 
       if (fetchError) throw fetchError;
 
@@ -132,11 +124,9 @@ export function useGroupMembers(): UseGroupMembersResult {
     clearError();
 
     try {
-      const { error: updateError } = await supabase
-        .from('group_members')
-        .update({ role: newRole })
-        .eq('id', memberId)
-        .eq('group_id', currentGroup.id);
+      const { error: updateError } = await membersRepo.updateMemberRole(
+        memberId, currentGroup.id, newRole
+      );
 
       if (updateError) throw updateError;
 
@@ -167,11 +157,7 @@ export function useGroupMembers(): UseGroupMembersResult {
     clearError();
 
     try {
-      const { error: deleteError } = await supabase
-        .from('group_members')
-        .delete()
-        .eq('id', memberId)
-        .eq('group_id', currentGroup.id);
+      const { error: deleteError } = await membersRepo.removeMember(memberId, currentGroup.id);
 
       if (deleteError) throw deleteError;
 
@@ -203,12 +189,9 @@ export function useGroupMembers(): UseGroupMembersResult {
     clearError();
 
     try {
-      const { data, error: rpcError } = await supabase.rpc('create_placeholder_member', {
-        p_group_id: currentGroup.id,
-        p_email: email,
-        p_full_name: fullName,
-        p_role: role as string,
-      } as any);
+      const { data, error: rpcError } = await membersRepo.createPlaceholderMember(
+        currentGroup.id, email, fullName, role as string
+      );
 
       if (rpcError) throw rpcError;
 
@@ -238,4 +221,3 @@ export function useGroupMembers(): UseGroupMembersResult {
     createPlaceholder,
   };
 }
-

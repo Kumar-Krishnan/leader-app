@@ -49,8 +49,9 @@ interface SeriesViewModalState {
 export default function MeetingsScreen() {
   const { isGroupLeader } = useGroup();
   const { user } = useAuth();
-  
-  // Use the useMeetings hook for all data and operations
+  const [showPast, setShowPast] = useState(false);
+
+  // Use the useMeetings hook — only fetches past meetings when user toggles to Past
   const {
     meetings,
     loading,
@@ -64,8 +65,7 @@ export default function MeetingsScreen() {
     getSeriesMeetings,
     skipMeeting,
     sendMeetingEmail,
-  } = useMeetings();
-  
+  } = useMeetings({ includePast: showPast });
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [rsvpModal, setRsvpModal] = useState<RSVPModalState>({
     visible: false,
@@ -95,35 +95,34 @@ export default function MeetingsScreen() {
     meeting: MeetingWithAttendees | null;
   }>({ visible: false, meeting: null });
 
-  // Group meetings: standalone meetings + one entry per series (showing next upcoming meeting)
+  // Group meetings: standalone meetings + one entry per series
+  // Past meetings show newest first, upcoming show soonest first
   const displayItems = useMemo((): DisplayItem[] => {
     const items: DisplayItem[] = [];
     const processedSeriesIds = new Set<string>();
 
-    // Sort meetings by date
     const sortedMeetings = [...meetings].sort(
-      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+      (a, b) => showPast
+        ? new Date(b.date).getTime() - new Date(a.date).getTime()
+        : new Date(a.date).getTime() - new Date(b.date).getTime()
     );
 
     for (const meeting of sortedMeetings) {
       if (!meeting.series_id) {
-        // Standalone meeting
         items.push({ type: 'single', meeting });
       } else if (!processedSeriesIds.has(meeting.series_id)) {
-        // First (next upcoming) meeting in this series
         processedSeriesIds.add(meeting.series_id);
         const seriesMeetings = getSeriesMeetings(meeting.series_id);
         items.push({
           type: 'series',
-          meeting, // This is the next upcoming meeting
+          meeting,
           seriesMeetings,
         });
       }
-      // Skip subsequent meetings in already-processed series
     }
 
     return items;
-  }, [meetings, getSeriesMeetings]);
+  }, [meetings, getSeriesMeetings, showPast]);
 
   // Open series view modal
   const openSeriesView = (item: DisplayItem) => {
@@ -438,13 +437,17 @@ export default function MeetingsScreen() {
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
       <Text style={styles.emptyIcon}>📅</Text>
-      <Text style={styles.emptyTitle}>No upcoming events</Text>
-      <Text style={styles.emptyText}>
-        {isGroupLeader 
-          ? 'Schedule an event to get your group together.'
-          : 'Upcoming events will appear here.'}
+      <Text style={styles.emptyTitle}>
+        {showPast ? 'No past events' : 'No upcoming events'}
       </Text>
-      {isGroupLeader && (
+      <Text style={styles.emptyText}>
+        {showPast
+          ? 'Past events will appear here.'
+          : isGroupLeader
+            ? 'Schedule an event to get your group together.'
+            : 'Upcoming events will appear here.'}
+      </Text>
+      {!showPast && isGroupLeader && (
         <TouchableOpacity style={styles.emptyButton} onPress={() => setShowCreateModal(true)}>
           <Text style={styles.emptyButtonText}>Create Event</Text>
         </TouchableOpacity>
@@ -469,6 +472,24 @@ export default function MeetingsScreen() {
           onPress: () => setShowCreateModal(true),
         } : undefined}
       />
+      <View style={styles.toggleRow}>
+        <TouchableOpacity
+          style={[styles.toggleButton, !showPast && styles.toggleButtonActive]}
+          onPress={() => setShowPast(false)}
+        >
+          <Text style={[styles.toggleButtonText, !showPast && styles.toggleButtonTextActive]}>
+            Upcoming
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.toggleButton, showPast && styles.toggleButtonActive]}
+          onPress={() => setShowPast(true)}
+        >
+          <Text style={[styles.toggleButtonText, showPast && styles.toggleButtonTextActive]}>
+            Past
+          </Text>
+        </TouchableOpacity>
+      </View>
       <FlatList
         data={displayItems}
         renderItem={renderDisplayItem}
@@ -741,6 +762,29 @@ const styles = StyleSheet.create({
   newButtonText: {
     color: colors.text.inverse,
     fontWeight: fontWeight.semibold,
+  },
+  toggleRow: {
+    flexDirection: 'row',
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.md,
+    gap: spacing.sm,
+  },
+  toggleButton: {
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    borderRadius: borderRadius.xl,
+    backgroundColor: colors.background.tertiary,
+  },
+  toggleButtonActive: {
+    backgroundColor: colors.primary[500],
+  },
+  toggleButtonText: {
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.medium,
+    color: colors.text.secondary,
+  },
+  toggleButtonTextActive: {
+    color: colors.text.inverse,
   },
   list: {
     padding: spacing.xl,

@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { isSupabaseConfigured } from '../lib/supabase';
+import { authService } from '../services/auth';
+import * as profilesRepo from '../repositories/profilesRepo';
 import { Profile } from '../types/database';
 import { recordLogin, recordSignup } from '../services/locationAnalytics';
 
@@ -28,7 +30,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     console.log('[AuthContext] init, isSupabaseConfigured:', isSupabaseConfigured);
-    
+
     // Skip auth if Supabase isn't configured
     if (!isSupabaseConfigured) {
       console.log('[AuthContext] Supabase not configured, setting loading false');
@@ -41,7 +43,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const initSession = async (retryCount = 0) => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { session } } = await authService.getSession();
         console.log('[AuthContext] Got session:', !!session, session?.user?.email);
         currentUserId = session?.user?.id ?? null;
         console.log('[AuthContext] Set currentUserId to:', currentUserId);
@@ -65,34 +67,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     initSession();
-    
+
     // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+    const { data: { subscription } } = authService.onAuthStateChange(
       async (event, newSession) => {
         const newUserId = newSession?.user?.id ?? null;
         console.log('[AuthContext] onAuthStateChange event:', event, 'currentUserId:', currentUserId, 'newUserId:', newUserId);
-        
+
         // Ignore token refreshes entirely
         if (event === 'TOKEN_REFRESHED') {
           console.log('[AuthContext] Token refreshed, ignoring');
           return;
         }
-        
+
         // For SIGNED_IN, only update if user actually changed
         if (event === 'SIGNED_IN' && currentUserId === newUserId) {
           console.log('[AuthContext] SIGNED_IN but same user, ignoring');
           return;
         }
-        
+
         // For INITIAL_SESSION, skip if we already have this user
         if (event === 'INITIAL_SESSION' && currentUserId === newUserId) {
           console.log('[AuthContext] INITIAL_SESSION but same user, ignoring');
           return;
         }
-        
+
         console.log('[AuthContext] Auth state changed, updating from', currentUserId, 'to', newUserId);
         currentUserId = newUserId;
-        
+
         if (event === 'SIGNED_OUT') {
           setSession(null);
           setUser(null);
@@ -125,11 +127,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const fetchProfile = async (userId: string, retryCount = 0) => {
     console.log('[AuthContext] fetchProfile starting for:', userId);
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
+      const { data, error } = await profilesRepo.fetchProfile(userId);
 
       if (error) throw error;
       console.log('[AuthContext] fetchProfile got data:', !!data);
@@ -151,25 +149,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!isSupabaseConfigured) {
       return { error: new Error('Supabase is not configured. Please add your credentials to .env') };
     }
-    
+
     try {
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            full_name: fullName,
-          },
-        },
+      const { error } = await authService.signUp(email, password, {
+        full_name: fullName,
       });
 
       if (error) throw error;
 
       // Profile is created automatically by database trigger
-      
+
       // Record anonymous location event for analytics
       recordSignup();
-      
+
       return { error: null };
     } catch (error) {
       return { error: error as Error };
@@ -182,16 +174,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      const { error } = await authService.signIn(email, password);
 
       if (error) throw error;
-      
+
       // Record anonymous location event for analytics
       recordLogin();
-      
+
       return { error: null };
     } catch (error) {
       return { error: error as Error };
@@ -200,7 +189,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     if (isSupabaseConfigured) {
-      await supabase.auth.signOut();
+      await authService.signOut();
     }
     setProfile(null);
     setSession(null);

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '../lib/supabase';
+import * as resourcesRepo from '../repositories/resourcesRepo';
 import { storage, RESOURCES_BUCKET, generateFilePath } from '../lib/storage';
 import { Resource, ResourceFolder } from '../types/database';
 import { useAuth } from '../contexts/AuthContext';
@@ -174,44 +174,15 @@ export function useResources(options: UseResourcesOptions = {}): UseResourcesRes
 
     try {
       // Fetch own folders
-      let folderQuery = supabase
-        .from('resource_folders')
-        .select('*')
-        .eq('group_id', currentGroup.id);
-
-      if (currentFolderId === null) {
-        folderQuery = folderQuery.is('parent_id', null);
-      } else {
-        folderQuery = folderQuery.eq('parent_id', currentFolderId);
-      }
-
-      const { data: folderData, error: folderError } = await folderQuery.order('name');
+      const { data: folderData, error: folderError } = await resourcesRepo.fetchFolders(
+        currentGroup.id, currentFolderId
+      );
       if (folderError) throw folderError;
 
       // Fetch own resources filtered by visibility
-      let resourceQuery = supabase
-        .from('resources')
-        .select('*')
-        .eq('group_id', currentGroup.id);
-
-      // Apply visibility filter
-      if (visibility === 'leaders_only') {
-        resourceQuery = resourceQuery.eq('visibility', 'leaders_only');
-      } else if (visibility === 'members_only') {
-        resourceQuery = resourceQuery.eq('visibility', 'members_only');
-      } else {
-        // Default: exclude hub-specific resources (they go to their respective hubs)
-        resourceQuery = resourceQuery.eq('visibility', 'all');
-      }
-
-      if (currentFolderId === null) {
-        resourceQuery = resourceQuery.is('folder_id', null);
-      } else {
-        resourceQuery = resourceQuery.eq('folder_id', currentFolderId);
-      }
-
-      const { data: resourceData, error: resourceError } = await resourceQuery
-        .order('created_at', { ascending: false });
+      const { data: resourceData, error: resourceError } = await resourcesRepo.fetchResources(
+        currentGroup.id, currentFolderId, visibility
+      );
       if (resourceError) throw resourceError;
 
       // Type assertions for data arrays
@@ -225,10 +196,7 @@ export function useResources(options: UseResourcesOptions = {}): UseResourcesRes
       // Get share counts for own resources
       const resourceShareCountMap = new Map<string, number>();
       if (resourceIds.length > 0) {
-        const { data: resourceShareCounts } = await supabase
-          .from('resource_group_shares')
-          .select('resource_id')
-          .in('resource_id', resourceIds);
+        const { data: resourceShareCounts } = await resourcesRepo.fetchResourceShareCounts(resourceIds);
 
         ((resourceShareCounts || []) as { resource_id: string }[]).forEach(share => {
           resourceShareCountMap.set(
@@ -241,10 +209,7 @@ export function useResources(options: UseResourcesOptions = {}): UseResourcesRes
       // Get share counts for own folders
       const folderShareCountMap = new Map<string, number>();
       if (folderIds.length > 0) {
-        const { data: folderShareCounts } = await supabase
-          .from('resource_folder_group_shares')
-          .select('folder_id')
-          .in('folder_id', folderIds);
+        const { data: folderShareCounts } = await resourcesRepo.fetchFolderShareCounts(folderIds);
 
         ((folderShareCounts || []) as { folder_id: string }[]).forEach(share => {
           folderShareCountMap.set(
@@ -271,17 +236,7 @@ export function useResources(options: UseResourcesOptions = {}): UseResourcesRes
 
       if (currentFolderId === null) {
         // At root level, fetch directly shared folders
-        const { data: sharedFolderData } = await supabase
-          .from('resource_folder_group_shares')
-          .select(`
-            folder_id,
-            shared_at,
-            folder:resource_folders!folder_id (
-              *,
-              group:groups!group_id (id, name)
-            )
-          `)
-          .eq('shared_with_group_id', currentGroup.id);
+        const { data: sharedFolderData } = await resourcesRepo.fetchSharedFolders(currentGroup.id);
 
         sharedFolders = ((sharedFolderData || []) as any[])
           .filter((item) => item.folder)
@@ -293,17 +248,7 @@ export function useResources(options: UseResourcesOptions = {}): UseResourcesRes
           }));
 
         // Fetch directly shared resources (at root level)
-        const { data: sharedResourceData } = await supabase
-          .from('resource_group_shares')
-          .select(`
-            resource_id,
-            shared_at,
-            resource:resources!resource_id (
-              *,
-              group:groups!group_id (id, name)
-            )
-          `)
-          .eq('shared_with_group_id', currentGroup.id);
+        const { data: sharedResourceData } = await resourcesRepo.fetchSharedResources(currentGroup.id);
 
         sharedResources = ((sharedResourceData || []) as any[])
           .filter((item) => {
@@ -334,10 +279,7 @@ export function useResources(options: UseResourcesOptions = {}): UseResourcesRes
 
           if (sourceGroupId) {
             // Fetch subfolders of the current shared folder
-            const { data: subFolderData } = await supabase
-              .from('resource_folders')
-              .select('*, group:groups!group_id (id, name)')
-              .eq('parent_id', currentFolderId);
+            const { data: subFolderData } = await resourcesRepo.fetchSharedSubfolders(currentFolderId);
 
             sharedFolders = ((subFolderData || []) as any[]).map((f) => ({
               ...f,
@@ -347,20 +289,9 @@ export function useResources(options: UseResourcesOptions = {}): UseResourcesRes
             }));
 
             // Fetch resources in the current shared folder with visibility filter
-            let subResourceQuery = supabase
-              .from('resources')
-              .select('*, group:groups!group_id (id, name)')
-              .eq('folder_id', currentFolderId);
-
-            if (visibility === 'leaders_only') {
-              subResourceQuery = subResourceQuery.eq('visibility', 'leaders_only');
-            } else if (visibility === 'members_only') {
-              subResourceQuery = subResourceQuery.eq('visibility', 'members_only');
-            } else {
-              subResourceQuery = subResourceQuery.eq('visibility', 'all');
-            }
-
-            const { data: subResourceData } = await subResourceQuery;
+            const { data: subResourceData } = await resourcesRepo.fetchSharedSubResources(
+              currentFolderId, visibility
+            );
 
             sharedResources = ((subResourceData || []) as any[]).map((r) => ({
               ...r,
@@ -420,14 +351,12 @@ export function useResources(options: UseResourcesOptions = {}): UseResourcesRes
     }
 
     try {
-      const { error: insertError } = await supabase
-        .from('resource_folders')
-        .insert({
-          name: name.trim(),
-          group_id: currentGroup.id,
-          parent_id: currentFolderId,
-          created_by: user.id,
-        });
+      const { error: insertError } = await resourcesRepo.createFolder({
+        name: name.trim(),
+        group_id: currentGroup.id,
+        parent_id: currentFolderId,
+        created_by: user.id,
+      });
 
       if (insertError) throw insertError;
 
@@ -475,20 +404,18 @@ export function useResources(options: UseResourcesOptions = {}): UseResourcesRes
 
       if (uploadResult.error) throw uploadResult.error;
 
-      const { error: insertError } = await supabase
-        .from('resources')
-        .insert({
-          title: title.trim(),
-          type: 'document',
-          group_id: currentGroup.id,
-          folder_id: currentFolderId,
-          file_path: storagePath,
-          file_size: file.size || null,
-          mime_type: file.type || null,
-          visibility: visibility === 'leaders_only' ? 'leaders_only' : (visibility === 'members_only' ? 'members_only' : 'all'),
-          shared_by: user.id,
-          tags: [],
-        });
+      const { error: insertError } = await resourcesRepo.createResource({
+        title: title.trim(),
+        type: 'document',
+        group_id: currentGroup.id,
+        folder_id: currentFolderId,
+        file_path: storagePath,
+        file_size: file.size || null,
+        mime_type: file.type || null,
+        visibility: visibility === 'leaders_only' ? 'leaders_only' : (visibility === 'members_only' ? 'members_only' : 'all'),
+        shared_by: user.id,
+        tags: [],
+      });
 
       if (insertError) throw insertError;
 
@@ -520,18 +447,16 @@ export function useResources(options: UseResourcesOptions = {}): UseResourcesRes
     }
 
     try {
-      const { error: insertError } = await supabase
-        .from('resources')
-        .insert({
-          title: title.trim(),
-          type: 'link',
-          url: url.trim(),
-          group_id: currentGroup.id,
-          folder_id: currentFolderId,
-          visibility: visibility === 'leaders_only' ? 'leaders_only' : (visibility === 'members_only' ? 'members_only' : 'all'),
-          shared_by: user.id,
-          tags: [],
-        });
+      const { error: insertError } = await resourcesRepo.createResource({
+        title: title.trim(),
+        type: 'link',
+        url: url.trim(),
+        group_id: currentGroup.id,
+        folder_id: currentFolderId,
+        visibility: visibility === 'leaders_only' ? 'leaders_only' : (visibility === 'members_only' ? 'members_only' : 'all'),
+        shared_by: user.id,
+        tags: [],
+      });
 
       if (insertError) throw insertError;
 
@@ -548,10 +473,7 @@ export function useResources(options: UseResourcesOptions = {}): UseResourcesRes
    */
   const deleteFolder = useCallback(async (folderId: string): Promise<boolean> => {
     try {
-      const { error: deleteError } = await supabase
-        .from('resource_folders')
-        .delete()
-        .eq('id', folderId);
+      const { error: deleteError } = await resourcesRepo.deleteFolder(folderId);
 
       if (deleteError) throw deleteError;
 
@@ -576,10 +498,7 @@ export function useResources(options: UseResourcesOptions = {}): UseResourcesRes
         await storage.delete(RESOURCES_BUCKET, filePath);
       }
 
-      const { error: deleteError } = await supabase
-        .from('resources')
-        .delete()
-        .eq('id', resourceId);
+      const { error: deleteError } = await resourcesRepo.deleteResource(resourceId);
 
       if (deleteError) throw deleteError;
 
@@ -620,13 +539,9 @@ export function useResources(options: UseResourcesOptions = {}): UseResourcesRes
     try {
       // Insert shares one by one to handle conflicts
       for (const groupId of groupIds) {
-        const { error: insertError } = await supabase
-          .from('resource_group_shares')
-          .upsert({
-            resource_id: resourceId,
-            shared_with_group_id: groupId,
-            shared_by_user_id: user.id,
-          }, { onConflict: 'resource_id,shared_with_group_id' });
+        const { error: insertError } = await resourcesRepo.upsertResourceShare(
+          resourceId, groupId, user.id
+        );
 
         if (insertError) throw insertError;
       }
@@ -648,11 +563,7 @@ export function useResources(options: UseResourcesOptions = {}): UseResourcesRes
   ): Promise<boolean> => {
     try {
       for (const groupId of groupIds) {
-        const { error: deleteError } = await supabase
-          .from('resource_group_shares')
-          .delete()
-          .eq('resource_id', resourceId)
-          .eq('shared_with_group_id', groupId);
+        const { error: deleteError } = await resourcesRepo.deleteResourceShare(resourceId, groupId);
 
         if (deleteError) throw deleteError;
       }
@@ -680,13 +591,9 @@ export function useResources(options: UseResourcesOptions = {}): UseResourcesRes
     try {
       // Insert shares one by one to handle conflicts
       for (const groupId of groupIds) {
-        const { error: insertError } = await supabase
-          .from('resource_folder_group_shares')
-          .upsert({
-            folder_id: folderId,
-            shared_with_group_id: groupId,
-            shared_by_user_id: user.id,
-          }, { onConflict: 'folder_id,shared_with_group_id' });
+        const { error: insertError } = await resourcesRepo.upsertFolderShare(
+          folderId, groupId, user.id
+        );
 
         if (insertError) throw insertError;
       }
@@ -708,11 +615,7 @@ export function useResources(options: UseResourcesOptions = {}): UseResourcesRes
   ): Promise<boolean> => {
     try {
       for (const groupId of groupIds) {
-        const { error: deleteError } = await supabase
-          .from('resource_folder_group_shares')
-          .delete()
-          .eq('folder_id', folderId)
-          .eq('shared_with_group_id', groupId);
+        const { error: deleteError } = await resourcesRepo.deleteFolderShare(folderId, groupId);
 
         if (deleteError) throw deleteError;
       }
@@ -730,14 +633,7 @@ export function useResources(options: UseResourcesOptions = {}): UseResourcesRes
    */
   const getResourceShares = useCallback(async (resourceId: string): Promise<ShareInfo[]> => {
     try {
-      const { data, error: fetchError } = await supabase
-        .from('resource_group_shares')
-        .select(`
-          shared_with_group_id,
-          shared_at,
-          group:groups!shared_with_group_id (id, name)
-        `)
-        .eq('resource_id', resourceId);
+      const { data, error: fetchError } = await resourcesRepo.fetchResourceShares(resourceId);
 
       if (fetchError) throw fetchError;
 
@@ -760,14 +656,7 @@ export function useResources(options: UseResourcesOptions = {}): UseResourcesRes
    */
   const getFolderShares = useCallback(async (folderId: string): Promise<ShareInfo[]> => {
     try {
-      const { data, error: fetchError } = await supabase
-        .from('resource_folder_group_shares')
-        .select(`
-          shared_with_group_id,
-          shared_at,
-          group:groups!shared_with_group_id (id, name)
-        `)
-        .eq('folder_id', folderId);
+      const { data, error: fetchError } = await resourcesRepo.fetchFolderShares(folderId);
 
       if (fetchError) throw fetchError;
 
@@ -793,16 +682,11 @@ export function useResources(options: UseResourcesOptions = {}): UseResourcesRes
     if (!currentGroup) return [];
 
     try {
-      // Fetch all groups in the system (excluding current group)
-      const { data, error } = await supabase
-        .from('groups')
-        .select('id, name')
-        .neq('id', currentGroup.id)
-        .order('name');
+      const { data, error } = await resourcesRepo.fetchShareableGroups(currentGroup.id);
 
       if (error) throw error;
 
-      return (data || []).map(g => ({ id: g.id, name: g.name }));
+      return ((data || []) as any[]).map(g => ({ id: g.id, name: g.name }));
     } catch (err) {
       // Log but don't set error state - this is a silent failure
       logger.error('useResources', 'Error fetching shareable groups', { error: err });
