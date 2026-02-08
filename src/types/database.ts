@@ -166,8 +166,10 @@ export interface Meeting {
   title: string;
   /** Optional description/notes */
   description: string | null;
-  /** ISO date string of meeting date/time */
+  /** ISO date string of meeting start date/time */
   date: string;
+  /** ISO date string of meeting end date/time */
+  end_date: string | null;
   /** Physical or virtual location */
   location: string | null;
   /** Discussion topics or text references */

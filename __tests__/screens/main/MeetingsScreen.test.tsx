@@ -332,6 +332,91 @@ describe('MeetingsScreen', () => {
     });
   });
 
+  it('should hide series in past view when last event is still upcoming', async () => {
+    const now = Date.now();
+    // Series with 2 meetings: one past, one still upcoming
+    const pastSeriesMeeting = createMockMeetingWithAttendees({
+      id: 'series-past-1',
+      group_id: 'group-id',
+      title: 'Ongoing Series',
+      date: new Date(now - 7 * 86400000).toISOString(), // 1 week ago
+      series_id: 'series-ongoing',
+      series_index: 1,
+      series_total: 2,
+      created_by: 'user-id',
+      attendees: [],
+    });
+    const futureSeriesMeeting = createMockMeetingWithAttendees({
+      id: 'series-future-1',
+      group_id: 'group-id',
+      title: 'Ongoing Series',
+      date: new Date(now + 7 * 86400000).toISOString(), // 1 week from now
+      series_id: 'series-ongoing',
+      series_index: 2,
+      series_total: 2,
+      created_by: 'user-id',
+      attendees: [],
+    });
+
+    const getSeriesMeetings = jest.fn().mockReturnValue([pastSeriesMeeting, futureSeriesMeeting]);
+    mockUseMeetingsResult = createMockUseMeetings({
+      meetings: [pastSeriesMeeting, futureSeriesMeeting],
+      getSeriesMeetings,
+    });
+
+    const { getByText, queryByText } = render(<MeetingsScreen />);
+
+    // Switch to past view
+    fireEvent.press(getByText('Past'));
+
+    await waitFor(() => {
+      // Series should NOT appear because last event is still upcoming
+      expect(queryByText('Ongoing Series')).toBeNull();
+    });
+  });
+
+  it('should show series in past view when all events are past', async () => {
+    const now = Date.now();
+    const pastMeeting1 = createMockMeetingWithAttendees({
+      id: 'series-done-1',
+      group_id: 'group-id',
+      title: 'Completed Series',
+      date: new Date(now - 14 * 86400000).toISOString(), // 2 weeks ago
+      series_id: 'series-done',
+      series_index: 1,
+      series_total: 2,
+      created_by: 'user-id',
+      attendees: [],
+    });
+    const pastMeeting2 = createMockMeetingWithAttendees({
+      id: 'series-done-2',
+      group_id: 'group-id',
+      title: 'Completed Series',
+      date: new Date(now - 7 * 86400000).toISOString(), // 1 week ago
+      series_id: 'series-done',
+      series_index: 2,
+      series_total: 2,
+      created_by: 'user-id',
+      attendees: [],
+    });
+
+    const getSeriesMeetings = jest.fn().mockReturnValue([pastMeeting1, pastMeeting2]);
+    mockUseMeetingsResult = createMockUseMeetings({
+      meetings: [pastMeeting1, pastMeeting2],
+      getSeriesMeetings,
+    });
+
+    const { getByText } = render(<MeetingsScreen />);
+
+    // Switch to past view
+    fireEvent.press(getByText('Past'));
+
+    await waitFor(() => {
+      // Series SHOULD appear because all events are past
+      expect(getByText('Completed Series')).toBeTruthy();
+    });
+  });
+
   it('should display RSVP options in series view modal', async () => {
     const seriesMeeting = createMockMeetingWithAttendees({
       id: 'series-meeting-1',

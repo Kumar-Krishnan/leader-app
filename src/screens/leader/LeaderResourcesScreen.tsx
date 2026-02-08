@@ -27,6 +27,14 @@ const TYPE_ICONS: Record<string, string> = {
   folder: '📁',
 };
 
+const ICON_BG: Record<string, string> = {
+  folder: 'rgba(251, 191, 36, 0.12)',
+  document: 'rgba(96, 165, 250, 0.12)',
+  link: 'rgba(74, 222, 128, 0.12)',
+  video: 'rgba(192, 132, 252, 0.12)',
+  other: 'rgba(148, 163, 184, 0.12)',
+};
+
 type ListItem =
   | { type: 'folder'; data: ResourceFolderWithSharing }
   | { type: 'resource'; data: ResourceWithSharing };
@@ -229,146 +237,101 @@ export default function LeaderResourcesScreen() {
   };
 
   const renderItem = ({ item }: { item: ListItem }) => {
-    if (item.type === 'folder') {
-      const folder = item.data;
-      const isOwnItem = folder.group_id === currentGroup?.id;
-      const canShare = canApproveRequests && isOwnItem && !folder.isShared;
+    const isFolder = item.type === 'folder';
+    const data = item.data;
+    const isOwnItem = data.group_id === currentGroup?.id;
+    const canShare = canApproveRequests && isOwnItem && !(data as any).isShared;
+    const canDelete = canApproveRequests && isOwnItem;
+    const iconType = isFolder ? 'folder' : (data as ResourceWithSharing).type;
+    const iconBg = ICON_BG[iconType] || ICON_BG.other;
+    const title = isFolder ? (data as ResourceFolderWithSharing).name : (data as ResourceWithSharing).title;
+    const shareCount = (data as any).shareCount || 0;
+    const isShared = (data as any).isShared;
+    const sourceGroupName = (data as any).sourceGroupName;
 
-      return (
-        <View style={styles.itemCard}>
-          <TouchableOpacity
-            style={styles.itemContent}
-            onPress={() => openFolder(folder)}
-            onLongPress={canApproveRequests && isOwnItem ? () => confirmDeleteFolder(folder) : undefined}
-            delayLongPress={500}
-          >
-            <View style={styles.iconContainer}>
-              <Text style={styles.icon}>📁</Text>
-            </View>
-            <View style={styles.itemInfo}>
-              <View style={styles.titleRow}>
-                <Text style={styles.itemTitle}>{folder.name}</Text>
-                {folder.shareCount && folder.shareCount > 0 && (
-                  <View style={styles.shareCountBadge}>
-                    <Text style={styles.shareCountText}>Shared</Text>
-                  </View>
-                )}
-              </View>
-              {folder.isShared && folder.sourceGroupName ? (
-                <Text style={styles.sharedFromText}>
-                  Shared from {folder.sourceGroupName}
-                </Text>
-              ) : (
-                <Text style={styles.itemMeta}>Folder</Text>
-              )}
-            </View>
-            {!canApproveRequests && !folder.isShared && <Text style={styles.chevron}>→</Text>}
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.commentButton}
-            onPress={() => setCommentsModal({
-              visible: true,
-              folderId: folder.id,
-              title: folder.name,
-            })}
-            activeOpacity={0.6}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <Text style={styles.commentButtonText}>💬</Text>
-          </TouchableOpacity>
-          {canShare && (
-            <TouchableOpacity
-              style={styles.shareButton}
-              onPress={() => openShareModal({ folderId: folder.id, title: folder.name })}
-              activeOpacity={0.6}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-              <Text style={styles.shareButtonText}>↗</Text>
-            </TouchableOpacity>
-          )}
-          {canApproveRequests && isOwnItem && (
-            <TouchableOpacity
-              style={styles.deleteButton}
-              onPress={() => confirmDeleteFolder(folder)}
-              activeOpacity={0.6}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-              <Text style={styles.deleteButtonText}>🗑️</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      );
-    }
+    const getMeta = () => {
+      if (isShared && sourceGroupName) return null;
+      if (isFolder) return 'Folder';
+      const res = data as ResourceWithSharing;
+      if (res.type === 'document' && res.file_size) return formatFileSize(res.file_size);
+      return res.type;
+    };
 
-    const resource = item.data;
-    const isOwnItem = resource.group_id === currentGroup?.id;
-    const canShare = canApproveRequests && isOwnItem && !resource.isShared;
+    const handlePress = () => {
+      if (isFolder) openFolder(data as ResourceFolderWithSharing);
+      else openResource(data as ResourceWithSharing);
+    };
+
+    const handleDelete = () => {
+      if (isFolder) confirmDeleteFolder(data as ResourceFolderWithSharing);
+      else confirmDeleteResource(data as ResourceWithSharing);
+    };
+
+    const handleComment = () => {
+      setCommentsModal({
+        visible: true,
+        ...(isFolder ? { folderId: data.id } : { resourceId: data.id }),
+        title,
+      });
+    };
+
+    const handleShare = () => {
+      openShareModal({
+        ...(isFolder ? { folderId: data.id } : { resourceId: data.id }),
+        title,
+      });
+    };
 
     return (
       <View style={styles.itemCard}>
         <TouchableOpacity
           style={styles.itemContent}
-          onPress={() => openResource(resource)}
-          onLongPress={canApproveRequests && isOwnItem ? () => confirmDeleteResource(resource) : undefined}
+          onPress={handlePress}
+          onLongPress={canDelete ? handleDelete : undefined}
           delayLongPress={500}
+          activeOpacity={0.7}
         >
-          <View style={styles.iconContainer}>
-            <Text style={styles.icon}>{TYPE_ICONS[resource.type] || TYPE_ICONS.other}</Text>
+          <View style={[styles.iconContainer, { backgroundColor: iconBg }]}>
+            <Text style={styles.icon}>
+              {isFolder ? '📁' : (TYPE_ICONS[(data as ResourceWithSharing).type] || TYPE_ICONS.other)}
+            </Text>
           </View>
           <View style={styles.itemInfo}>
             <View style={styles.titleRow}>
-              <Text style={styles.itemTitle} numberOfLines={1}>{resource.title}</Text>
-              {resource.shareCount && resource.shareCount > 0 && (
+              <Text style={styles.itemTitle} numberOfLines={1}>{title}</Text>
+              {shareCount > 0 && (
                 <View style={styles.shareCountBadge}>
                   <Text style={styles.shareCountText}>Shared</Text>
                 </View>
               )}
             </View>
-            {resource.isShared && resource.sourceGroupName ? (
-              <Text style={styles.sharedFromText}>
-                Shared from {resource.sourceGroupName}
-              </Text>
+            {isShared && sourceGroupName ? (
+              <Text style={styles.sharedFromText}>Shared from {sourceGroupName}</Text>
             ) : (
-              <Text style={styles.itemMeta}>
-                {resource.type === 'document' && resource.file_size
-                  ? formatFileSize(resource.file_size)
-                  : resource.type}
-              </Text>
+              <Text style={styles.itemMeta}>{getMeta()}</Text>
             )}
           </View>
+          {isFolder && <Text style={styles.chevron}>›</Text>}
         </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.commentButton}
-          onPress={() => setCommentsModal({
-            visible: true,
-            resourceId: resource.id,
-            title: resource.title,
-          })}
-          activeOpacity={0.6}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Text style={styles.commentButtonText}>💬</Text>
-        </TouchableOpacity>
-        {canShare && (
-          <TouchableOpacity
-            style={styles.shareButton}
-            onPress={() => openShareModal({ resourceId: resource.id, title: resource.title })}
-            activeOpacity={0.6}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <Text style={styles.shareButtonText}>↗</Text>
+
+        <View style={styles.actionBar}>
+          <TouchableOpacity style={styles.actionChip} onPress={handleComment} activeOpacity={0.6}>
+            <Text style={styles.actionChipEmoji}>💬</Text>
+            <Text style={styles.actionChipLabel}>Comment</Text>
           </TouchableOpacity>
-        )}
-        {canApproveRequests && isOwnItem && (
-          <TouchableOpacity
-            style={styles.deleteButton}
-            onPress={() => confirmDeleteResource(resource)}
-            activeOpacity={0.6}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <Text style={styles.deleteButtonText}>🗑️</Text>
-          </TouchableOpacity>
-        )}
+          {canShare && (
+            <TouchableOpacity style={[styles.actionChip, styles.actionChipShare]} onPress={handleShare} activeOpacity={0.6}>
+              <Text style={styles.actionChipShareIcon}>↗</Text>
+              <Text style={[styles.actionChipLabel, styles.actionChipShareLabel]}>Share</Text>
+            </TouchableOpacity>
+          )}
+          <View style={{ flex: 1 }} />
+          {canDelete && (
+            <TouchableOpacity style={[styles.actionChip, styles.actionChipDelete]} onPress={handleDelete} activeOpacity={0.6}>
+              <Text style={styles.actionChipDeleteLabel}>Delete</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
     );
   };
@@ -650,8 +613,8 @@ const styles = StyleSheet.create({
     fontSize: fontSize.md,
   },
   list: {
-    padding: spacing.xl,
-    gap: spacing.sm,
+    padding: spacing.lg,
+    gap: spacing.md,
   },
   emptyList: {
     flex: 1,
@@ -659,29 +622,26 @@ const styles = StyleSheet.create({
   },
   itemCard: {
     backgroundColor: colors.card.background,
-    borderRadius: borderRadius.md,
-    flexDirection: 'row',
-    alignItems: 'center',
+    borderRadius: borderRadius.lg,
+    overflow: 'hidden',
     borderLeftWidth: 3,
     borderLeftColor: colors.primary[500],
-    ...shadows.sm,
+    ...shadows.md,
   },
   itemContent: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 14,
+    padding: spacing.lg,
   },
   iconContainer: {
-    width: 44,
-    height: 44,
-    borderRadius: 10,
-    backgroundColor: colors.neutral[700],
+    width: 48,
+    height: 48,
+    borderRadius: borderRadius.md,
     justifyContent: 'center',
     alignItems: 'center',
   },
   icon: {
-    fontSize: 22,
+    fontSize: 24,
   },
   itemInfo: {
     flex: 1,
@@ -701,51 +661,75 @@ const styles = StyleSheet.create({
   itemMeta: {
     fontSize: fontSize.sm,
     color: colors.text.tertiary,
-    marginTop: 2,
+    marginTop: 3,
     textTransform: 'capitalize',
   },
   sharedFromText: {
     fontSize: fontSize.sm,
     color: colors.primary[500],
-    marginTop: 2,
+    marginTop: 3,
   },
   shareCountBadge: {
     backgroundColor: colors.accent.light,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: borderRadius.sm,
   },
   shareCountText: {
     color: colors.primary[500],
-    fontSize: 10,
+    fontSize: fontSize.xs,
     fontWeight: fontWeight.semibold,
   },
   chevron: {
     color: colors.text.tertiary,
-    fontSize: fontSize.lg,
+    fontSize: 22,
+    fontWeight: fontWeight.bold,
+    marginLeft: spacing.sm,
   },
-  commentButton: {
-    padding: 14,
-    paddingLeft: spacing.sm,
+  actionBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.border.light,
+    gap: spacing.sm,
   },
-  commentButtonText: {
-    fontSize: fontSize.lg,
+  actionChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6,
+    borderRadius: borderRadius.full,
+    backgroundColor: colors.background.tertiary,
+    gap: 6,
   },
-  shareButton: {
-    padding: 14,
-    paddingLeft: spacing.sm,
+  actionChipEmoji: {
+    fontSize: 13,
   },
-  shareButtonText: {
-    fontSize: fontSize.xl,
+  actionChipLabel: {
+    fontSize: fontSize.sm,
+    color: colors.text.secondary,
+    fontWeight: fontWeight.medium,
+  },
+  actionChipShare: {
+    backgroundColor: 'rgba(249, 200, 14, 0.1)',
+  },
+  actionChipShareIcon: {
+    fontSize: fontSize.md,
+    color: colors.primary[500],
+    fontWeight: fontWeight.bold,
+  },
+  actionChipShareLabel: {
     color: colors.primary[500],
   },
-  deleteButton: {
-    padding: 14,
-    paddingLeft: spacing.sm,
+  actionChipDelete: {
+    backgroundColor: 'rgba(244, 67, 54, 0.08)',
   },
-  deleteButtonText: {
-    fontSize: fontSize.xl,
-    opacity: 0.7,
+  actionChipDeleteLabel: {
+    fontSize: fontSize.sm,
+    color: colors.error.light,
+    fontWeight: fontWeight.medium,
   },
   emptyState: {
     flex: 1,

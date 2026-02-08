@@ -87,10 +87,10 @@ supabase functions deploy send-meeting-email --no-verify-jwt
 supabase functions list
 ```
 
-**Important**: The `--no-verify-jwt` flag is required. The function still requires a valid Authorization header, but JWT verification is handled by checking the header format rather than at the Supabase gateway level. This is necessary because:
-- Server-side role verification would require the service_role key
-- Supabase's newer projects may use different key patterns
-- Authorization is enforced client-side (only leaders see the Send Email button)
+**Important**: The `--no-verify-jwt` flag disables JWT verification at the Supabase gateway level. The function itself performs full server-side authentication and authorization:
+- Verifies the caller's JWT via `supabase.auth.getUser()`
+- Checks that the caller has a `leader-helper`, `leader`, or `admin` role in `group_members`
+- Returns 401 for invalid/expired tokens, 403 for non-leaders
 
 ## Step 6: Test the Integration
 

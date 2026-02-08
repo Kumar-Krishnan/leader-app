@@ -5,6 +5,7 @@
  * Only group leaders, leader-helpers, and admins can send emails
  */
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 import { corsHeaders, handleCors } from '../_shared/cors.ts';
 
 interface Attendee {
@@ -238,13 +239,50 @@ serve(async (req) => {
   }
 
   try {
-    // Get the authorization header
+    // Verify the caller's JWT and extract their identity
     const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return new Response(
-        JSON.stringify({ error: 'Missing authorization header' }),
+        JSON.stringify({ error: 'Missing or invalid authorization header' }),
         {
           status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+    // Verify the caller's JWT using the service role client
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+    const jwt = authHeader.replace('Bearer ', '');
+
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(jwt);
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid or expired token' }),
+        {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    // Verify the caller is a leader-helper, leader, or admin in at least one group
+    const { data: membership } = await supabaseAdmin
+      .from('group_members')
+      .select('role')
+      .eq('user_id', user.id)
+      .in('role', ['leader-helper', 'leader', 'admin'])
+      .limit(1)
+      .single();
+
+    if (!membership) {
+      return new Response(
+        JSON.stringify({ error: 'Permission denied: only leaders can send meeting emails' }),
+        {
+          status: 403,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         }
       );
@@ -252,18 +290,6 @@ serve(async (req) => {
 
     // Parse the request body
     const body: MeetingEmailRequest = await req.json();
-
-    // Note: Authorization is handled client-side (only leaders see the Send Email button)
-    // The authHeader is still required to ensure the request comes from an authenticated user
-    if (!authHeader.startsWith('Bearer ')) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid authorization header' }),
-        {
-          status: 401,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
-    }
 
     const sendgridApiKey = Deno.env.get('SENDGRID_API_KEY');
     const defaultFromEmail = Deno.env.get('SENDGRID_FROM_EMAIL');

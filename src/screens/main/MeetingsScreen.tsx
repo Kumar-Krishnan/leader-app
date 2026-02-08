@@ -97,9 +97,11 @@ export default function MeetingsScreen() {
 
   // Group meetings: standalone meetings + one entry per series
   // Past meetings show newest first, upcoming show soonest first
+  // In past view, series only appear once the last event in the series is past
   const displayItems = useMemo((): DisplayItem[] => {
     const items: DisplayItem[] = [];
     const processedSeriesIds = new Set<string>();
+    const now = new Date();
 
     const sortedMeetings = [...meetings].sort(
       (a, b) => showPast
@@ -113,6 +115,17 @@ export default function MeetingsScreen() {
       } else if (!processedSeriesIds.has(meeting.series_id)) {
         processedSeriesIds.add(meeting.series_id);
         const seriesMeetings = getSeriesMeetings(meeting.series_id);
+
+        // In past view, only show a series if every event has already passed
+        if (showPast) {
+          const lastByDate = seriesMeetings.reduce((latest, m) =>
+            new Date(m.date) > new Date(latest.date) ? m : latest
+          , seriesMeetings[0]);
+          if (lastByDate && new Date(lastByDate.date) > now) {
+            continue;
+          }
+        }
+
         items.push({
           type: 'series',
           meeting,
@@ -308,6 +321,7 @@ export default function MeetingsScreen() {
             <Text style={styles.meetingDetails}>
               {isSeries ? 'Next: ' : ''}
               {new Date(meeting.date).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+              {meeting.end_date ? ` – ${new Date(meeting.end_date).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}` : ''}
               {meeting.location ? ` • ${meeting.location}` : ''}
             </Text>
 
@@ -651,6 +665,7 @@ export default function MeetingsScreen() {
                           hour: 'numeric',
                           minute: '2-digit',
                         })}
+                        {meeting.end_date ? ` – ${new Date(meeting.end_date).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}` : ''}
                       </Text>
                       {meeting.description && (
                         <Text style={styles.seriesViewMeetingDescription}>{meeting.description}</Text>

@@ -66,10 +66,17 @@ export default function SendMeetingEmailModal({
     month: 'long',
     day: 'numeric',
   });
-  const formattedTime = new Date(meeting.date).toLocaleTimeString('en-US', {
+  const startTime = new Date(meeting.date).toLocaleTimeString('en-US', {
     hour: 'numeric',
     minute: '2-digit',
   });
+  const endTime = meeting.end_date
+    ? new Date(meeting.end_date).toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+      })
+    : null;
+  const formattedTime = endTime ? `${startTime} – ${endTime}` : startTime;
 
   const renderTextField = (
     label: string,

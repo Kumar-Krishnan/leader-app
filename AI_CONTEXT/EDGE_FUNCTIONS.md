@@ -11,7 +11,7 @@ The Leader App uses Supabase Edge Functions (Deno runtime) for server-side opera
 
 | Function | Purpose | Auth | Deployment Flag |
 |----------|---------|------|-----------------|
-| `send-meeting-email` | Send meeting invitations via SendGrid | Client-side (leaders only) | `--no-verify-jwt` |
+| `send-meeting-email` | Send meeting invitations via SendGrid | Server-side (JWT + role check) | `--no-verify-jwt` |
 | `hubspot-sync` | Sync contacts to HubSpot CRM | N/A (internal) | Default |
 | `generate-meeting-reminders` | Cron job for meeting reminders | N/A (scheduled) | Default |
 
@@ -63,25 +63,16 @@ interface MeetingEmailRequest {
 
 ### Authorization Model
 
-**Current Implementation**: Client-side authorization
-- The function requires a valid `Authorization: Bearer <token>` header
-- JWT format is validated but not cryptographically verified at the gateway
-- Role-based access control is enforced in the React Native app:
-  - Only users with `leader`, `leader-helper`, or `admin` roles see the "Send Email" button
+**Current Implementation**: Server-side authentication and authorization
+- The function verifies the caller's JWT server-side via `supabase.auth.getUser()`
+- Role-based access control is enforced server-side:
+  - Uses the `service_role` key to query `group_members` for the caller's role
+  - Only `leader`, `leader-helper`, or `admin` roles are authorized
+  - Returns 401 for invalid/expired tokens, 403 for insufficient permissions
+- Client-side UI also restricts visibility (belt-and-suspenders):
+  - Only users with leader roles see the "Send Email" button
   - The `useMeetings` hook checks `isGroupLeader` before showing email functionality
-
-**Why not server-side authorization?**
-- Supabase's newer projects use different API key patterns
-- The `service_role` key approach for bypassing RLS had permission issues
-- Client-side authorization is sufficient for MVP since:
-  - The UI doesn't expose the functionality to non-leaders
-  - The function still requires authentication (valid token format)
-  - Emails can only be sent to attendees provided in the request
-
-**Future Enhancement**: If stronger server-side authorization is needed:
-1. Create a custom RPC function that checks roles and returns a signed token
-2. Pass that token to the Edge Function for validation
-3. Or use Supabase's custom JWT claims when available
+- The `--no-verify-jwt` deployment flag disables redundant gateway-level JWT check
 
 ### Required Secrets
 ```bash
@@ -173,14 +164,14 @@ curl -X POST http://localhost:54321/functions/v1/send-meeting-email \
 │  React Native   │────▶│  Supabase Edge Fn    │────▶│  SendGrid   │
 │  App (Client)   │     │  send-meeting-email  │     │  API        │
 └─────────────────┘     └──────────────────────┘     └─────────────┘
-        │                        │
-        │ Auth check             │ Secrets
-        │ (isGroupLeader)        │ (SENDGRID_*)
-        ▼                        ▼
-┌─────────────────┐     ┌──────────────────────┐
-│  Supabase Auth  │     │  Supabase Secrets    │
-│  (JWT tokens)   │     │  (encrypted)         │
-└─────────────────┘     └──────────────────────┘
+        │                   │            │
+        │ UI guard          │ Auth       │ Secrets
+        │ (isGroupLeader)   │ (JWT +     │ (SENDGRID_*)
+        ▼                   │  role)     ▼
+┌─────────────────┐         │    ┌──────────────────────┐
+│  Supabase Auth  │◀────────┘    │  Supabase Secrets    │
+│  (JWT tokens)   │              │  (encrypted)         │
+└─────────────────┘              └──────────────────────┘
 ```
 
 ## Related Files

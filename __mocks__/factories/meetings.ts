@@ -23,6 +23,7 @@ export function createMockMeeting(overrides: Partial<Meeting> = {}): Meeting {
     title: 'Test Meeting',
     description: 'A test meeting',
     date: new Date(Date.now() + 86400000).toISOString(), // Tomorrow
+    end_date: null,
     location: 'Test Location',
     passages: [],
     group_id: 'test-group-id',
