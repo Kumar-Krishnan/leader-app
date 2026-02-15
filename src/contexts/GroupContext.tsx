@@ -26,6 +26,7 @@ interface GroupContextType {
   approveRequest: (requestId: string) => Promise<{ error: Error | null }>;
   rejectRequest: (requestId: string) => Promise<{ error: Error | null }>;
   updateMemberRole: (memberId: string, newRole: GroupRole) => Promise<{ error: Error | null }>;
+  updateGroupTimezone: (groupId: string, timezone: string) => Promise<{ error: Error | null }>;
 }
 
 const GroupContext = createContext<GroupContextType | undefined>(undefined);
@@ -326,6 +327,19 @@ export function GroupProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const updateGroupTimezone = async (groupId: string, timezone: string) => {
+    try {
+      const { error } = await groupsRepo.updateGroupTimezone(groupId, timezone);
+
+      if (error) throw error;
+
+      await fetchGroups();
+      return { error: null };
+    } catch (error) {
+      return { error: error as Error };
+    }
+  };
+
   return (
     <GroupContext.Provider
       value={{
@@ -345,6 +359,7 @@ export function GroupProvider({ children }: { children: React.ReactNode }) {
         approveRequest,
         rejectRequest,
         updateMemberRole,
+        updateGroupTimezone,
       }}
     >
       {children}

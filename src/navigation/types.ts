@@ -35,4 +35,5 @@ export type RootStackParamList = {
   Auth: undefined;
   GroupSelect: undefined;
   Main: undefined;
+  ConfirmReminder: { token: string };
 };

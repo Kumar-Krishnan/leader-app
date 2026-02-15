@@ -11,11 +11,12 @@ import Avatar from '../../components/Avatar';
 import ScreenHeader from '../../components/ScreenHeader';
 import { showAlert } from '../../lib/errors';
 import { colors, spacing, borderRadius, fontSize, fontWeight, shadows } from '../../constants/theme';
+import { TIMEZONE_OPTIONS } from '../../components/CreateMeetingModal';
 
 export default function ProfileScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<ProfileStackParamList>>();
   const { profile, signOut, isLeader, isAdmin, refreshProfile } = useAuth();
-  const { currentGroup, groups, setCurrentGroup, isGroupAdmin, canApproveRequests, pendingRequests, refreshPendingRequests } = useGroup();
+  const { currentGroup, groups, setCurrentGroup, isGroupAdmin, canApproveRequests, pendingRequests, refreshPendingRequests, updateGroupTimezone } = useGroup();
 
   // Refresh pending requests when screen is focused
   useFocusEffect(
@@ -28,6 +29,7 @@ export default function ProfileScreen() {
     }, [canApproveRequests, refreshPendingRequests, currentGroup?.role, pendingRequests.length])
   );
   const [showGroupPicker, setShowGroupPicker] = useState(false);
+  const [showTimezonePicker, setShowTimezonePicker] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = React.useState(
     profile?.notification_preferences?.push_enabled ?? true
   );
@@ -188,6 +190,21 @@ export default function ProfileScreen() {
           </View>
         )}
 
+        {isGroupAdmin && currentGroup && (
+          <View style={styles.timezoneContainer}>
+            <Text style={styles.codeLabel}>Group Timezone:</Text>
+            <TouchableOpacity
+              style={styles.timezoneButton}
+              onPress={() => setShowTimezonePicker(true)}
+            >
+              <Text style={styles.timezoneButtonText}>
+                {TIMEZONE_OPTIONS.find(tz => tz.value === currentGroup.timezone)?.label || currentGroup.timezone || 'Eastern'}
+              </Text>
+              <Text style={styles.timezoneEditHint}>Change</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {canApproveRequests && (
           <TouchableOpacity 
             style={styles.manageButton}
@@ -249,6 +266,39 @@ export default function ProfileScreen() {
       <TouchableOpacity style={styles.signOutButton} onPress={signOut}>
         <Text style={styles.signOutText}>Sign Out</Text>
       </TouchableOpacity>
+
+      {/* Timezone Picker Modal */}
+      <Modal visible={showTimezonePicker} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Group Timezone</Text>
+              <TouchableOpacity onPress={() => setShowTimezonePicker(false)}>
+                <Text style={styles.closeButton}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            {TIMEZONE_OPTIONS.map((tz) => (
+              <TouchableOpacity
+                key={tz.value}
+                style={[
+                  styles.groupOption,
+                  currentGroup?.timezone === tz.value && styles.groupOptionActive,
+                ]}
+                onPress={async () => {
+                  if (currentGroup) {
+                    await updateGroupTimezone(currentGroup.id, tz.value);
+                    setShowTimezonePicker(false);
+                  }
+                }}
+              >
+                <Text style={styles.groupOptionName}>{tz.label}</Text>
+                <Text style={styles.groupOptionRole}>{tz.value}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      </Modal>
 
       {/* Group Picker Modal */}
       <Modal visible={showGroupPicker} animationType="slide" transparent>
@@ -430,6 +480,31 @@ const styles = StyleSheet.create({
     color: colors.primary[500],
     marginLeft: spacing.sm,
     letterSpacing: 2,
+  },
+  timezoneContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: spacing.md,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.border.light,
+  },
+  timezoneButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: spacing.sm,
+    flex: 1,
+    justifyContent: 'space-between',
+  },
+  timezoneButtonText: {
+    fontSize: fontSize.lg,
+    fontWeight: fontWeight.bold,
+    color: colors.primary[500],
+  },
+  timezoneEditHint: {
+    fontSize: fontSize.sm,
+    color: colors.primary[500],
+    fontWeight: fontWeight.semibold,
   },
   manageButton: {
     flexDirection: 'row',

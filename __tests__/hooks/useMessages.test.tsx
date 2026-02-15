@@ -35,11 +35,15 @@ jest.mock('../../src/contexts/AuthContext', () => ({
   useAuth: () => mockAuthContext,
 }));
 
-// Mock realtime channel
-const mockChannel = {
-  on: jest.fn().mockReturnThis(),
-  subscribe: jest.fn().mockReturnThis(),
-};
+// Mock realtime service
+const mockUnsubscribe = jest.fn();
+const mockSubscribeToTable = jest.fn().mockReturnValue({ unsubscribe: mockUnsubscribe });
+
+jest.mock('../../src/services/realtime', () => ({
+  realtimeService: {
+    subscribeToTable: (...args: any[]) => mockSubscribeToTable(...args),
+  },
+}));
 
 // Helper to create mock chain
 const createMockChain = (data: any, error: any = null) => ({
@@ -58,8 +62,6 @@ describe('useMessages', () => {
     jest.useFakeTimers();
     mockAuthContext = { user: mockUser };
     (supabase.from as jest.Mock).mockReturnValue(createMockChain([mockMessage]));
-    (supabase.channel as jest.Mock).mockReturnValue(mockChannel);
-    (supabase.removeChannel as jest.Mock).mockReturnValue(undefined);
   });
 
   afterEach(() => {
@@ -196,9 +198,15 @@ describe('useMessages', () => {
   it('should setup realtime subscription', () => {
     renderHook(() => useMessages('thread-1'));
 
-    expect(supabase.channel).toHaveBeenCalledWith('messages:thread-1');
-    expect(mockChannel.on).toHaveBeenCalled();
-    expect(mockChannel.subscribe).toHaveBeenCalled();
+    expect(mockSubscribeToTable).toHaveBeenCalledWith(
+      'messages',
+      'thread_id=eq.thread-1',
+      expect.objectContaining({
+        onInsert: expect.any(Function),
+        onUpdate: expect.any(Function),
+        onDelete: expect.any(Function),
+      })
+    );
   });
 
   it('should cleanup subscription on unmount', () => {
@@ -206,7 +214,7 @@ describe('useMessages', () => {
 
     unmount();
 
-    expect(supabase.removeChannel).toHaveBeenCalled();
+    expect(mockUnsubscribe).toHaveBeenCalled();
   });
 
   it('should return false on edit error', async () => {

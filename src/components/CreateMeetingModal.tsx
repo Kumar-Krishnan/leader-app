@@ -39,6 +39,25 @@ interface Props {
 
 type RecurrenceType = 'none' | 'weekly' | 'biweekly' | 'monthly';
 
+// ── Timezone options ─────────────────────────────────────────────────
+
+export const TIMEZONE_OPTIONS = [
+  { label: 'Eastern', value: 'America/New_York' },
+  { label: 'Central', value: 'America/Chicago' },
+  { label: 'Mountain', value: 'America/Denver' },
+  { label: 'Pacific', value: 'America/Los_Angeles' },
+  { label: 'Alaska', value: 'America/Anchorage' },
+  { label: 'Hawaii', value: 'Pacific/Honolulu' },
+  { label: 'GMT/London', value: 'Europe/London' },
+  { label: 'Central Europe', value: 'Europe/Paris' },
+  { label: 'Japan', value: 'Asia/Tokyo' },
+  { label: 'Australia East', value: 'Australia/Sydney' },
+] as const;
+
+function timezoneLabel(value: string): string {
+  return TIMEZONE_OPTIONS.find(tz => tz.value === value)?.label ?? value;
+}
+
 // ── Time option helpers ──────────────────────────────────────────────
 
 interface TimeOption {
@@ -77,6 +96,12 @@ export default function CreateMeetingModal({ visible, onClose, onCreated }: Prop
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  // Timezone state
+  const [timezone, setTimezone] = useState(
+    currentGroup?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone
+  );
+  const [showTimezonePicker, setShowTimezonePicker] = useState(false);
+
   // Time state
   const [startMinutes, setStartMinutes] = useState<number | null>(null);
   const [endMinutes, setEndMinutes] = useState<number | null>(null);
@@ -110,6 +135,8 @@ export default function CreateMeetingModal({ visible, onClose, onCreated }: Prop
       setActiveDropdown(null);
       setRecurrence('none');
       setRecurrenceCount('4');
+      setTimezone(currentGroup.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone);
+      setShowTimezonePicker(false);
     }
   }, [visible, currentGroup]);
 
@@ -294,6 +321,7 @@ export default function CreateMeetingModal({ visible, onClose, onCreated }: Prop
           series_id: seriesId,
           series_index: recurrence !== 'none' ? index + 1 : null,
           series_total: recurrence !== 'none' ? eventDates.length : null,
+          timezone,
         };
         if (endMinutes !== null) {
           const endDate = new Date(eventDate);
@@ -360,6 +388,8 @@ export default function CreateMeetingModal({ visible, onClose, onCreated }: Prop
     setActiveDropdown(null);
     setRecurrence('none');
     setRecurrenceCount('4');
+    setTimezone(currentGroup?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone);
+    setShowTimezonePicker(false);
     setError('');
     setSelectedMembers(new Set());
   };
@@ -505,6 +535,36 @@ export default function CreateMeetingModal({ visible, onClose, onCreated }: Prop
                   getItemLayout={(_, index) => ({ length: 44, offset: 44 * index, index })}
                   onScrollToIndexFailed={() => {}}
                 />
+              </View>
+            )}
+
+            {/* Timezone */}
+            <Text style={styles.fieldLabel}>Timezone</Text>
+            <TouchableOpacity
+              style={[styles.pickerButton, showTimezonePicker && { borderColor: '#3B82F6' }]}
+              onPress={() => setShowTimezonePicker(!showTimezonePicker)}
+            >
+              <Text style={styles.pickerButtonText}>{timezoneLabel(timezone)}</Text>
+            </TouchableOpacity>
+
+            {showTimezonePicker && (
+              <View style={styles.dropdownContainer}>
+                <ScrollView style={styles.dropdownList} nestedScrollEnabled>
+                  {TIMEZONE_OPTIONS.map((tz) => (
+                    <TouchableOpacity
+                      key={tz.value}
+                      style={[styles.dropdownItem, timezone === tz.value && styles.dropdownItemActive]}
+                      onPress={() => {
+                        setTimezone(tz.value);
+                        setShowTimezonePicker(false);
+                      }}
+                    >
+                      <Text style={[styles.dropdownItemText, timezone === tz.value && styles.dropdownItemTextActive]}>
+                        {tz.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
               </View>
             )}
 

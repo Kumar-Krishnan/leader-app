@@ -11,7 +11,7 @@ import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { logger } from './src/lib/logger';
 
 const linking = {
-  prefixes: ['http://localhost:8081', 'leaderapp://'],
+  prefixes: ['http://localhost:8081', 'https://leader-app.netlify.app', 'leaderapp://'],
   config: {
     screens: {
       Auth: {
@@ -19,6 +19,10 @@ const linking = {
           SignIn: 'sign-in',
           SignUp: 'sign-up',
         },
+      },
+      ConfirmReminder: {
+        path: 'confirm-reminder',
+        parse: { token: (token: string) => token },
       },
       Main: {
         screens: {

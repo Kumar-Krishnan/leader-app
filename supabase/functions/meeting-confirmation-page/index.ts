@@ -14,6 +14,7 @@ import {
   formatDate,
   formatDateShort,
   formatTime,
+  formatTimezoneShort,
   htmlHead,
   htmlFooter,
 } from '../_shared/html-utils.ts';
@@ -43,13 +44,17 @@ interface MeetingData {
   location: string | null;
   group_id: string;
   created_by: string;
-  groups: { name: string };
+  timezone: string | null;
+  groups: { name: string; timezone: string | null };
   profiles: { email: string; full_name: string | null };
+  resolvedTimezone: string;
 }
 
 interface Attendee {
-  user_id: string;
-  profiles: { email: string; full_name: string | null };
+  user_id: string | null;
+  placeholder_id: string | null;
+  profiles: { email: string; full_name: string | null } | null;
+  placeholder_profiles: { email: string; full_name: string } | null;
 }
 
 /**
@@ -60,8 +65,10 @@ function renderConfirmationForm(
   attendeeCount: number,
   error?: string
 ): string {
-  const formattedDate = formatDate(meeting.date);
-  const formattedTime = formatTime(meeting.date);
+  const tz = meeting.resolvedTimezone;
+  const formattedDate = formatDate(meeting.date, tz);
+  const formattedTime = formatTime(meeting.date, tz);
+  const tzShort = formatTimezoneShort(meeting.date, tz);
   const groupName = meeting.groups.name;
   const leaderName = meeting.profiles.full_name || 'Meeting Leader';
 
@@ -88,7 +95,7 @@ ${htmlHead(`Confirm Reminder: ${meeting.title}`)}
         <span class="detail-icon">&#128336;</span>
         <div class="detail-content">
           <span class="detail-label">Time</span>
-          <div class="detail-value">${formattedTime}</div>
+          <div class="detail-value">${formattedTime} ${tzShort}</div>
         </div>
       </div>
 
@@ -158,7 +165,7 @@ function renderSuccessPage(
   meeting: MeetingData,
   attendeeCount: number
 ): string {
-  const formattedDate = formatDate(meeting.date);
+  const formattedDate = formatDate(meeting.date, meeting.resolvedTimezone);
   const groupName = meeting.groups.name;
 
   return `
@@ -220,8 +227,10 @@ function generateAttendeeEmailHtml(
   customDescription: string | null,
   customMessage: string | null
 ): string {
-  const formattedDate = formatDate(meeting.date);
-  const formattedTime = formatTime(meeting.date);
+  const tz = meeting.resolvedTimezone;
+  const formattedDate = formatDate(meeting.date, tz);
+  const formattedTime = formatTime(meeting.date, tz);
+  const tzShort = formatTimezoneShort(meeting.date, tz);
   const groupName = meeting.groups.name;
   const leaderName = meeting.profiles.full_name || 'Meeting Leader';
   const description = customDescription || meeting.description;
@@ -300,7 +309,7 @@ function generateAttendeeEmailHtml(
                         </td>
                         <td style="padding-left: 12px;">
                           <p style="margin: 0; color: #6B7280; font-size: 12px; text-transform: uppercase;">Time</p>
-                          <p style="margin: 4px 0 0 0; color: #111827; font-size: 16px; font-weight: 500;">${formattedTime}</p>
+                          <p style="margin: 4px 0 0 0; color: #111827; font-size: 16px; font-weight: 500;">${formattedTime} ${tzShort}</p>
                         </td>
                       </tr>
                     </table>
@@ -381,8 +390,10 @@ function generateAttendeeEmailText(
   customDescription: string | null,
   customMessage: string | null
 ): string {
-  const formattedDate = formatDate(meeting.date);
-  const formattedTime = formatTime(meeting.date);
+  const tz = meeting.resolvedTimezone;
+  const formattedDate = formatDate(meeting.date, tz);
+  const formattedTime = formatTime(meeting.date, tz);
+  const tzShort = formatTimezoneShort(meeting.date, tz);
   const groupName = meeting.groups.name;
   const leaderName = meeting.profiles.full_name || 'Meeting Leader';
   const description = customDescription || meeting.description;
@@ -394,7 +405,7 @@ function generateAttendeeEmailText(
   }
 
   text += `Date: ${formattedDate}\n`;
-  text += `Time: ${formattedTime}\n`;
+  text += `Time: ${formattedTime} ${tzShort}\n`;
   if (meeting.location) {
     text += `Location: ${meeting.location}\n`;
   }
@@ -409,6 +420,26 @@ function generateAttendeeEmailText(
   return text;
 }
 
+/** Helper to return JSON or HTML error */
+function errorResponse(
+  req: Request,
+  status: number,
+  title: string,
+  message: string
+): Response {
+  const wantsJson = req.headers.get('accept')?.includes('application/json');
+  if (wantsJson) {
+    return new Response(JSON.stringify({ error: message }), {
+      status,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+  return new Response(renderErrorPage(title, message), {
+    status,
+    headers: { 'Content-Type': 'text/html; charset=utf-8' },
+  });
+}
+
 serve(async (req) => {
   // Handle CORS preflight
   const corsResponse = handleCors(req);
@@ -419,10 +450,7 @@ serve(async (req) => {
     const token = url.searchParams.get('token');
 
     if (!token) {
-      return new Response(renderErrorPage('Invalid Link', 'No token provided.'), {
-        status: 400,
-        headers: { 'Content-Type': 'text/html; charset=utf-8' },
-      });
+      return errorResponse(req, 400, 'Invalid Link', 'No token provided.');
     }
 
     // Initialize Supabase client
@@ -443,40 +471,19 @@ serve(async (req) => {
       .single();
 
     if (tokenError || !tokenRecord) {
-      return new Response(
-        renderErrorPage('Invalid Link', 'This link is invalid or has expired.'),
-        {
-          status: 404,
-          headers: { 'Content-Type': 'text/html; charset=utf-8' },
-        }
-      );
+      return errorResponse(req, 404, 'Invalid Link', 'This link is invalid or has expired.');
     }
 
     const typedToken = tokenRecord as TokenRecord;
 
     // Check if token is expired
     if (new Date(typedToken.expires_at) < new Date()) {
-      return new Response(
-        renderErrorPage('Link Expired', 'This link has expired. Please contact the meeting organizer.'),
-        {
-          status: 410,
-          headers: { 'Content-Type': 'text/html; charset=utf-8' },
-        }
-      );
+      return errorResponse(req, 410, 'Link Expired', 'This link has expired. Please contact the meeting organizer.');
     }
 
     // Check if already confirmed
     if (typedToken.confirmed_at) {
-      return new Response(
-        renderErrorPage(
-          'Already Sent',
-          'The reminder for this meeting has already been sent.'
-        ),
-        {
-          status: 409,
-          headers: { 'Content-Type': 'text/html; charset=utf-8' },
-        }
-      );
+      return errorResponse(req, 409, 'Already Sent', 'The reminder for this meeting has already been sent.');
     }
 
     // Fetch meeting details
@@ -491,7 +498,8 @@ serve(async (req) => {
         location,
         group_id,
         created_by,
-        groups!inner(name),
+        timezone,
+        groups!inner(name, timezone),
         profiles!meetings_created_by_fkey(email, full_name)
       `
       )
@@ -499,35 +507,27 @@ serve(async (req) => {
       .single();
 
     if (meetingError || !meeting) {
-      return new Response(
-        renderErrorPage('Meeting Not Found', 'The meeting associated with this link no longer exists.'),
-        {
-          status: 404,
-          headers: { 'Content-Type': 'text/html; charset=utf-8' },
-        }
-      );
+      return errorResponse(req, 404, 'Meeting Not Found', 'The meeting associated with this link no longer exists.');
     }
 
-    const typedMeeting = meeting as unknown as MeetingData;
+    const rawMeeting = meeting as unknown as MeetingData;
+    const resolvedTimezone = rawMeeting.timezone || rawMeeting.groups.timezone || 'America/New_York';
+    const typedMeeting: MeetingData = { ...rawMeeting, resolvedTimezone };
 
     // Check if meeting is still in the future
     if (new Date(typedMeeting.date) < new Date()) {
-      return new Response(
-        renderErrorPage('Meeting Passed', 'This meeting has already occurred.'),
-        {
-          status: 410,
-          headers: { 'Content-Type': 'text/html; charset=utf-8' },
-        }
-      );
+      return errorResponse(req, 410, 'Meeting Passed', 'This meeting has already occurred.');
     }
 
-    // Fetch attendees with 'invited' or 'accepted' status
+    // Fetch attendees with profiles (real users) and placeholder_profiles (placeholders)
     const { data: attendees, error: attendeesError } = await supabase
       .from('meeting_attendees')
       .select(
         `
         user_id,
-        profiles!meeting_attendees_user_id_fkey(email, full_name)
+        placeholder_id,
+        profiles(email, full_name),
+        placeholder_profiles(email, full_name)
       `
       )
       .eq('meeting_id', typedMeeting.id)
@@ -541,8 +541,40 @@ serve(async (req) => {
     const typedAttendees = (attendees || []) as unknown as Attendee[];
     const attendeeCount = typedAttendees.length;
 
-    // Handle GET request - render form
+    // Build recipients from whichever profile exists (real user or placeholder)
+    const recipients = typedAttendees
+      .map((a) => {
+        const email = a.profiles?.email || a.placeholder_profiles?.email;
+        const name = a.profiles?.full_name || a.placeholder_profiles?.full_name || null;
+        return email ? { email, name } : null;
+      })
+      .filter((r): r is { email: string; name: string | null } => r !== null);
+
+    console.log(`Meeting ${typedMeeting.id}: ${attendeeCount} attendees, ${recipients.length} with email`);
+
+    const wantsJson = req.headers.get('accept')?.includes('application/json');
+    const jsonHeaders = { ...corsHeaders, 'Content-Type': 'application/json' };
+
+    // Handle GET request
     if (req.method === 'GET') {
+      if (wantsJson) {
+        return new Response(
+          JSON.stringify({
+            meeting: {
+              id: typedMeeting.id,
+              title: typedMeeting.title,
+              description: typedMeeting.description,
+              date: typedMeeting.date,
+              location: typedMeeting.location,
+            },
+            groupName: typedMeeting.groups.name,
+            leaderName: typedMeeting.profiles.full_name || 'Meeting Leader',
+            attendeeCount,
+            resolvedTimezone,
+          }),
+          { status: 200, headers: jsonHeaders }
+        );
+      }
       return new Response(renderConfirmationForm(typedMeeting, attendeeCount), {
         status: 200,
         headers: { 'Content-Type': 'text/html; charset=utf-8' },
@@ -551,10 +583,20 @@ serve(async (req) => {
 
     // Handle POST request - process confirmation
     if (req.method === 'POST') {
-      // Parse form data
-      const formData = await req.formData();
-      let customDescription = formData.get('description') as string | null;
-      let customMessage = formData.get('message') as string | null;
+      let customDescription: string | null = null;
+      let customMessage: string | null = null;
+
+      // Support both JSON and form data
+      const contentType = req.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        const body = await req.json();
+        customDescription = body.description || null;
+        customMessage = body.message || null;
+      } else {
+        const formData = await req.formData();
+        customDescription = formData.get('description') as string | null;
+        customMessage = formData.get('message') as string | null;
+      }
 
       // Trim and validate content
       customDescription = customDescription?.trim() || null;
@@ -576,16 +618,7 @@ serve(async (req) => {
         .single();
 
       if (currentToken?.confirmed_at) {
-        return new Response(
-          renderErrorPage(
-            'Already Sent',
-            'The reminder for this meeting has already been sent.'
-          ),
-          {
-            status: 409,
-            headers: { 'Content-Type': 'text/html; charset=utf-8' },
-          }
-        );
+        return errorResponse(req, 409, 'Already Sent', 'The reminder for this meeting has already been sent.');
       }
 
       // Update token with custom content and confirmed_at
@@ -603,8 +636,8 @@ serve(async (req) => {
         throw updateError;
       }
 
-      // Send emails to attendees
-      if (attendeeCount > 0) {
+      // Send emails to attendees with valid email addresses
+      if (recipients.length > 0) {
         const sendgridApiKey = Deno.env.get('SENDGRID_API_KEY');
         const fromEmail = Deno.env.get('SENDGRID_FROM_EMAIL');
         const fromName = Deno.env.get('SENDGRID_FROM_NAME') || 'Leader App';
@@ -624,14 +657,14 @@ serve(async (req) => {
           customMessage
         );
 
-        const dateShort = formatDateShort(typedMeeting.date);
+        const dateShort = formatDateShort(typedMeeting.date, typedMeeting.resolvedTimezone);
 
-        // Build personalizations for each attendee
-        const personalizations = typedAttendees.map((attendee) => ({
+        // Build personalizations for each recipient
+        const personalizations = recipients.map((recipient) => ({
           to: [
             {
-              email: attendee.profiles.email,
-              name: attendee.profiles.full_name || undefined,
+              email: recipient.email,
+              name: recipient.name || undefined,
             },
           ],
         }));
@@ -676,16 +709,15 @@ serve(async (req) => {
             .update({ confirmed_at: null })
             .eq('id', typedToken.id);
 
+          if (wantsJson) {
+            return new Response(
+              JSON.stringify({ error: 'Failed to send emails. Please try again.' }),
+              { status: 500, headers: jsonHeaders }
+            );
+          }
           return new Response(
-            renderConfirmationForm(
-              typedMeeting,
-              attendeeCount,
-              'Failed to send emails. Please try again.'
-            ),
-            {
-              status: 500,
-              headers: { 'Content-Type': 'text/html; charset=utf-8' },
-            }
+            renderConfirmationForm(typedMeeting, attendeeCount, 'Failed to send emails. Please try again.'),
+            { status: 500, headers: { 'Content-Type': 'text/html; charset=utf-8' } }
           );
         }
 
@@ -695,34 +727,38 @@ serve(async (req) => {
           .update({ attendee_email_sent_at: new Date().toISOString() })
           .eq('id', typedToken.id);
 
-        console.log(
-          `Sent reminder emails to ${attendeeCount} attendees for meeting ${typedMeeting.id}`
-        );
       }
 
-      return new Response(renderSuccessPage(typedMeeting, attendeeCount), {
+      const emailsSent = recipients.length;
+      console.log(`Meeting ${typedMeeting.id}: sent ${emailsSent} of ${attendeeCount} emails`);
+
+      if (wantsJson) {
+        return new Response(
+          JSON.stringify({ success: true, attendeeCount: emailsSent }),
+          { status: 200, headers: jsonHeaders }
+        );
+      }
+      return new Response(renderSuccessPage(typedMeeting, emailsSent), {
         status: 200,
         headers: { 'Content-Type': 'text/html; charset=utf-8' },
       });
     }
 
     // Method not allowed
-    return new Response(renderErrorPage('Method Not Allowed', 'Invalid request method.'), {
-      status: 405,
-      headers: { 'Content-Type': 'text/html; charset=utf-8' },
-    });
+    return errorResponse(req, 405, 'Method Not Allowed', 'Invalid request method.');
   } catch (error) {
     console.error('Error in meeting-confirmation-page:', error);
 
+    const wantsJson = req.headers.get('accept')?.includes('application/json');
+    if (wantsJson) {
+      return new Response(
+        JSON.stringify({ error: 'An unexpected error occurred. Please try again later.' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
     return new Response(
-      renderErrorPage(
-        'Error',
-        'An unexpected error occurred. Please try again later.'
-      ),
-      {
-        status: 500,
-        headers: { 'Content-Type': 'text/html; charset=utf-8' },
-      }
+      renderErrorPage('Error', 'An unexpected error occurred. Please try again later.'),
+      { status: 500, headers: { 'Content-Type': 'text/html; charset=utf-8' } }
     );
   }
 });

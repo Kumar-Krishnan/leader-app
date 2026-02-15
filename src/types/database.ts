@@ -74,6 +74,8 @@ export interface Group {
   is_system: boolean;
   /** Type of system group (e.g., 'hubspot') */
   system_type: string | null;
+  /** IANA timezone identifier (e.g., 'America/New_York') */
+  timezone: string;
   created_at: string;
   updated_at: string;
 }
@@ -188,6 +190,8 @@ export interface Meeting {
   series_index: number | null;
   /** Total events in the series */
   series_total: number | null;
+  /** IANA timezone identifier; NULL = inherit from group */
+  timezone: string | null;
   created_at: string;
   updated_at: string;
 }

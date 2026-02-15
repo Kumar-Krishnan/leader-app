@@ -390,70 +390,27 @@ export function useMeetings(options?: { includePast?: boolean }): UseMeetingsRes
     customMessage?: string,
     descriptionFirst: boolean = true
   ): Promise<boolean> => {
-    if (!user || !currentGroup) {
-      setError('Not authenticated or no group selected');
-      return false;
-    }
-
-    const meeting = meetings.find(m => m.id === meetingId);
-    if (!meeting) {
-      setError('Meeting not found');
-      return false;
-    }
-
-    // Get attendees with email addresses (exclude the sender)
-    // Include both real users and placeholders
-    const attendees = meeting.attendees
-      ?.filter(a => {
-        // Exclude the sender (only real users can be the sender)
-        if (a.user_id === user.id) return false;
-        // Must have an email from either user or placeholder
-        const email = a.user?.email || (a as any).placeholder?.email;
-        return !!email;
-      })
-      .map(a => {
-        const placeholder = (a as any).placeholder;
-        return {
-          email: a.user?.email || placeholder?.email,
-          name: a.user?.full_name || placeholder?.full_name || null,
-        };
-      }) || [];
-
-    if (attendees.length === 0) {
-      setError('No attendees with email addresses to send to');
+    if (!user) {
+      setError('Not authenticated');
       return false;
     }
 
     setSendingEmail(true);
     clearError();
 
-    // Generate sender email from leader's name (e.g., "Jon Snow" -> "JonSnow@manatee.link")
-    const senderName = profile?.full_name || 'Leader';
-    const senderEmail = senderName.replace(/\s+/g, '') + '@manatee.link';
-
     try {
       const result = await emailService.sendMeetingEmail({
-        meetingId: meeting.id,
-        title: meeting.title,
-        description: customDescription !== undefined ? customDescription : meeting.description,
+        meetingId,
+        customDescription: customDescription !== undefined ? customDescription : null,
         customMessage: customMessage || null,
         descriptionFirst,
-        date: meeting.date,
-        location: meeting.location,
-        attendees,
-        senderName,
-        senderEmail,
-        groupName: currentGroup.name,
       });
 
       if (!result.success) {
         throw new Error(result.error || 'Failed to send email');
       }
 
-      logger.info('useMeetings', 'Meeting email sent successfully', {
-        meetingId,
-        recipientCount: attendees.length,
-      });
+      logger.info('useMeetings', 'Meeting email sent successfully', { meetingId });
 
       return true;
     } catch (err) {
@@ -462,7 +419,7 @@ export function useMeetings(options?: { includePast?: boolean }): UseMeetingsRes
     } finally {
       setSendingEmail(false);
     }
-  }, [user, profile, currentGroup, meetings, clearError, handleError]);
+  }, [user, clearError, handleError]);
 
   // Fetch meetings when group changes
   useEffect(() => {

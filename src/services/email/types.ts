@@ -1,20 +1,8 @@
-export interface EmailRecipient {
-  email: string;
-  name: string | null;
-}
-
 export interface SendMeetingEmailParams {
   meetingId: string;
-  title: string;
-  description: string | null;
-  customMessage: string | null;
-  descriptionFirst: boolean;
-  date: string;
-  location: string | null;
-  attendees: EmailRecipient[];
-  senderName: string;
-  senderEmail: string;
-  groupName: string;
+  customMessage?: string | null;
+  descriptionFirst?: boolean;
+  customDescription?: string | null;
 }
 
 export interface EmailService {

@@ -27,37 +27,55 @@ export function nl2br(text: string | null | undefined): string {
 /**
  * Format a date for display
  */
-export function formatDate(isoDate: string): string {
+export function formatDate(isoDate: string, timezone?: string): string {
   const date = new Date(isoDate);
-  return date.toLocaleDateString('en-US', {
+  const options: Intl.DateTimeFormatOptions = {
     weekday: 'long',
     year: 'numeric',
     month: 'long',
     day: 'numeric',
-  });
+    ...(timezone ? { timeZone: timezone } : {}),
+  };
+  return date.toLocaleDateString('en-US', options);
 }
 
 /**
  * Format a date in short form (e.g., "March 15")
  */
-export function formatDateShort(isoDate: string): string {
+export function formatDateShort(isoDate: string, timezone?: string): string {
   const date = new Date(isoDate);
-  return date.toLocaleDateString('en-US', {
+  const options: Intl.DateTimeFormatOptions = {
     month: 'long',
     day: 'numeric',
-  });
+    ...(timezone ? { timeZone: timezone } : {}),
+  };
+  return date.toLocaleDateString('en-US', options);
 }
 
 /**
  * Format time for display
  */
-export function formatTime(isoDate: string): string {
+export function formatTime(isoDate: string, timezone?: string): string {
   const date = new Date(isoDate);
-  return date.toLocaleTimeString('en-US', {
+  const options: Intl.DateTimeFormatOptions = {
     hour: 'numeric',
     minute: '2-digit',
     hour12: true,
-  });
+    ...(timezone ? { timeZone: timezone } : {}),
+  };
+  return date.toLocaleTimeString('en-US', options);
+}
+
+/**
+ * Get short timezone label for display (e.g., "EST", "PST")
+ */
+export function formatTimezoneShort(isoDate: string, timezone: string): string {
+  const date = new Date(isoDate);
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    timeZoneName: 'short',
+  }).formatToParts(date);
+  return parts.find((p) => p.type === 'timeZoneName')?.value || '';
 }
 
 /**

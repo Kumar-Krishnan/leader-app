@@ -5,6 +5,7 @@ import { useGroup } from '../contexts/GroupContext';
 import AuthNavigator from './AuthNavigator';
 import DrawerNavigator from './DrawerNavigator';
 import GroupSelectScreen from '../screens/group/GroupSelectScreen';
+import ConfirmReminderScreen from '../screens/ConfirmReminderScreen';
 import { RootStackParamList } from './types';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 
@@ -31,19 +32,15 @@ export default function RootNavigator() {
     );
   }
 
-  // Logged in but no group selected (or no groups)
-  if (!currentGroup) {
-    return (
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="GroupSelect" component={GroupSelectScreen} />
-      </Stack.Navigator>
-    );
-  }
-
-  // Logged in with group selected
+  // Logged in - ConfirmReminder is available regardless of group selection
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="Main" component={DrawerNavigator} />
+      {!currentGroup ? (
+        <Stack.Screen name="GroupSelect" component={GroupSelectScreen} />
+      ) : (
+        <Stack.Screen name="Main" component={DrawerNavigator} />
+      )}
+      <Stack.Screen name="ConfirmReminder" component={ConfirmReminderScreen} />
     </Stack.Navigator>
   );
 }

@@ -14,16 +14,19 @@ import { useGroupMembers, MemberWithProfile } from '../../hooks/useGroupMembers'
 import { GroupRole } from '../../types/database';
 import Avatar from '../../components/Avatar';
 import AddPlaceholderModal from '../../components/AddPlaceholderModal';
-import { showAlert } from '../../lib/errors';
+import { showAlert, showDestructiveConfirm } from '../../lib/errors';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function ManageMembersScreen() {
-  const { 
-    currentGroup, 
-    pendingRequests, 
-    approveRequest, 
+  const { user } = useAuth();
+  const {
+    currentGroup,
+    pendingRequests,
+    approveRequest,
     rejectRequest,
     refreshPendingRequests,
     isGroupLeader,
+    isGroupAdmin,
     canApproveRequests,
   } = useGroup();
   
@@ -33,6 +36,7 @@ export default function ManageMembersScreen() {
     loading,
     processingId,
     updateRole,
+    removeMember,
     refetch,
     createPlaceholder,
   } = useGroupMembers();
@@ -67,6 +71,22 @@ export default function ManageMembersScreen() {
       showAlert('Error', 'Failed to update role');
     } else {
       setSelectedMember(null);
+    }
+  };
+
+  const handleRemoveMember = async (member: MemberWithProfile) => {
+    const confirmed = await showDestructiveConfirm(
+      'Remove Member',
+      `Are you sure you want to remove ${member.displayName} from the group?`,
+      'Remove',
+    );
+    if (!confirmed) return;
+
+    const success = await removeMember(member.id);
+    if (success) {
+      setSelectedMember(null);
+    } else {
+      showAlert('Error', 'Failed to remove member');
     }
   };
 
@@ -121,8 +141,8 @@ export default function ManageMembersScreen() {
   const renderMember = ({ item }: { item: MemberWithProfile }) => (
     <TouchableOpacity
       style={styles.memberCard}
-      onPress={() => isGroupLeader ? setSelectedMember(item) : null}
-      disabled={!isGroupLeader || item.role === 'admin'}
+      onPress={() => (isGroupLeader || isGroupAdmin) ? setSelectedMember(item) : null}
+      disabled={(!isGroupLeader && !isGroupAdmin) || item.user_id === user?.id}
     >
       {item.isPlaceholder ? (
         <View style={styles.placeholderAvatar}>
@@ -270,6 +290,16 @@ export default function ManageMembersScreen() {
 
             {processingId === selectedMember?.id && (
               <ActivityIndicator style={{ marginTop: 16 }} color="#3B82F6" />
+            )}
+
+            {isGroupAdmin && selectedMember && (
+              <TouchableOpacity
+                style={styles.removeButton}
+                onPress={() => handleRemoveMember(selectedMember)}
+                disabled={processingId === selectedMember.id}
+              >
+                <Text style={styles.removeButtonText}>Remove from Group</Text>
+              </TouchableOpacity>
             )}
           </View>
         </View>
@@ -536,5 +566,17 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#64748B',
     marginTop: 4,
+  },
+  removeButton: {
+    marginTop: 20,
+    backgroundColor: '#7F1D1D',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+  },
+  removeButtonText: {
+    color: '#EF4444',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

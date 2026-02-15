@@ -78,3 +78,10 @@ export function updateMemberRole(memberId: string, newRole: string) {
     new_role: newRole,
   });
 }
+
+export function updateGroupTimezone(groupId: string, timezone: string) {
+  return supabase
+    .from('groups')
+    .update({ timezone } as any)
+    .eq('id', groupId);
+}

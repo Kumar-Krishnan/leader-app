@@ -1,7 +1,7 @@
 /**
  * Generate Meeting Reminders Edge Function
  *
- * Scheduled daily via GitHub Actions to:
+ * Scheduled every 8 hours via pg_cron to:
  * 1. Find meetings ~2 days from now
  * 2. Generate secure tokens for leaders
  * 3. Send reminder emails to leaders with confirmation links
@@ -14,6 +14,7 @@ import {
   formatDate,
   formatDateShort,
   formatTime,
+  formatTimezoneShort,
   escapeHtml,
 } from '../_shared/html-utils.ts';
 
@@ -25,12 +26,14 @@ interface Meeting {
   location: string | null;
   group_id: string;
   created_by: string;
+  timezone: string | null;
 }
 
 interface MeetingWithDetails extends Meeting {
-  group: { name: string };
+  group: { name: string; timezone: string | null };
   leader: { email: string; full_name: string | null };
   attendee_count: number;
+  resolvedTimezone: string;
 }
 
 /**
@@ -40,9 +43,11 @@ function generateLeaderReminderHtml(
   meeting: MeetingWithDetails,
   confirmationUrl: string
 ): string {
-  const formattedDate = formatDate(meeting.date);
-  const formattedTime = formatTime(meeting.date);
-  const dateShort = formatDateShort(meeting.date);
+  const tz = meeting.resolvedTimezone;
+  const formattedDate = formatDate(meeting.date, tz);
+  const formattedTime = formatTime(meeting.date, tz);
+  const tzShort = formatTimezoneShort(meeting.date, tz);
+  const dateShort = formatDateShort(meeting.date, tz);
 
   return `
 <!DOCTYPE html>
@@ -102,7 +107,7 @@ function generateLeaderReminderHtml(
                         </td>
                         <td style="padding-left: 12px;">
                           <p style="margin: 0; color: #6B7280; font-size: 12px; text-transform: uppercase;">Time</p>
-                          <p style="margin: 4px 0 0 0; color: #111827; font-size: 16px; font-weight: 500;">${formattedTime}</p>
+                          <p style="margin: 4px 0 0 0; color: #111827; font-size: 16px; font-weight: 500;">${formattedTime} ${tzShort}</p>
                         </td>
                       </tr>
                     </table>
@@ -191,13 +196,15 @@ function generateLeaderReminderText(
   meeting: MeetingWithDetails,
   confirmationUrl: string
 ): string {
-  const formattedDate = formatDate(meeting.date);
-  const formattedTime = formatTime(meeting.date);
+  const tz = meeting.resolvedTimezone;
+  const formattedDate = formatDate(meeting.date, tz);
+  const formattedTime = formatTime(meeting.date, tz);
+  const tzShort = formatTimezoneShort(meeting.date, tz);
 
   let text = `Your meeting is coming up in 2 days\n\n`;
   text += `${meeting.title}\n\n`;
   text += `Date: ${formattedDate}\n`;
-  text += `Time: ${formattedTime}\n`;
+  text += `Time: ${formattedTime} ${tzShort}\n`;
   if (meeting.location) {
     text += `Location: ${meeting.location}\n`;
   }
@@ -238,16 +245,17 @@ serve(async (req) => {
       throw new Error('Missing SendGrid configuration');
     }
 
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: { persistSession: false },
+    });
 
-    // Calculate the time window for meetings ~2 days from now
-    // We use a 2-hour window (47-49 hours) to account for scheduler timing variations
+    // Calculate the time window for meetings in the next 48 hours
+    // Runs every 8 hours via pg_cron; duplicates prevented by UNIQUE(meeting_id) on meeting_reminder_tokens
     const now = new Date();
-    const targetStart = new Date(now.getTime() + 47 * 60 * 60 * 1000); // 47 hours from now
-    const targetEnd = new Date(now.getTime() + 49 * 60 * 60 * 1000); // 49 hours from now
+    const targetEnd = new Date(now.getTime() + 48 * 60 * 60 * 1000); // 48 hours from now
 
     console.log(
-      `Looking for meetings between ${targetStart.toISOString()} and ${targetEnd.toISOString()}`
+      `Looking for meetings between ${now.toISOString()} and ${targetEnd.toISOString()}`
     );
 
     // Find meetings in the target window that don't have a reminder sent yet
@@ -262,11 +270,12 @@ serve(async (req) => {
         location,
         group_id,
         created_by,
-        groups!inner(name),
+        timezone,
+        groups!inner(name, timezone),
         profiles!meetings_created_by_fkey(email, full_name)
       `
       )
-      .gte('date', targetStart.toISOString())
+      .gte('date', now.toISOString())
       .lte('date', targetEnd.toISOString())
       .not('created_by', 'is', null);
 
@@ -359,15 +368,19 @@ serve(async (req) => {
           tokenRecord = data;
         }
 
-        // Build confirmation URL
-        const confirmationUrl = `${supabaseUrl}/functions/v1/meeting-confirmation-page?token=${token}`;
+        // Build confirmation URL - link to the app, not the edge function
+        const appUrl = Deno.env.get('APP_URL') || 'https://leader-app.netlify.app';
+        const confirmationUrl = `${appUrl}/confirm-reminder?token=${token}`;
 
         // Prepare meeting data for email
+        const groupData = meeting.groups as { name: string; timezone: string | null };
+        const resolvedTimezone = (meeting as any).timezone || groupData.timezone || 'America/New_York';
         const meetingWithDetails: MeetingWithDetails = {
           ...meeting,
-          group: { name: (meeting.groups as { name: string }).name },
+          group: groupData,
           leader: meeting.profiles as { email: string; full_name: string | null },
           attendee_count: attendeeCount || 0,
+          resolvedTimezone,
         };
 
         // Generate email content
@@ -380,7 +393,7 @@ serve(async (req) => {
           confirmationUrl
         );
 
-        const dateShort = formatDateShort(meeting.date);
+        const dateShort = formatDateShort(meeting.date, resolvedTimezone);
 
         // Send email via SendGrid
         const sendgridResponse = await fetch(

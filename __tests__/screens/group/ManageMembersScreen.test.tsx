@@ -71,6 +71,7 @@ let mockGroupContext = {
   rejectRequest: jest.fn(),
   refreshPendingRequests: jest.fn(),
   isGroupLeader: true,
+  isGroupAdmin: false,
   canApproveRequests: true,
 };
 
@@ -80,6 +81,10 @@ jest.mock('../../../src/hooks/useGroupMembers', () => ({
 
 jest.mock('../../../src/contexts/GroupContext', () => ({
   useGroup: () => mockGroupContext,
+}));
+
+jest.mock('../../../src/contexts/AuthContext', () => ({
+  useAuth: () => ({ user: { id: 'current-user-id' } }),
 }));
 
 describe('ManageMembersScreen', () => {
