@@ -1,0 +1,524 @@
+[
+    {
+      "name": "policy_exists_rls_disabled",
+      "title": "Policy Exists RLS Disabled",
+      "level": "ERROR",
+      "facing": "EXTERNAL",
+      "categories": [
+        "SECURITY"
+      ],
+      "description": "Detects cases where row level security (RLS) policies have been created, but RLS has not been enabled for the underlying table.",
+      "detail": "Table \\`public.group_join_requests\\` has RLS policies but RLS is not enabled on the table. Policies include {\"Leaders can review requests\",\"Leaders view join requests\",\"Users can request to join\",\"Users view own join requests\",gjr_insert,gjr_select,gjr_update}.",
+      "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0007_policy_exists_rls_disabled",
+      "metadata": {
+        "name": "group_join_requests",
+        "type": "table",
+        "schema": "public"
+      },
+      "cache_key": "policy_exists_rls_disabled_public_group_join_requests"
+    },
+    {
+      "name": "policy_exists_rls_disabled",
+      "title": "Policy Exists RLS Disabled",
+      "level": "ERROR",
+      "facing": "EXTERNAL",
+      "categories": [
+        "SECURITY"
+      ],
+      "description": "Detects cases where row level security (RLS) policies have been created, but RLS has not been enabled for the underlying table.",
+      "detail": "Table \\`public.group_members\\` has RLS policies but RLS is not enabled on the table. Policies include {\"Add group members\",gm_delete,gm_insert,gm_select,gm_update}.",
+      "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0007_policy_exists_rls_disabled",
+      "metadata": {
+        "name": "group_members",
+        "type": "table",
+        "schema": "public"
+      },
+      "cache_key": "policy_exists_rls_disabled_public_group_members"
+    },
+    {
+      "name": "policy_exists_rls_disabled",
+      "title": "Policy Exists RLS Disabled",
+      "level": "ERROR",
+      "facing": "EXTERNAL",
+      "categories": [
+        "SECURITY"
+      ],
+      "description": "Detects cases where row level security (RLS) policies have been created, but RLS has not been enabled for the underlying table.",
+      "detail": "Table \\`public.groups\\` has RLS policies but RLS is not enabled on the table. Policies include {\"Delete groups\",groups_insert,groups_select,groups_update}.",
+      "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0007_policy_exists_rls_disabled",
+      "metadata": {
+        "name": "groups",
+        "type": "table",
+        "schema": "public"
+      },
+      "cache_key": "policy_exists_rls_disabled_public_groups"
+    },
+    {
+      "name": "policy_exists_rls_disabled",
+      "title": "Policy Exists RLS Disabled",
+      "level": "ERROR",
+      "facing": "EXTERNAL",
+      "categories": [
+        "SECURITY"
+      ],
+      "description": "Detects cases where row level security (RLS) policies have been created, but RLS has not been enabled for the underlying table.",
+      "detail": "Table \\`public.hubspot_files\\` has RLS policies but RLS is not enabled on the table. Policies include {\"Admins can view hubspot files\",\"Service role full access to hubspot files\"}.",
+      "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0007_policy_exists_rls_disabled",
+      "metadata": {
+        "name": "hubspot_files",
+        "type": "table",
+        "schema": "public"
+      },
+      "cache_key": "policy_exists_rls_disabled_public_hubspot_files"
+    },
+    {
+      "name": "policy_exists_rls_disabled",
+      "title": "Policy Exists RLS Disabled",
+      "level": "ERROR",
+      "facing": "EXTERNAL",
+      "categories": [
+        "SECURITY"
+      ],
+      "description": "Detects cases where row level security (RLS) policies have been created, but RLS has not been enabled for the underlying table.",
+      "detail": "Table \\`public.hubspot_sync_state\\` has RLS policies but RLS is not enabled on the table. Policies include {\"Admins can view sync state\",\"Service role full access to sync state\"}.",
+      "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0007_policy_exists_rls_disabled",
+      "metadata": {
+        "name": "hubspot_sync_state",
+        "type": "table",
+        "schema": "public"
+      },
+      "cache_key": "policy_exists_rls_disabled_public_hubspot_sync_state"
+    },
+    {
+      "name": "policy_exists_rls_disabled",
+      "title": "Policy Exists RLS Disabled",
+      "level": "ERROR",
+      "facing": "EXTERNAL",
+      "categories": [
+        "SECURITY"
+      ],
+      "description": "Detects cases where row level security (RLS) policies have been created, but RLS has not been enabled for the underlying table.",
+      "detail": "Table \\`public.meetings\\` has RLS policies but RLS is not enabled on the table. Policies include {\"Leaders create meetings\",\"Leaders delete meetings\",\"Leaders update meetings\",\"View meetings in group\",meetings_insert,meetings_select,meetings_update}.",
+      "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0007_policy_exists_rls_disabled",
+      "metadata": {
+        "name": "meetings",
+        "type": "table",
+        "schema": "public"
+      },
+      "cache_key": "policy_exists_rls_disabled_public_meetings"
+    },
+    {
+      "name": "policy_exists_rls_disabled",
+      "title": "Policy Exists RLS Disabled",
+      "level": "ERROR",
+      "facing": "EXTERNAL",
+      "categories": [
+        "SECURITY"
+      ],
+      "description": "Detects cases where row level security (RLS) policies have been created, but RLS has not been enabled for the underlying table.",
+      "detail": "Table \\`public.messages\\` has RLS policies but RLS is not enabled on the table. Policies include {\"View messages in threads\",messages_delete,messages_insert,messages_select,messages_update}.",
+      "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0007_policy_exists_rls_disabled",
+      "metadata": {
+        "name": "messages",
+        "type": "table",
+        "schema": "public"
+      },
+      "cache_key": "policy_exists_rls_disabled_public_messages"
+    },
+    {
+      "name": "policy_exists_rls_disabled",
+      "title": "Policy Exists RLS Disabled",
+      "level": "ERROR",
+      "facing": "EXTERNAL",
+      "categories": [
+        "SECURITY"
+      ],
+      "description": "Detects cases where row level security (RLS) policies have been created, but RLS has not been enabled for the underlying table.",
+      "detail": "Table \\`public.profiles\\` has RLS policies but RLS is not enabled on the table. Policies include {\"Users can update own profile\",profiles_insert,profiles_select,profiles_update}.",
+      "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0007_policy_exists_rls_disabled",
+      "metadata": {
+        "name": "profiles",
+        "type": "table",
+        "schema": "public"
+      },
+      "cache_key": "policy_exists_rls_disabled_public_profiles"
+    },
+    {
+      "name": "policy_exists_rls_disabled",
+      "title": "Policy Exists RLS Disabled",
+      "level": "ERROR",
+      "facing": "EXTERNAL",
+      "categories": [
+        "SECURITY"
+      ],
+      "description": "Detects cases where row level security (RLS) policies have been created, but RLS has not been enabled for the underlying table.",
+      "detail": "Table \\`public.resource_folders\\` has RLS policies but RLS is not enabled on the table. Policies include {\"View resource folders in group or shared\",rf_delete,rf_insert,rf_select,rf_update}.",
+      "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0007_policy_exists_rls_disabled",
+      "metadata": {
+        "name": "resource_folders",
+        "type": "table",
+        "schema": "public"
+      },
+      "cache_key": "policy_exists_rls_disabled_public_resource_folders"
+    },
+    {
+      "name": "policy_exists_rls_disabled",
+      "title": "Policy Exists RLS Disabled",
+      "level": "ERROR",
+      "facing": "EXTERNAL",
+      "categories": [
+        "SECURITY"
+      ],
+      "description": "Detects cases where row level security (RLS) policies have been created, but RLS has not been enabled for the underlying table.",
+      "detail": "Table \\`public.resource_shares\\` has RLS policies but RLS is not enabled on the table. Policies include {rs_insert,rs_select}.",
+      "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0007_policy_exists_rls_disabled",
+      "metadata": {
+        "name": "resource_shares",
+        "type": "table",
+        "schema": "public"
+      },
+      "cache_key": "policy_exists_rls_disabled_public_resource_shares"
+    },
+    {
+      "name": "policy_exists_rls_disabled",
+      "title": "Policy Exists RLS Disabled",
+      "level": "ERROR",
+      "facing": "EXTERNAL",
+      "categories": [
+        "SECURITY"
+      ],
+      "description": "Detects cases where row level security (RLS) policies have been created, but RLS has not been enabled for the underlying table.",
+      "detail": "Table \\`public.resources\\` has RLS policies but RLS is not enabled on the table. Policies include {\"Leaders create resources\",\"Leaders delete resources\",\"Leaders update resources\",\"View resources in group or shared\",resources_delete,resources_insert,resources_select,resources_update}.",
+      "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0007_policy_exists_rls_disabled",
+      "metadata": {
+        "name": "resources",
+        "type": "table",
+        "schema": "public"
+      },
+      "cache_key": "policy_exists_rls_disabled_public_resources"
+    },
+    {
+      "name": "policy_exists_rls_disabled",
+      "title": "Policy Exists RLS Disabled",
+      "level": "ERROR",
+      "facing": "EXTERNAL",
+      "categories": [
+        "SECURITY"
+      ],
+      "description": "Detects cases where row level security (RLS) policies have been created, but RLS has not been enabled for the underlying table.",
+      "detail": "Table \\`public.thread_members\\` has RLS policies but RLS is not enabled on the table. Policies include {\"Delete thread members\",\"Leaders add thread members\",tm_insert,tm_select}.",
+      "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0007_policy_exists_rls_disabled",
+      "metadata": {
+        "name": "thread_members",
+        "type": "table",
+        "schema": "public"
+      },
+      "cache_key": "policy_exists_rls_disabled_public_thread_members"
+    },
+    {
+      "name": "policy_exists_rls_disabled",
+      "title": "Policy Exists RLS Disabled",
+      "level": "ERROR",
+      "facing": "EXTERNAL",
+      "categories": [
+        "SECURITY"
+      ],
+      "description": "Detects cases where row level security (RLS) policies have been created, but RLS has not been enabled for the underlying table.",
+      "detail": "Table \\`public.threads\\` has RLS policies but RLS is not enabled on the table. Policies include {\"Delete threads\",\"Leaders create threads\",\"Leaders update threads\",\"Users view threads in their group\",threads_insert,threads_select,threads_update}.",
+      "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0007_policy_exists_rls_disabled",
+      "metadata": {
+        "name": "threads",
+        "type": "table",
+        "schema": "public"
+      },
+      "cache_key": "policy_exists_rls_disabled_public_threads"
+    },
+    {
+      "name": "security_definer_view",
+      "title": "Security Definer View",
+      "level": "ERROR",
+      "facing": "EXTERNAL",
+      "categories": [
+        "SECURITY"
+      ],
+      "description": "Detects views defined with the SECURITY DEFINER property. These views enforce Postgres permissions and row level security policies (RLS) of the view creator, rather than that of the querying user",
+      "detail": "View \\`public.resource_upvote_counts\\` is defined with the SECURITY DEFINER property",
+      "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0010_security_definer_view",
+      "metadata": {
+        "name": "resource_upvote_counts",
+        "type": "view",
+        "schema": "public"
+      },
+      "cache_key": "security_definer_view_public_resource_upvote_counts"
+    },
+    {
+      "name": "security_definer_view",
+      "title": "Security Definer View",
+      "level": "ERROR",
+      "facing": "EXTERNAL",
+      "categories": [
+        "SECURITY"
+      ],
+      "description": "Detects views defined with the SECURITY DEFINER property. These views enforce Postgres permissions and row level security policies (RLS) of the view creator, rather than that of the querying user",
+      "detail": "View \\`public.location_events_by_region\\` is defined with the SECURITY DEFINER property",
+      "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0010_security_definer_view",
+      "metadata": {
+        "name": "location_events_by_region",
+        "type": "view",
+        "schema": "public"
+      },
+      "cache_key": "security_definer_view_public_location_events_by_region"
+    },
+    {
+      "name": "security_definer_view",
+      "title": "Security Definer View",
+      "level": "ERROR",
+      "facing": "EXTERNAL",
+      "categories": [
+        "SECURITY"
+      ],
+      "description": "Detects views defined with the SECURITY DEFINER property. These views enforce Postgres permissions and row level security policies (RLS) of the view creator, rather than that of the querying user",
+      "detail": "View \\`public.location_events_daily\\` is defined with the SECURITY DEFINER property",
+      "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0010_security_definer_view",
+      "metadata": {
+        "name": "location_events_daily",
+        "type": "view",
+        "schema": "public"
+      },
+      "cache_key": "security_definer_view_public_location_events_daily"
+    },
+    {
+      "name": "rls_disabled_in_public",
+      "title": "RLS Disabled in Public",
+      "level": "ERROR",
+      "facing": "EXTERNAL",
+      "categories": [
+        "SECURITY"
+      ],
+      "description": "Detects cases where row level security (RLS) has not been enabled on tables in schemas exposed to PostgREST",
+      "detail": "Table \\`public.profiles\\` is public, but RLS has not been enabled.",
+      "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0013_rls_disabled_in_public",
+      "metadata": {
+        "name": "profiles",
+        "type": "table",
+        "schema": "public"
+      },
+      "cache_key": "rls_disabled_in_public_public_profiles"
+    },
+    {
+      "name": "rls_disabled_in_public",
+      "title": "RLS Disabled in Public",
+      "level": "ERROR",
+      "facing": "EXTERNAL",
+      "categories": [
+        "SECURITY"
+      ],
+      "description": "Detects cases where row level security (RLS) has not been enabled on tables in schemas exposed to PostgREST",
+      "detail": "Table \\`public.groups\\` is public, but RLS has not been enabled.",
+      "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0013_rls_disabled_in_public",
+      "metadata": {
+        "name": "groups",
+        "type": "table",
+        "schema": "public"
+      },
+      "cache_key": "rls_disabled_in_public_public_groups"
+    },
+    {
+      "name": "rls_disabled_in_public",
+      "title": "RLS Disabled in Public",
+      "level": "ERROR",
+      "facing": "EXTERNAL",
+      "categories": [
+        "SECURITY"
+      ],
+      "description": "Detects cases where row level security (RLS) has not been enabled on tables in schemas exposed to PostgREST",
+      "detail": "Table \\`public.group_members\\` is public, but RLS has not been enabled.",
+      "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0013_rls_disabled_in_public",
+      "metadata": {
+        "name": "group_members",
+        "type": "table",
+        "schema": "public"
+      },
+      "cache_key": "rls_disabled_in_public_public_group_members"
+    },
+    {
+      "name": "rls_disabled_in_public",
+      "title": "RLS Disabled in Public",
+      "level": "ERROR",
+      "facing": "EXTERNAL",
+      "categories": [
+        "SECURITY"
+      ],
+      "description": "Detects cases where row level security (RLS) has not been enabled on tables in schemas exposed to PostgREST",
+      "detail": "Table \\`public.messages\\` is public, but RLS has not been enabled.",
+      "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0013_rls_disabled_in_public",
+      "metadata": {
+        "name": "messages",
+        "type": "table",
+        "schema": "public"
+      },
+      "cache_key": "rls_disabled_in_public_public_messages"
+    },
+    {
+      "name": "rls_disabled_in_public",
+      "title": "RLS Disabled in Public",
+      "level": "ERROR",
+      "facing": "EXTERNAL",
+      "categories": [
+        "SECURITY"
+      ],
+      "description": "Detects cases where row level security (RLS) has not been enabled on tables in schemas exposed to PostgREST",
+      "detail": "Table \\`public.group_join_requests\\` is public, but RLS has not been enabled.",
+      "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0013_rls_disabled_in_public",
+      "metadata": {
+        "name": "group_join_requests",
+        "type": "table",
+        "schema": "public"
+      },
+      "cache_key": "rls_disabled_in_public_public_group_join_requests"
+    },
+    {
+      "name": "rls_disabled_in_public",
+      "title": "RLS Disabled in Public",
+      "level": "ERROR",
+      "facing": "EXTERNAL",
+      "categories": [
+        "SECURITY"
+      ],
+      "description": "Detects cases where row level security (RLS) has not been enabled on tables in schemas exposed to PostgREST",
+      "detail": "Table \\`public.threads\\` is public, but RLS has not been enabled.",
+      "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0013_rls_disabled_in_public",
+      "metadata": {
+        "name": "threads",
+        "type": "table",
+        "schema": "public"
+      },
+      "cache_key": "rls_disabled_in_public_public_threads"
+    },
+    {
+      "name": "rls_disabled_in_public",
+      "title": "RLS Disabled in Public",
+      "level": "ERROR",
+      "facing": "EXTERNAL",
+      "categories": [
+        "SECURITY"
+      ],
+      "description": "Detects cases where row level security (RLS) has not been enabled on tables in schemas exposed to PostgREST",
+      "detail": "Table \\`public.thread_members\\` is public, but RLS has not been enabled.",
+      "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0013_rls_disabled_in_public",
+      "metadata": {
+        "name": "thread_members",
+        "type": "table",
+        "schema": "public"
+      },
+      "cache_key": "rls_disabled_in_public_public_thread_members"
+    },
+    {
+      "name": "rls_disabled_in_public",
+      "title": "RLS Disabled in Public",
+      "level": "ERROR",
+      "facing": "EXTERNAL",
+      "categories": [
+        "SECURITY"
+      ],
+      "description": "Detects cases where row level security (RLS) has not been enabled on tables in schemas exposed to PostgREST",
+      "detail": "Table \\`public.resource_shares\\` is public, but RLS has not been enabled.",
+      "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0013_rls_disabled_in_public",
+      "metadata": {
+        "name": "resource_shares",
+        "type": "table",
+        "schema": "public"
+      },
+      "cache_key": "rls_disabled_in_public_public_resource_shares"
+    },
+    {
+      "name": "rls_disabled_in_public",
+      "title": "RLS Disabled in Public",
+      "level": "ERROR",
+      "facing": "EXTERNAL",
+      "categories": [
+        "SECURITY"
+      ],
+      "description": "Detects cases where row level security (RLS) has not been enabled on tables in schemas exposed to PostgREST",
+      "detail": "Table \\`public.resources\\` is public, but RLS has not been enabled.",
+      "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0013_rls_disabled_in_public",
+      "metadata": {
+        "name": "resources",
+        "type": "table",
+        "schema": "public"
+      },
+      "cache_key": "rls_disabled_in_public_public_resources"
+    },
+    {
+      "name": "rls_disabled_in_public",
+      "title": "RLS Disabled in Public",
+      "level": "ERROR",
+      "facing": "EXTERNAL",
+      "categories": [
+        "SECURITY"
+      ],
+      "description": "Detects cases where row level security (RLS) has not been enabled on tables in schemas exposed to PostgREST",
+      "detail": "Table \\`public.resource_folders\\` is public, but RLS has not been enabled.",
+      "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0013_rls_disabled_in_public",
+      "metadata": {
+        "name": "resource_folders",
+        "type": "table",
+        "schema": "public"
+      },
+      "cache_key": "rls_disabled_in_public_public_resource_folders"
+    },
+    {
+      "name": "rls_disabled_in_public",
+      "title": "RLS Disabled in Public",
+      "level": "ERROR",
+      "facing": "EXTERNAL",
+      "categories": [
+        "SECURITY"
+      ],
+      "description": "Detects cases where row level security (RLS) has not been enabled on tables in schemas exposed to PostgREST",
+      "detail": "Table \\`public.meetings\\` is public, but RLS has not been enabled.",
+      "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0013_rls_disabled_in_public",
+      "metadata": {
+        "name": "meetings",
+        "type": "table",
+        "schema": "public"
+      },
+      "cache_key": "rls_disabled_in_public_public_meetings"
+    },
+    {
+      "name": "rls_disabled_in_public",
+      "title": "RLS Disabled in Public",
+      "level": "ERROR",
+      "facing": "EXTERNAL",
+      "categories": [
+        "SECURITY"
+      ],
+      "description": "Detects cases where row level security (RLS) has not been enabled on tables in schemas exposed to PostgREST",
+      "detail": "Table \\`public.hubspot_sync_state\\` is public, but RLS has not been enabled.",
+      "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0013_rls_disabled_in_public",
+      "metadata": {
+        "name": "hubspot_sync_state",
+        "type": "table",
+        "schema": "public"
+      },
+      "cache_key": "rls_disabled_in_public_public_hubspot_sync_state"
+    },
+    {
+      "name": "rls_disabled_in_public",
+      "title": "RLS Disabled in Public",
+      "level": "ERROR",
+      "facing": "EXTERNAL",
+      "categories": [
+        "SECURITY"
+      ],
+      "description": "Detects cases where row level security (RLS) has not been enabled on tables in schemas exposed to PostgREST",
+      "detail": "Table \\`public.hubspot_files\\` is public, but RLS has not been enabled.",
+      "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0013_rls_disabled_in_public",
+      "metadata": {
+        "name": "hubspot_files",
+        "type": "table",
+        "schema": "public"
+      },
+      "cache_key": "rls_disabled_in_public_public_hubspot_files"
+    }
+  ]

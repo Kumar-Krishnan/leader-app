@@ -1,0 +1,1 @@
+ curl -s -X POST "https://ynmzmedihevwfdvlrlfg.supabase.co/auth/v1/token?grant_type=password" -H "apikey: sb_publishable_avWhmlk7jk1NFOOyZiONEw_o4ZTa9-_" -H "Content-Type: application/json" -d '{"email": "gkrishnan803@gmail.com", "password": ""}'  | jq -r '.access_token'

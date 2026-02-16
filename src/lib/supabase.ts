@@ -32,6 +32,12 @@ export const supabase: SupabaseClient<Database> = createClient<Database>(
       autoRefreshToken: true,
       persistSession: true,
       detectSessionInUrl: Platform.OS === 'web', // Enable for web to handle redirects
+      // Bypass navigator.locks — Safari leaves stale locks after reload/crash,
+      // causing AbortError on all Supabase requests. A simple pass-through is
+      // safe since the app doesn't need multi-tab session coordination.
+      ...(Platform.OS === 'web' && {
+        lock: async (_name: string, _acquireTimeout: number, fn: () => Promise<any>) => await fn(),
+      }),
     },
   }
 );

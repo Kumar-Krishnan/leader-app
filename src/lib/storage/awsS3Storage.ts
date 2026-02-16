@@ -124,6 +124,11 @@ export class AwsS3StorageProvider implements StorageProvider {
     throw new Error('AWS S3 provider not configured. See awsS3Storage.ts for setup instructions.');
   }
 
+  getPublicUrl(bucket: string, path: string): { url: string } {
+    // Example: return { url: `https://${bucket}.s3.${this.region}.amazonaws.com/${path}` };
+    throw new Error('AWS S3 provider not configured. See awsS3Storage.ts for setup instructions.');
+  }
+
   async list(bucket: string, prefix?: string): Promise<ListResult> {
     // Example implementation:
     // try {

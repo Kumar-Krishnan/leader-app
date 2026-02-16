@@ -21,8 +21,8 @@ describe('AddPlaceholderModal', () => {
       />
     );
 
-    // Title and button both have "Add Placeholder" text
-    expect(getAllByText('Add Placeholder').length).toBeGreaterThan(0);
+    // Title and button both have "Add Member" text
+    expect(getAllByText('Add Member').length).toBeGreaterThan(0);
     expect(getByText('Email Address *')).toBeTruthy();
     expect(getByText('Full Name *')).toBeTruthy();
     expect(getByText('Role')).toBeTruthy();
@@ -37,7 +37,7 @@ describe('AddPlaceholderModal', () => {
       />
     );
 
-    expect(queryByText('Add Placeholder')).toBeNull();
+    expect(queryByText('Add Member')).toBeNull();
   });
 
   it('should show error when email is empty', async () => {
@@ -49,8 +49,8 @@ describe('AddPlaceholderModal', () => {
       />
     );
 
-    // Get the button (second element with "Add Placeholder" text)
-    const addPlaceholderElements = getAllByText('Add Placeholder');
+    // Get the button (second element with "Add Member" text)
+    const addPlaceholderElements = getAllByText('Add Member');
     const submitButton = addPlaceholderElements[addPlaceholderElements.length - 1];
     fireEvent.press(submitButton);
 
@@ -73,8 +73,8 @@ describe('AddPlaceholderModal', () => {
     const emailInput = getByPlaceholderText('email@example.com');
     fireEvent.changeText(emailInput, 'invalid-email');
 
-    // Get the button (second element with "Add Placeholder" text)
-    const addPlaceholderElements = getAllByText('Add Placeholder');
+    // Get the button (second element with "Add Member" text)
+    const addPlaceholderElements = getAllByText('Add Member');
     const submitButton = addPlaceholderElements[addPlaceholderElements.length - 1];
     fireEvent.press(submitButton);
 
@@ -97,8 +97,8 @@ describe('AddPlaceholderModal', () => {
     const emailInput = getByPlaceholderText('email@example.com');
     fireEvent.changeText(emailInput, 'valid@example.com');
 
-    // Get the button (second element with "Add Placeholder" text)
-    const addPlaceholderElements = getAllByText('Add Placeholder');
+    // Get the button (second element with "Add Member" text)
+    const addPlaceholderElements = getAllByText('Add Member');
     const submitButton = addPlaceholderElements[addPlaceholderElements.length - 1];
     fireEvent.press(submitButton);
 
@@ -124,8 +124,8 @@ describe('AddPlaceholderModal', () => {
     fireEvent.changeText(emailInput, 'newuser@example.com');
     fireEvent.changeText(nameInput, 'New User');
 
-    // Get the button (second element with "Add Placeholder" text)
-    const addPlaceholderElements = getAllByText('Add Placeholder');
+    // Get the button (second element with "Add Member" text)
+    const addPlaceholderElements = getAllByText('Add Member');
     const submitButton = addPlaceholderElements[addPlaceholderElements.length - 1];
     fireEvent.press(submitButton);
 
@@ -157,8 +157,8 @@ describe('AddPlaceholderModal', () => {
     const leaderOption = getByText('Leader');
     fireEvent.press(leaderOption);
 
-    // Get the button (second element with "Add Placeholder" text)
-    const addPlaceholderElements = getAllByText('Add Placeholder');
+    // Get the button (second element with "Add Member" text)
+    const addPlaceholderElements = getAllByText('Add Member');
     const submitButton = addPlaceholderElements[addPlaceholderElements.length - 1];
     fireEvent.press(submitButton);
 
@@ -201,8 +201,8 @@ describe('AddPlaceholderModal', () => {
     fireEvent.changeText(emailInput, 'test@example.com');
     fireEvent.changeText(nameInput, 'Test User');
 
-    // Get the button (second element with "Add Placeholder" text)
-    const addPlaceholderElements = getAllByText('Add Placeholder');
+    // Get the button (second element with "Add Member" text)
+    const addPlaceholderElements = getAllByText('Add Member');
     const submitButton = addPlaceholderElements[addPlaceholderElements.length - 1];
     fireEvent.press(submitButton);
 
@@ -228,8 +228,8 @@ describe('AddPlaceholderModal', () => {
     fireEvent.changeText(emailInput, 'existing@example.com');
     fireEvent.changeText(nameInput, 'Existing User');
 
-    // Get the button (second element with "Add Placeholder" text)
-    const addPlaceholderElements = getAllByText('Add Placeholder');
+    // Get the button (second element with "Add Member" text)
+    const addPlaceholderElements = getAllByText('Add Member');
     const submitButton = addPlaceholderElements[addPlaceholderElements.length - 1];
     fireEvent.press(submitButton);
 
@@ -268,8 +268,8 @@ describe('AddPlaceholderModal', () => {
     fireEvent.changeText(emailInput, '  test@example.com  ');
     fireEvent.changeText(nameInput, '  Test User  ');
 
-    // Get the button (second element with "Add Placeholder" text)
-    const addPlaceholderElements = getAllByText('Add Placeholder');
+    // Get the button (second element with "Add Member" text)
+    const addPlaceholderElements = getAllByText('Add Member');
     const submitButton = addPlaceholderElements[addPlaceholderElements.length - 1];
     fireEvent.press(submitButton);
 

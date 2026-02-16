@@ -120,11 +120,11 @@ describe('ManageMembersScreen', () => {
     expect(getByText('Placeholder User')).toBeTruthy();
   });
 
-  it('should show placeholder badge on placeholder members', () => {
+  it('should show invite sent badge on placeholder members', () => {
     const { getAllByText } = render(<ManageMembersScreen />);
 
-    const placeholderBadges = getAllByText('Placeholder');
-    expect(placeholderBadges.length).toBeGreaterThan(0);
+    const inviteBadges = getAllByText('Invite Sent');
+    expect(inviteBadges.length).toBeGreaterThan(0);
   });
 
   it('should show question mark avatar for placeholder members', () => {
@@ -134,24 +134,24 @@ describe('ManageMembersScreen', () => {
     expect(getByText('?')).toBeTruthy();
   });
 
-  it('should show Add Placeholder button for leaders', () => {
+  it('should show Add Member button for leaders', () => {
     const { getByText } = render(<ManageMembersScreen />);
 
-    expect(getByText('+ Add Placeholder')).toBeTruthy();
+    expect(getByText('+ Add Member')).toBeTruthy();
   });
 
-  it('should not show Add Placeholder button for non-leaders', () => {
+  it('should not show Add Member button for non-leaders', () => {
     mockGroupContext.isGroupLeader = false;
 
     const { queryByText } = render(<ManageMembersScreen />);
 
-    expect(queryByText('+ Add Placeholder')).toBeNull();
+    expect(queryByText('+ Add Member')).toBeNull();
   });
 
-  it('should open AddPlaceholderModal when Add Placeholder button pressed', async () => {
+  it('should open AddPlaceholderModal when Add Member button pressed', async () => {
     const { getByText } = render(<ManageMembersScreen />);
 
-    const addButton = getByText('+ Add Placeholder');
+    const addButton = getByText('+ Add Member');
     fireEvent.press(addButton);
 
     await waitFor(() => {
@@ -193,7 +193,7 @@ describe('ManageMembersScreen', () => {
       const { getByText, getAllByText, getByPlaceholderText } = render(<ManageMembersScreen />);
 
       // Open modal
-      fireEvent.press(getByText('+ Add Placeholder'));
+      fireEvent.press(getByText('+ Add Member'));
 
       await waitFor(() => {
         expect(getByText('Email Address *')).toBeTruthy();
@@ -206,9 +206,9 @@ describe('ManageMembersScreen', () => {
       fireEvent.changeText(emailInput, 'newuser@example.com');
       fireEvent.changeText(nameInput, 'New User');
 
-      // Submit - get the button (second element with "Add Placeholder" text)
-      const addPlaceholderElements = getAllByText('Add Placeholder');
-      const submitButton = addPlaceholderElements[addPlaceholderElements.length - 1];
+      // Submit - get the button (second element with "Add Member" text)
+      const addMemberElements = getAllByText('Add Member');
+      const submitButton = addMemberElements[addMemberElements.length - 1];
       fireEvent.press(submitButton);
 
       await waitFor(() => {

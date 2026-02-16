@@ -135,6 +135,7 @@ describe('CreateThreadModal', () => {
         group_id: 'test-group-id',
         created_by: 'test-user-id',
         is_archived: false,
+        description: null,
       });
     });
 

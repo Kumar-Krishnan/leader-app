@@ -4,6 +4,7 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
+  Pressable,
   ScrollView,
   Modal,
   TextInput,
@@ -16,6 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useGroup } from '../contexts/GroupContext';
 import { useAuth } from '../contexts/AuthContext';
 import { colors, spacing, borderRadius, fontSize, fontWeight } from '../constants/theme';
+import SendGroupEmailModal from './SendGroupEmailModal';
 
 const ROLE_COLORS: Record<string, string> = {
   admin: colors.error.main,
@@ -45,6 +47,7 @@ export default function GroupSidebar(props: DrawerContentComponentProps) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [emailModalGroup, setEmailModalGroup] = useState<{ id: string; name: string } | null>(null);
 
   const handleSelectGroup = (group: typeof groups[0]) => {
     setCurrentGroup(group);
@@ -132,6 +135,14 @@ export default function GroupSidebar(props: DrawerContentComponentProps) {
                   <Text style={styles.roleBadgeText}>{roleLabel}</Text>
                 </View>
               </View>
+              {['leader', 'admin', 'leader-helper'].includes(group.role) && (
+                <Pressable
+                  style={styles.mailButton}
+                  onPress={() => setEmailModalGroup({ id: group.id, name: group.name })}
+                >
+                  <Text style={styles.mailButtonText}>✉️</Text>
+                </Pressable>
+              )}
               {isActive && (
                 <View style={styles.activeIndicator}>
                   <Text style={styles.activeIndicatorText}>*</Text>
@@ -249,6 +260,14 @@ export default function GroupSidebar(props: DrawerContentComponentProps) {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* Group Email Modal */}
+      <SendGroupEmailModal
+        visible={!!emailModalGroup}
+        onClose={() => setEmailModalGroup(null)}
+        groupName={emailModalGroup?.name || ''}
+        groupId={emailModalGroup?.id || ''}
+      />
 
       {/* Create Modal */}
       <Modal visible={showCreateModal} animationType="slide" transparent>
@@ -388,6 +407,18 @@ const styles = StyleSheet.create({
     fontSize: fontSize.xs,
     fontWeight: fontWeight.semibold,
     color: colors.text.inverse,
+  },
+  mailButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.neutral[700],
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: spacing.sm,
+  },
+  mailButtonText: {
+    fontSize: 16,
   },
   activeIndicator: {
     width: 24,

@@ -159,8 +159,8 @@ export default function ManageMembersScreen() {
         <View style={styles.memberNameRow}>
           <Text style={styles.memberName}>{item.displayName}</Text>
           {item.isPlaceholder && (
-            <View style={styles.placeholderBadge}>
-              <Text style={styles.placeholderBadgeText}>Placeholder</Text>
+            <View style={styles.inviteBadge}>
+              <Text style={styles.inviteBadgeText}>Invite Sent</Text>
             </View>
           )}
         </View>
@@ -181,10 +181,13 @@ export default function ManageMembersScreen() {
   }
 
   const handleCreatePlaceholder = async (email: string, fullName: string, role: GroupRole) => {
-    const success = await createPlaceholder(email, fullName, role);
-    if (!success) {
+    const result = await createPlaceholder(email, fullName, role);
+    if (!result.success) {
       // Error is already set in the hook
       return false;
+    }
+    if (result.message) {
+      showAlert('Member Added', result.message);
     }
     return true;
   };
@@ -202,7 +205,7 @@ export default function ManageMembersScreen() {
               style={styles.addPlaceholderButton}
               onPress={() => setShowPlaceholderModal(true)}
             >
-              <Text style={styles.addPlaceholderButtonText}>+ Add Placeholder</Text>
+              <Text style={styles.addPlaceholderButtonText}>+ Add Member</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -485,13 +488,13 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#F8FAFC',
   },
-  placeholderBadge: {
-    backgroundColor: '#F59E0B',
+  inviteBadge: {
+    backgroundColor: '#10B981',
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 10,
   },
-  placeholderBadgeText: {
+  inviteBadgeText: {
     color: '#fff',
     fontSize: 10,
     fontWeight: '600',

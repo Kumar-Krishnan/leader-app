@@ -4,6 +4,7 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
+  Pressable,
   TextInput,
   ActivityIndicator,
   FlatList,
@@ -14,6 +15,7 @@ import {
 } from 'react-native';
 import { useGroup } from '../../contexts/GroupContext';
 import { useAuth } from '../../contexts/AuthContext';
+import SendGroupEmailModal from '../../components/SendGroupEmailModal';
 
 export default function GroupSelectScreen() {
   const { 
@@ -34,6 +36,7 @@ export default function GroupSelectScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [emailModalGroup, setEmailModalGroup] = useState<{ id: string; name: string } | null>(null);
 
   const handleCreate = async () => {
     if (!groupName.trim()) {
@@ -140,6 +143,16 @@ export default function GroupSelectScreen() {
                     <Text style={styles.groupName}>{group.name}</Text>
                     <Text style={styles.groupRole}>{group.role.replace('-', ' ')}</Text>
                   </View>
+                  {['leader', 'admin', 'leader-helper'].includes(group.role) && (
+                    <Pressable
+                      style={styles.mailButton}
+                      onPress={() => {
+                        setEmailModalGroup({ id: group.id, name: group.name });
+                      }}
+                    >
+                      <Text style={styles.mailButtonText}>✉️</Text>
+                    </Pressable>
+                  )}
                   {currentGroup?.id === group.id && (
                     <View style={styles.checkmark}>
                       <Text style={styles.checkmarkText}>✓</Text>
@@ -251,6 +264,14 @@ export default function GroupSelectScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* Group Email Modal */}
+      <SendGroupEmailModal
+        visible={!!emailModalGroup}
+        onClose={() => setEmailModalGroup(null)}
+        groupName={emailModalGroup?.name || ''}
+        groupId={emailModalGroup?.id || ''}
+      />
 
       {/* Create Modal */}
       <Modal visible={showCreateModal} animationType="slide" transparent>
@@ -388,6 +409,19 @@ const styles = StyleSheet.create({
     color: '#64748B',
     marginTop: 2,
     textTransform: 'capitalize',
+  },
+  mailButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#334155',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  mailButtonText: {
+    fontSize: 18,
+    color: '#94A3B8',
   },
   checkmark: {
     width: 28,

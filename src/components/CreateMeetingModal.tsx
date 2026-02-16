@@ -14,7 +14,8 @@ import {
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useAuth } from '../contexts/AuthContext';
 import { useGroup } from '../contexts/GroupContext';
-import { supabase } from '../lib/supabase';
+import { fetchMembers } from '../repositories/membersRepo';
+import { createMeetings, createMeetingAttendees } from '../repositories/meetingsRepo';
 import { Profile, PlaceholderProfile } from '../types/database';
 
 interface SeriesInfo {
@@ -146,15 +147,7 @@ export default function CreateMeetingModal({ visible, onClose, onCreated }: Prop
     if (!currentGroup) return;
     setLoadingMembers(true);
     try {
-      const { data, error } = await supabase
-        .from('group_members')
-        .select(`
-          user_id,
-          placeholder_id,
-          user:profiles(*),
-          placeholder:placeholder_profiles(*)
-        `)
-        .eq('group_id', currentGroup.id);
+      const { data, error } = await fetchMembers(currentGroup.id);
 
       if (error) throw error;
 
@@ -333,10 +326,7 @@ export default function CreateMeetingModal({ visible, onClose, onCreated }: Prop
         return base;
       });
 
-      const { data: meetings, error: meetingError } = await supabase
-        .from('meetings')
-        .insert(eventsToCreate as any)
-        .select();
+      const { data: meetings, error: meetingError } = await createMeetings(eventsToCreate);
 
       if (meetingError) throw meetingError;
 
@@ -355,9 +345,7 @@ export default function CreateMeetingModal({ visible, onClose, onCreated }: Prop
         );
 
         if (allAttendees.length > 0) {
-          const { error: attendeesError } = await supabase
-            .from('meeting_attendees')
-            .insert(allAttendees as any);
+          const { error: attendeesError } = await createMeetingAttendees(allAttendees);
           if (attendeesError) throw attendeesError;
         }
       }

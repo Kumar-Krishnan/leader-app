@@ -37,8 +37,6 @@ export interface Profile {
   role: UserRole;
   /** User's notification settings */
   notification_preferences: NotificationPreferences;
-  /** HubSpot CRM contact ID for sync */
-  hubspot_contact_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -70,10 +68,6 @@ export interface Group {
   code: string | null;
   /** User ID who created the group */
   created_by: string | null;
-  /** Whether this is a system-managed group */
-  is_system: boolean;
-  /** Type of system group (e.g., 'hubspot') */
-  system_type: string | null;
   /** IANA timezone identifier (e.g., 'America/New_York') */
   timezone: string;
   created_at: string;
@@ -345,64 +339,6 @@ export interface GroupJoinRequestWithDetails extends GroupJoinRequest {
 }
 
 /**
- * Status of a HubSpot sync run
- */
-export type HubSpotSyncStatus = 'pending' | 'running' | 'completed' | 'failed';
-
-/**
- * Status of a HubSpot file tracking record
- */
-export type HubSpotFileSyncStatus = 'synced' | 'failed' | 'deleted';
-
-/**
- * HubSpot sync state record
- * Tracks each sync run and its statistics
- */
-export interface HubSpotSyncState {
-  id: string;
-  /** Timestamp of last successful sync */
-  last_sync_at: string | null;
-  /** Current status of the sync run */
-  status: HubSpotSyncStatus;
-  /** Number of files successfully synced */
-  files_synced: number;
-  /** Number of files skipped (already exist) */
-  files_skipped: number;
-  /** Number of files that failed to sync */
-  files_failed: number;
-  /** Error message if sync failed */
-  error_message: string | null;
-  /** When the sync started */
-  started_at: string | null;
-  /** When the sync completed */
-  completed_at: string | null;
-  created_at: string;
-}
-
-/**
- * HubSpot file tracking record
- * Maps HubSpot files to local resources for deduplication
- */
-export interface HubSpotFile {
-  id: string;
-  /** HubSpot's file ID */
-  hubspot_file_id: string;
-  /** Original filename in HubSpot */
-  hubspot_file_name: string;
-  /** File size in bytes */
-  hubspot_file_size: number | null;
-  /** HubSpot file URL */
-  hubspot_file_url: string | null;
-  /** Local resource ID (if synced) */
-  resource_id: string | null;
-  /** Sync status of this file */
-  sync_status: HubSpotFileSyncStatus;
-  /** Last time this file was synced */
-  last_synced_at: string;
-  created_at: string;
-}
-
-/**
  * Meeting reminder token record
  * Stores secure tokens for meeting reminder email confirmation flow
  */
@@ -498,16 +434,6 @@ export interface Database {
         Row: ResourceShare;
         Insert: Omit<ResourceShare, 'id' | 'shared_at'>;
         Update: Partial<Omit<ResourceShare, 'id'>>;
-      };
-      hubspot_sync_state: {
-        Row: HubSpotSyncState;
-        Insert: Omit<HubSpotSyncState, 'id' | 'created_at'>;
-        Update: Partial<Omit<HubSpotSyncState, 'id' | 'created_at'>>;
-      };
-      hubspot_files: {
-        Row: HubSpotFile;
-        Insert: Omit<HubSpotFile, 'id' | 'created_at'>;
-        Update: Partial<Omit<HubSpotFile, 'id' | 'created_at'>>;
       };
       meeting_reminder_tokens: {
         Row: MeetingReminderToken;

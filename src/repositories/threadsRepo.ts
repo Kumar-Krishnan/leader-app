@@ -23,6 +23,12 @@ export function createThread(data: {
     .single();
 }
 
+export function addThreadMember(threadId: string, userId: string) {
+  return (supabase
+    .from('thread_members') as any)
+    .insert({ thread_id: threadId, user_id: userId });
+}
+
 export function archiveThread(threadId: string) {
   return (supabase
     .from('threads') as any)

@@ -1,1 +1,0 @@
- curl -X POST https://ynmzmedihevwfdvlrlfg.supabase.co/functions/v1/hubspot-sync -H "Authorization: Bearer sb_secret_GNW8T6m5uPQdpsQnkkDA6Q_EFdZwJSM" -H "Content-Type: application/json"

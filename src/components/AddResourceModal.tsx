@@ -13,7 +13,8 @@ import {
   Alert,
 } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
-import { supabase } from '../lib/supabase';
+import { storage } from '../lib/storage';
+import { createResource } from '../repositories/resourcesRepo';
 import { useAuth } from '../contexts/AuthContext';
 import { useGroup } from '../contexts/GroupContext';
 
@@ -77,14 +78,11 @@ export default function AddResourceModal({ visible, folderId, onClose, onCreated
       const response = await fetch(selectedFile.uri);
       const blob = await response.blob();
 
-      const { error: uploadError } = await supabase.storage
-        .from('resources')
-        .upload(fileName, blob, {
-          contentType: selectedFile.mimeType || 'application/octet-stream',
-          upsert: false,
-        });
+      const uploadResult = await storage.upload('resources', fileName, blob, {
+        contentType: selectedFile.mimeType || 'application/octet-stream',
+      });
 
-      if (uploadError) throw uploadError;
+      if (uploadResult.error) throw uploadResult.error;
 
       return fileName;
     } catch (err) {
@@ -123,10 +121,10 @@ export default function AddResourceModal({ visible, folderId, onClose, onCreated
       }
 
       // Create resource record
-      const { error: insertError } = await supabase.from('resources').insert({
+      const { error: insertError } = await createResource({
         title: title.trim(),
         type,
-        url: type === 'link' ? url.trim() : null,
+        url: type === 'link' ? url.trim() : undefined,
         visibility,
         tags: tags.split(',').map(t => t.trim()).filter(Boolean),
         group_id: currentGroup.id,

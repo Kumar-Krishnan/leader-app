@@ -94,6 +94,19 @@ export function updateMeetingDate(meetingId: string, newDate: string) {
     .eq('id', meetingId);
 }
 
+export function createMeetings(data: any[]) {
+  return (supabase
+    .from('meetings') as any)
+    .insert(data)
+    .select();
+}
+
+export function createMeetingAttendees(data: any[]) {
+  return (supabase
+    .from('meeting_attendees') as any)
+    .insert(data);
+}
+
 export function updateAttendeeRsvp(
   attendeeId: string,
   status: AttendeeStatus,

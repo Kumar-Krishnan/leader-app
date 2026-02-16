@@ -3,6 +3,7 @@ import * as membersRepo from '../repositories/membersRepo';
 import { GroupMember, Profile, GroupRole, PlaceholderProfile } from '../types/database';
 import { useGroup } from '../contexts/GroupContext';
 import { useErrorHandler } from './useErrorHandler';
+import { emailService } from '../services/email';
 
 /**
  * Member with profile information (either real user or placeholder)
@@ -37,7 +38,7 @@ export interface UseGroupMembersResult {
   /** Remove a member from the group */
   removeMember: (memberId: string) => Promise<boolean>;
   /** Create a placeholder member (for users who haven't signed up yet) */
-  createPlaceholder: (email: string, fullName: string, role?: GroupRole) => Promise<boolean>;
+  createPlaceholder: (email: string, fullName: string, role?: GroupRole) => Promise<{ success: boolean; message?: string }>;
 }
 
 /**
@@ -175,15 +176,16 @@ export function useGroupMembers(): UseGroupMembersResult {
 
   /**
    * Create a placeholder member (for users who haven't signed up yet)
+   * If the email belongs to an existing user, adds them directly instead.
    */
   const createPlaceholder = useCallback(async (
     email: string,
     fullName: string,
     role: GroupRole = 'member'
-  ): Promise<boolean> => {
+  ): Promise<{ success: boolean; message?: string }> => {
     if (!currentGroup) {
       setError('No group selected');
-      return false;
+      return { success: false };
     }
 
     clearError();
@@ -195,13 +197,37 @@ export function useGroupMembers(): UseGroupMembersResult {
 
       if (rpcError) throw rpcError;
 
+      console.log('[createPlaceholder] RPC success, data:', JSON.stringify(data));
+
       // Refetch members to get the updated list
       await fetchMembers();
 
-      return true;
+      // Parse JSONB result for existing user info
+      if (data?.is_existing_user) {
+        console.log('[createPlaceholder] Existing user detected, skipping invite email');
+        const name = data.full_name || email;
+        if (data.already_member) {
+          return { success: true, message: `${name} is already a member of this group.` };
+        }
+        return { success: true, message: `${name} already has an account and was added to the group.` };
+      }
+
+      // Send invite email for new placeholder (fire-and-forget)
+      console.log('[createPlaceholder] Sending invite email to:', email);
+      emailService.sendInviteEmail({
+        groupId: currentGroup.id,
+        inviteeName: fullName,
+        inviteeEmail: email,
+      }).then((result) => {
+        console.log('[createPlaceholder] sendInviteEmail result:', JSON.stringify(result));
+      }).catch((err) => {
+        console.error('[createPlaceholder] sendInviteEmail threw:', err);
+      });
+
+      return { success: true };
     } catch (err) {
       handleError(err, 'createPlaceholder');
-      return false;
+      return { success: false };
     }
   }, [currentGroup, fetchMembers, clearError, handleError, setError]);
 

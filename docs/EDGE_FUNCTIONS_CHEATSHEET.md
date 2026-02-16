@@ -17,6 +17,8 @@ Replace these placeholders in commands below:
 supabase functions deploy generate-meeting-reminders --no-verify-jwt
 supabase functions deploy meeting-confirmation-page --no-verify-jwt
 supabase functions deploy send-meeting-email --no-verify-jwt
+supabase functions deploy send-invite-email --no-verify-jwt
+supabase functions deploy send-group-email --no-verify-jwt
 
 # Set the APP_URL secret (used by reminder emails to link to the app)
 supabase secrets set APP_URL=https://leader-app.netlify.app
@@ -96,6 +98,42 @@ curl -X POST '<SUPABASE_URL>/functions/v1/send-meeting-email' \
     "meetingId": "<MEETING_UUID>",
     "customMessage": "See you there!",
     "customDescription": "Optional override for the description"
+  }'
+```
+
+---
+
+## Manually Trigger: Send Invite Email
+
+Sends an invite email to a new member (placeholder). Requires a user JWT.
+
+```bash
+curl -X POST '<SUPABASE_URL>/functions/v1/send-invite-email' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer <USER_JWT>' \
+  -H 'apikey: <ANON_KEY>' \
+  -d '{
+    "groupId": "<GROUP_UUID>",
+    "inviteeName": "Jane Doe",
+    "inviteeEmail": "jane@example.com"
+  }'
+```
+
+---
+
+## Manually Trigger: Send Group Email
+
+Sends an email to all members of a group. Requires a user JWT (sender must be leader/admin/leader-helper).
+
+```bash
+curl -X POST '<SUPABASE_URL>/functions/v1/send-group-email' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer <USER_JWT>' \
+  -H 'apikey: <ANON_KEY>' \
+  -d '{
+    "groupId": "<GROUP_UUID>",
+    "subject": "Upcoming Events",
+    "message": "Hi everyone, here are the upcoming events for this month..."
   }'
 ```
 

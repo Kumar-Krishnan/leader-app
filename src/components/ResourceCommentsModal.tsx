@@ -11,7 +11,9 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { supabase } from '../lib/supabase';
+import { fetchComments as fetchCommentsRepo, insertComment, deleteComment } from '../repositories/commentsRepo';
+import { fetchProfile } from '../repositories/profilesRepo';
+import { realtimeService } from '../services/realtime';
 import { useAuth } from '../contexts/AuthContext';
 import { ResourceCommentWithUser } from '../types/database';
 import Avatar from './Avatar';
@@ -65,26 +67,12 @@ export default function ResourceCommentsModal({
   const [newComment, setNewComment] = useState('');
   const [sending, setSending] = useState(false);
 
-  const fetchComments = useCallback(async () => {
+  const loadComments = useCallback(async () => {
     if (!resourceId && !folderId) return;
 
     setLoading(true);
     try {
-      let query = supabase
-        .from('resource_comments')
-        .select(`
-          *,
-          user:profiles!user_id(*)
-        `)
-        .order('created_at', { ascending: true });
-
-      if (resourceId) {
-        query = query.eq('resource_id', resourceId);
-      } else if (folderId) {
-        query = query.eq('folder_id', folderId);
-      }
-
-      const { data, error } = await query;
+      const { data, error } = await fetchCommentsRepo({ resourceId, folderId });
 
       if (error) throw error;
       setComments(data || []);
@@ -97,49 +85,36 @@ export default function ResourceCommentsModal({
 
   useEffect(() => {
     if (visible) {
-      fetchComments();
+      loadComments();
     }
-  }, [visible, fetchComments]);
+  }, [visible, loadComments]);
 
   // Setup realtime subscription
   useEffect(() => {
     if (!visible || (!resourceId && !folderId)) return;
 
-    const filter = resourceId 
-      ? `resource_id=eq.${resourceId}` 
+    const filter = resourceId
+      ? `resource_id=eq.${resourceId}`
       : `folder_id=eq.${folderId}`;
 
-    const channel = supabase
-      .channel(`comments:${resourceId || folderId}`)
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'resource_comments',
-        filter,
-      }, async (payload) => {
-        // Fetch user info for the new comment
-        const newComment = payload.new as ResourceCommentWithUser;
-        const { data: userData } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', newComment.user_id)
-          .single();
-        
-        setComments(prev => [...prev, { ...newComment, user: userData || undefined }]);
-      })
-      .on('postgres_changes', {
-        event: 'DELETE',
-        schema: 'public',
-        table: 'resource_comments',
-        filter,
-      }, (payload) => {
-        const deleted = payload.old as ResourceCommentWithUser;
-        setComments(prev => prev.filter(c => c.id !== deleted.id));
-      })
-      .subscribe();
+    const subscription = realtimeService.subscribeToTable(
+      'resource_comments',
+      filter,
+      {
+        onInsert: async (newRecord: any) => {
+          const newComment = newRecord as ResourceCommentWithUser;
+          const { data: userData } = await fetchProfile(newComment.user_id);
+          setComments(prev => [...prev, { ...newComment, user: userData || undefined }]);
+        },
+        onDelete: (oldRecord: any) => {
+          const deleted = oldRecord as ResourceCommentWithUser;
+          setComments(prev => prev.filter(c => c.id !== deleted.id));
+        },
+      }
+    );
 
     return () => {
-      supabase.removeChannel(channel);
+      subscription.unsubscribe();
     };
   }, [visible, resourceId, folderId]);
 
@@ -159,9 +134,7 @@ export default function ResourceCommentsModal({
         commentData.folder_id = folderId;
       }
 
-      const { error } = await supabase
-        .from('resource_comments')
-        .insert(commentData);
+      const { error } = await insertComment(commentData);
 
       if (error) throw error;
       setNewComment('');
@@ -183,10 +156,7 @@ export default function ResourceCommentsModal({
     if (!confirm) return;
 
     try {
-      const { error } = await supabase
-        .from('resource_comments')
-        .delete()
-        .eq('id', commentId);
+      const { error } = await deleteComment(commentId);
 
       if (error) throw error;
     } catch (error) {

@@ -16,7 +16,6 @@ CREATE TABLE profiles (
   avatar_url TEXT,
   role TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('user', 'leader', 'admin')),
   notification_preferences JSONB DEFAULT '{"messages": true, "meetings": true, "resources": true, "push_enabled": true}'::jsonb,
-  hubspot_contact_id TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );

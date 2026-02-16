@@ -120,18 +120,34 @@ CREATE OR REPLACE FUNCTION create_placeholder_member(
   p_full_name TEXT,
   p_role TEXT DEFAULT 'member'
 )
-RETURNS UUID AS $$
+RETURNS JSONB AS $$
 DECLARE
   v_placeholder_id UUID;
   v_existing_user_id UUID;
+  v_existing_user_name TEXT;
+  v_already_member BOOLEAN := FALSE;
+  v_inserted_count INTEGER;
 BEGIN
   -- Check if real user with this email already exists
-  SELECT id INTO v_existing_user_id
+  SELECT id, full_name INTO v_existing_user_id, v_existing_user_name
   FROM profiles
   WHERE LOWER(email) = LOWER(p_email);
 
   IF v_existing_user_id IS NOT NULL THEN
-    RAISE EXCEPTION 'A user with email % already exists. Add them as a regular member instead.', p_email;
+    -- Try to add the existing user to the group
+    INSERT INTO group_members (group_id, user_id, role)
+    VALUES (p_group_id, v_existing_user_id, p_role)
+    ON CONFLICT DO NOTHING;
+
+    GET DIAGNOSTICS v_inserted_count = ROW_COUNT;
+    v_already_member := (v_inserted_count = 0);
+
+    RETURN jsonb_build_object(
+      'id', v_existing_user_id,
+      'is_existing_user', TRUE,
+      'already_member', v_already_member,
+      'full_name', v_existing_user_name
+    );
   END IF;
 
   -- Find or create placeholder_profile record
@@ -146,7 +162,11 @@ BEGIN
   VALUES (p_group_id, v_placeholder_id, p_role)
   ON CONFLICT DO NOTHING;
 
-  RETURN v_placeholder_id;
+  RETURN jsonb_build_object(
+    'id', v_placeholder_id,
+    'is_existing_user', FALSE,
+    'already_member', FALSE
+  );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 

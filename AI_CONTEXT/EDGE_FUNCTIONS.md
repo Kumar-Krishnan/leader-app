@@ -3,7 +3,7 @@
 ## Overview
 
 The Leader App uses Supabase Edge Functions (Deno runtime) for server-side operations that require:
-- Third-party API integrations (SendGrid, HubSpot)
+- Third-party API integrations (SendGrid)
 - Operations that shouldn't expose API keys to clients
 - Scheduled/cron jobs
 
@@ -12,7 +12,6 @@ The Leader App uses Supabase Edge Functions (Deno runtime) for server-side opera
 | Function | Purpose | Auth | Deployment Flag |
 |----------|---------|------|-----------------|
 | `send-meeting-email` | Send meeting invitations via SendGrid | Server-side (JWT + role check) | `--no-verify-jwt` |
-| `hubspot-sync` | Sync contacts to HubSpot CRM | N/A (internal) | Default |
 | `generate-meeting-reminders` | Cron job for meeting reminders | N/A (scheduled) | Default |
 
 ## Function: send-meeting-email

@@ -7,6 +7,7 @@ export interface UploadOptions {
   contentType?: string;
   cacheControl?: string;
   metadata?: Record<string, string>;
+  upsert?: boolean;
 }
 
 export interface UploadResult {
@@ -80,6 +81,16 @@ export interface StorageProvider {
    * @param prefix - Optional folder prefix
    */
   list(bucket: string, prefix?: string): Promise<ListResult>;
+
+  /**
+   * Get a public (non-expiring) URL for a file
+   * @param bucket - The bucket/container name
+   * @param path - The file path within the bucket
+   */
+  getPublicUrl(
+    bucket: string,
+    path: string
+  ): { url: string };
 
   /**
    * Get the provider name (for logging/debugging)

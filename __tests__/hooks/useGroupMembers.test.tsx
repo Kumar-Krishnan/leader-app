@@ -335,7 +335,7 @@ describe('useGroupMembers', () => {
         p_email: 'newuser@example.com',
         p_full_name: 'New User',
       }));
-      expect(success).toBe(true);
+      expect(success).toEqual({ success: true });
     });
 
     it('should set error when createPlaceholder fails', async () => {
@@ -362,7 +362,7 @@ describe('useGroupMembers', () => {
         );
       });
 
-      expect(success).toBe(false);
+      expect(success).toEqual({ success: false });
       expect(result.current.error).toBeTruthy();
       consoleSpy.mockRestore();
     });
@@ -385,7 +385,7 @@ describe('useGroupMembers', () => {
         );
       });
 
-      expect(success).toBe(false);
+      expect(success).toEqual({ success: false });
       expect(result.current.error).toBe('No group selected');
     });
   });

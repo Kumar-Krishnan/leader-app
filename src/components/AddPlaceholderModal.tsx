@@ -93,15 +93,14 @@ export default function AddPlaceholderModal({ visible, onClose, onSubmit, groupN
       >
         <View style={styles.container}>
           <View style={styles.header}>
-            <Text style={styles.title}>Add Placeholder</Text>
+            <Text style={styles.title}>Add Member</Text>
             <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
               <Text style={styles.closeText}>X</Text>
             </TouchableOpacity>
           </View>
 
           <Text style={styles.description}>
-            Create a placeholder for someone who hasn't signed up yet.
-            They'll be added to the group automatically when they create an account.
+            Add someone to this group by email. If they don't have an account yet, they'll receive an invite and be added automatically when they sign up.
           </Text>
 
           {error && (
@@ -170,7 +169,7 @@ export default function AddPlaceholderModal({ visible, onClose, onSubmit, groupN
               {loading ? (
                 <ActivityIndicator color="#fff" />
               ) : (
-                <Text style={styles.buttonText}>Add Placeholder</Text>
+                <Text style={styles.buttonText}>Add Member</Text>
               )}
             </TouchableOpacity>
           </View>

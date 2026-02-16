@@ -10,7 +10,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { supabase } from '../lib/supabase';
+import { createThread, addThreadMember } from '../repositories/threadsRepo';
 import { useAuth } from '../contexts/AuthContext';
 import { useGroup } from '../contexts/GroupContext';
 
@@ -48,26 +48,18 @@ export default function CreateThreadModal({ visible, onClose, onCreated }: Props
 
     try {
       // Create the thread
-      const { data: thread, error: threadError } = await supabase
-        .from('threads')
-        .insert({
-          name: name.trim(),
-          group_id: currentGroup.id,
-          created_by: user.id,
-          is_archived: false,
-        })
-        .select()
-        .single();
+      const { data: thread, error: threadError } = await createThread({
+        name: name.trim(),
+        group_id: currentGroup.id,
+        created_by: user.id,
+        is_archived: false,
+        description: null,
+      });
 
       if (threadError) throw threadError;
 
       // Add creator as a member
-      const { error: memberError } = await supabase
-        .from('thread_members')
-        .insert({
-          thread_id: thread.id,
-          user_id: user.id,
-        });
+      const { error: memberError } = await addThreadMember(thread.id, user.id);
 
       if (memberError) throw memberError;
 

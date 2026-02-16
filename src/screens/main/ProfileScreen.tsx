@@ -6,7 +6,8 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { ProfileStackParamList } from '../../navigation/types';
 import * as ImagePicker from 'expo-image-picker';
-import { supabase } from '../../lib/supabase';
+import { storage } from '../../lib/storage';
+import { updateProfile } from '../../repositories/profilesRepo';
 import Avatar from '../../components/Avatar';
 import ScreenHeader from '../../components/ScreenHeader';
 import { showAlert } from '../../lib/errors';
@@ -86,32 +87,25 @@ export default function ProfileScreen() {
         uploadData = await blob.arrayBuffer();
       }
 
-      // Upload to Supabase Storage
-      const { error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(fileName, uploadData, {
-          contentType: mimeType,
-          upsert: true,
-        });
+      // Upload to storage
+      const uploadResult = await storage.upload('avatars', fileName, uploadData as any, {
+        contentType: mimeType,
+        upsert: true,
+      });
 
-      if (uploadError) {
-        console.error('[ProfileScreen] Upload error:', uploadError);
-        throw uploadError;
+      if (uploadResult.error) {
+        console.error('[ProfileScreen] Upload error:', uploadResult.error);
+        throw uploadResult.error;
       }
 
       // Get public URL
-      const { data: urlData } = supabase.storage
-        .from('avatars')
-        .getPublicUrl(fileName);
+      const { url: publicUrl } = storage.getPublicUrl('avatars', fileName);
 
       // Add cache buster to force reload
-      const avatarUrl = `${urlData.publicUrl}?t=${Date.now()}`;
+      const avatarUrl = `${publicUrl}?t=${Date.now()}`;
 
       // Update profile with new avatar URL
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({ avatar_url: avatarUrl })
-        .eq('id', profile?.id);
+      const { error: updateError } = await updateProfile(profile?.id, { avatar_url: avatarUrl });
 
       if (updateError) {
         console.error('[ProfileScreen] Profile update error:', updateError);

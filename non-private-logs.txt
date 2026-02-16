@@ -1,0 +1,96 @@
+[Log] [AuthContext] Visibility changed to: – "hidden"
+[Log] [Supabase] URL: – "https://ynmzmedihevwfdvlrlfg.supabase.co" (index.ts.bundle, line 110490)
+[Log] [Supabase] Anon key prefix: – "eyJhbGciOiJIUzI1NiIs" (index.ts.bundle, line 110491)
+[Log] [Supabase] Platform: – "web" (index.ts.bundle, line 110492)
+[Log] [Supabase] localStorage auth keys: – ["sb-ynmzmedihevwfdvlrlfg-auth-token"] (1) (index.ts.bundle, line 110495)
+[Log] [Supabase] sb-ynmzmedihevwfdvlrlfg-auth-token expires_at: – "2026-02-16T04:28:43.000Z" – "now:" – "2026-02-16T03:30:04.181Z" – "expired:" – false (index.ts.bundle, line 110503)
+[Log] [Supabase] sb-ynmzmedihevwfdvlrlfg-auth-token has access_token, length: – 972 (index.ts.bundle, line 110506)
+[Warning] "shadow*" style props are deprecated. Use "boxShadow". (index.ts.bundle, line 23462)
+[Log] Running application "main" with appParams: (index.ts.bundle, line 4277)
+ (2)
+{rootTag: "#root", hydrate: undefined}
+"
+Development-level warnings: ON.
+Performance optimizations: OFF."
+[Log] [GroupContext] useEffect triggered, authLoading: – true – "user:" – undefined – "loadedUserId:" – null (index.ts.bundle, line 134094)
+[Log] [GroupContext] Auth still loading, waiting... (index.ts.bundle, line 134098)
+[Log] [GroupContext] Pending requests effect, currentGroup: – undefined – "canApprove:" – false (index.ts.bundle, line 134121)
+[Log] [AuthContext] init, isSupabaseConfigured: – true (index.ts.bundle, line 110193)
+[Log] [AuthContext] Testing raw fetch to Supabase... (index.ts.bundle, line 110207)
+[Log] [AuthContext] Raw fetch status: – 200 (index.ts.bundle, line 110215)
+[Error] [AuthContext] getSession error: – AbortError: The operation was aborted.
+AbortError: The operation was aborted.
+	(anonymous function) (index.ts.bundle:110240)
+[Log] [AuthContext] Retrying after AbortError... (index.ts.bundle, line 110243)
+[Error] Unhandled Promise Rejection: AbortError: The operation was aborted.
+	initialize (index.ts.bundle:122428)
+[Error] Unhandled Promise Rejection: AbortError: The operation was aborted.
+	(anonymous function) (index.ts.bundle:124193)
+[Log] [AuthContext] Testing raw fetch to Supabase... (index.ts.bundle, line 110207)
+[Log] [AuthContext] Raw fetch status: – 200 (index.ts.bundle, line 110215)
+[Error] [AuthContext] getSession error: – AbortError: The operation was aborted.
+AbortError: The operation was aborted.
+	(anonymous function) (index.ts.bundle:110240)
+[Log] [AuthContext] Retrying after AbortError... (index.ts.bundle, line 110243)
+[Log] [AuthContext] Testing raw fetch to Supabase... (index.ts.bundle, line 110207)
+[Log] [AuthContext] Raw fetch status: – 200 (index.ts.bundle, line 110215)
+[Error] [AuthContext] getSession error: – AbortError: The operation was aborted.
+AbortError: The operation was aborted.
+	(anonymous function) (index.ts.bundle:110240)
+[Log] [GroupContext] useEffect triggered, authLoading: – false – "user:" – undefined – "loadedUserId:" – null (index.ts.bundle, line 134094)
+[Log] [GroupContext] No user, clearing state (index.ts.bundle, line 134111)
+[Warning] props.pointerEvents is deprecated. Use style.pointerEvents (index.ts.bundle, line 23462)
+[Log] [AuthContext] onAuthStateChange event: – "SIGNED_IN" – "currentUserId:" – null – "newUserId:" – "37ce5af2-1b47-4d5b-8567-cd1f9df47616" (index.ts.bundle, line 110259)
+[Log] [AuthContext] Auth state changed, updating from – null – "to" – "37ce5af2-1b47-4d5b-8567-cd1f9df47616" (index.ts.bundle, line 110278)
+[Log] [AuthContext] fetchProfile starting for: – "37ce5af2-1b47-4d5b-8567-cd1f9df47616" (index.ts.bundle, line 110307)
+[Error] [AuthContext] fetchProfile error: – {message: "AbortError: The operation was aborted.", details: "", hint: "", …}
+{message: "AbortError: The operation was aborted.", details: "", hint: "", code: ""}Object
+	(anonymous function) (index.ts.bundle:110318)
+[Log] [AuthContext] Retrying fetchProfile after AbortError... (index.ts.bundle, line 110321)
+[Log] [GroupContext] useEffect triggered, authLoading: – false – "user:" – "37ce5af2-1b47-4d5b-8567-cd1f9df47616" – "loadedUserId:" – null (index.ts.bundle, line 134094)
+[Log] [GroupContext] User changed from – null – "to" – "37ce5af2-1b47-4d5b-8567-cd1f9df47616" – "- loading data..." (index.ts.bundle, line 134104)
+[Log] [GroupContext] loadData starting... (index.ts.bundle, line 134139)
+[Log] [GroupContext] fetchGroups called, user: – "37ce5af2-1b47-4d5b-8567-cd1f9df47616" (index.ts.bundle, line 134165)
+[Log] [GroupContext] Querying group_members... (index.ts.bundle, line 134171)
+[Log] [GroupContext] group_members query complete, error: (3) (index.ts.bundle, line 134176)
+{message: "AbortError: The operation was aborted.", details: "", hint: "", code: ""}
+"data:"
+undefined
+[Log] [GroupContext] Retrying fetchGroups after AbortError... (index.ts.bundle, line 134180)
+[Log] [AuthContext] fetchProfile starting for: – "37ce5af2-1b47-4d5b-8567-cd1f9df47616" (index.ts.bundle, line 110307)
+[Error] [AuthContext] fetchProfile error: – {message: "AbortError: The operation was aborted.", details: "", hint: "", …}
+{message: "AbortError: The operation was aborted.", details: "", hint: "", code: ""}Object
+	(anonymous function) (index.ts.bundle:110318)
+[Log] [AuthContext] Retrying fetchProfile after AbortError... (index.ts.bundle, line 110321)
+[Log] [GroupContext] fetchGroups called, user: – "37ce5af2-1b47-4d5b-8567-cd1f9df47616" (index.ts.bundle, line 134165)
+[Log] [GroupContext] Querying group_members... (index.ts.bundle, line 134171)
+[Log] [GroupContext] group_members query complete, error: (3) (index.ts.bundle, line 134176)
+{message: "AbortError: The operation was aborted.", details: "", hint: "", code: ""}
+"data:"
+undefined
+[Log] [GroupContext] Retrying fetchGroups after AbortError... (index.ts.bundle, line 134180)
+[Log] [AuthContext] fetchProfile starting for: – "37ce5af2-1b47-4d5b-8567-cd1f9df47616" (index.ts.bundle, line 110307)
+[Error] [AuthContext] fetchProfile error: – {message: "AbortError: The operation was aborted.", details: "", hint: "", …}
+{message: "AbortError: The operation was aborted.", details: "", hint: "", code: ""}Object
+	(anonymous function) (index.ts.bundle:110318)
+[Log] [GroupContext] fetchGroups called, user: – "37ce5af2-1b47-4d5b-8567-cd1f9df47616" (index.ts.bundle, line 134165)
+[Log] [GroupContext] Querying group_members... (index.ts.bundle, line 134171)
+[Log] [GroupContext] group_members query complete, error: (3) (index.ts.bundle, line 134176)
+{message: "AbortError: The operation was aborted.", details: "", hint: "", code: ""}
+"data:"
+undefined
+[Error] Error fetching groups: – {message: "AbortError: The operation was aborted.", details: "", hint: "", …}
+{message: "AbortError: The operation was aborted.", details: "", hint: "", code: ""}Object
+	(anonymous function) (index.ts.bundle:134184)
+[Log] [GroupContext] fetchMyPendingRequests called, user: – "37ce5af2-1b47-4d5b-8567-cd1f9df47616" (index.ts.bundle, line 134222)
+[Log] [GroupContext] Querying group_join_requests... (index.ts.bundle, line 134228)
+[Log] [GroupContext] loadData complete (index.ts.bundle, line 134150)
+[Log] [GroupContext] loading set to false (index.ts.bundle, line 134161)
+[Log] [GroupContext] group_join_requests query complete, error: (3) (index.ts.bundle, line 134233)
+{message: "AbortError: The operation was aborted.", details: "", hint: "", code: ""}
+"data:"
+undefined
+[Error] Error fetching pending requests: – {message: "AbortError: The operation was aborted.", details: "", hint: "", …}
+{message: "AbortError: The operation was aborted.", details: "", hint: "", code: ""}Object
+	(anonymous function) (index.ts.bundle:134235)
+[Log] [LocationAnalytics] Error recording event: – "AbortError: The operation was aborted." (index.ts.bundle, line 132917)

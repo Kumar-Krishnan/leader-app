@@ -44,7 +44,7 @@ export class SupabaseStorageProvider implements StorageProvider {
         .upload(path, uploadData, {
           contentType: options?.contentType,
           cacheControl: options?.cacheControl || '3600',
-          upsert: false,
+          upsert: options?.upsert ?? false,
         });
 
       if (error) {
@@ -92,6 +92,11 @@ export class SupabaseStorageProvider implements StorageProvider {
     } catch (error) {
       return { success: false, error: error as Error };
     }
+  }
+
+  getPublicUrl(bucket: string, path: string): { url: string } {
+    const { data } = supabase.storage.from(bucket).getPublicUrl(path);
+    return { url: data.publicUrl };
   }
 
   async list(bucket: string, prefix?: string): Promise<ListResult> {

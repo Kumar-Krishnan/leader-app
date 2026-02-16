@@ -18,8 +18,6 @@ export function createMockGroup(overrides: Partial<Group> = {}): Group {
     description: 'A test group',
     code: 'ABC123',
     created_by: 'test-user-id',
-    is_system: false,
-    system_type: null,
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-01T00:00:00Z',
     ...overrides,
@@ -105,14 +103,3 @@ export function createMockGroupAsLeader(overrides: Partial<Group> = {}): GroupWi
   });
 }
 
-/**
- * Preset: System group (e.g., HubSpot managed)
- */
-export function createMockSystemGroup(overrides: Partial<Group> = {}): Group {
-  return createMockGroup({
-    is_system: true,
-    system_type: 'hubspot',
-    code: null,
-    ...overrides,
-  });
-}
