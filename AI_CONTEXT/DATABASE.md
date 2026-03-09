@@ -103,34 +103,37 @@ CREATE TRIGGER check_email_before_signup
 
 Allowed emails defined in `check_allowed_email()` function.
 
+## Supabase Setup
+
+- **Schema file**: `/supabase-fresh-start.sql` (run in SQL Editor for fresh setup)
+- **Auth**: Email provider enabled, confirm email disabled (dev)
+- **Email restriction**: Signup limited to 3 emails (remove trigger before launch)
+- **Realtime**: Enabled for messages, threads, thread_members, group_members, group_join_requests, meetings, resources
+- **Storage**: Bucket `resources` for file uploads
+
 ## Common Queries
 
-### Promote user to leader
 ```sql
+-- Promote user to leader
 UPDATE profiles SET role = 'leader' WHERE email = 'user@example.com';
-```
 
-### View all users
-```sql
+-- View all users
 SELECT id, email, full_name, role FROM profiles;
-```
 
-### View group memberships
-```sql
-SELECT 
-  p.email,
-  g.name as group_name,
-  gm.role as group_role
-FROM group_members gm
-JOIN profiles p ON p.id = gm.user_id
-JOIN groups g ON g.id = gm.group_id;
-```
+-- View group memberships
+SELECT p.email, g.name, gm.role FROM group_members gm
+JOIN profiles p ON p.id = gm.user_id JOIN groups g ON g.id = gm.group_id;
 
-### Remove email restriction
-```sql
+-- Remove email restriction
 DROP TRIGGER IF EXISTS check_email_before_signup ON auth.users;
 DROP FUNCTION IF EXISTS check_allowed_email();
 ```
+
+## Troubleshooting
+- **"permission denied for table X"**: `GRANT ALL ON ALL TABLES IN SCHEMA public TO authenticated;`
+- **"new row violates row-level security"**: Disable RLS or add policy
+- **Realtime not working**: `ALTER PUBLICATION supabase_realtime ADD TABLE table_name;`
+- **Session issues**: Clear browser localStorage
 
 ## Resource Sharing Between Groups
 
