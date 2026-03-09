@@ -45,7 +45,7 @@ const mockAuthContext = {
   user: { id: 'user-id' },
   profile: { id: 'user-id', email: 'test@example.com' },
   signOut: jest.fn(),
-  isLeader: false,
+  isOrganizer: false,
   isAdmin: false,
 };
 

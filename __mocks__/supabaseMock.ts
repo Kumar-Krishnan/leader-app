@@ -22,7 +22,7 @@ export const mockProfile = {
   email: 'test@example.com',
   full_name: 'Test User',
   avatar_url: null,
-  role: 'user' as const,
+  role: 'standard' as const,
   notification_preferences: {
     messages: true,
     meetings: true,

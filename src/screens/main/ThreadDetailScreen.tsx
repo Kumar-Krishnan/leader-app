@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,12 +10,17 @@ import {
   Platform,
   ActivityIndicator,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../../contexts/AuthContext';
 import { useMessages, MessageWithSender } from '../../hooks/useMessages';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ThreadsStackParamList } from '../../navigation/types';
+import { formatTime } from '../../lib/formatters';
 import Avatar from '../../components/Avatar';
+import MentionTextInput from '../../components/MentionTextInput';
+import MentionText from '../../components/MentionText';
 import { showAlert, showDestructiveConfirm } from '../../lib/errors';
+import { updateThreadLastRead } from '../../repositories/threadsRepo';
 
 type Props = NativeStackScreenProps<ThreadsStackParamList, 'ThreadDetail'>;
 
@@ -42,6 +47,15 @@ export default function ThreadDetailScreen({ route, navigation }: Props) {
   React.useEffect(() => {
     navigation.setOptions({ title: threadName });
   }, [threadName, navigation]);
+
+  // Mark thread as read when screen is focused
+  useFocusEffect(
+    useCallback(() => {
+      if (user?.id && threadId) {
+        updateThreadLastRead(threadId, user.id);
+      }
+    }, [threadId, user?.id])
+  );
 
   const handleSendMessage = async () => {
     if (!newMessage.trim()) return;
@@ -154,15 +168,10 @@ export default function ThreadDetailScreen({ route, navigation }: Props) {
             </View>
           ) : (
             <>
-              <Text style={[styles.messageText, isMe && styles.messageTextMe]}>
-                {item.content}
-              </Text>
+              <MentionText text={item.content} style={[styles.messageText, isMe && styles.messageTextMe]} />
               <View style={styles.messageFooter}>
                 <Text style={[styles.messageTime, isMe && styles.messageTimeMe]}>
-                  {new Date(item.created_at).toLocaleTimeString([], { 
-                    hour: 'numeric', 
-                    minute: '2-digit' 
-                  })}
+                  {formatTime(item.created_at)}
                 </Text>
                 {isMe && (
                   <View style={styles.messageActions}>
@@ -224,28 +233,16 @@ export default function ThreadDetailScreen({ route, navigation }: Props) {
         }}
       />
       
-      <View style={styles.inputContainer}>
-        <TextInput
-          style={styles.input}
-          placeholder="Type a message..."
-          placeholderTextColor="#64748B"
-          value={newMessage}
-          onChangeText={setNewMessage}
-          multiline
-          maxLength={1000}
-        />
-        <TouchableOpacity
-          style={[styles.sendButton, (!newMessage.trim() || sending) && styles.sendButtonDisabled]}
-          onPress={handleSendMessage}
-          disabled={!newMessage.trim() || sending}
-        >
-          {sending ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : (
-            <Text testID="send-button-text" style={styles.sendButtonText}>↑</Text>
-          )}
-        </TouchableOpacity>
-      </View>
+      <MentionTextInput
+        value={newMessage}
+        onChangeText={setNewMessage}
+        placeholder="Type a message..."
+        maxLength={1000}
+        onSubmit={handleSendMessage}
+        sending={sending}
+        showSendButton
+        containerStyle={styles.inputContainer}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -346,40 +343,11 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   inputContainer: {
-    flexDirection: 'row',
     padding: 12,
     paddingBottom: Platform.OS === 'ios' ? 28 : 12,
     backgroundColor: '#1E293B',
     borderTopWidth: 1,
     borderTopColor: '#334155',
-    alignItems: 'flex-end',
-  },
-  input: {
-    flex: 1,
-    backgroundColor: '#0F172A',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    fontSize: 15,
-    color: '#F8FAFC',
-    maxHeight: 100,
-    marginRight: 8,
-  },
-  sendButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#3B82F6',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  sendButtonDisabled: {
-    backgroundColor: '#334155',
-  },
-  sendButtonText: {
-    color: '#fff',
-    fontSize: 20,
-    fontWeight: '600',
   },
   messageFooter: {
     flexDirection: 'row',

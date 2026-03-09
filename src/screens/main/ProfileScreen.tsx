@@ -12,22 +12,21 @@ import Avatar from '../../components/Avatar';
 import ScreenHeader from '../../components/ScreenHeader';
 import { showAlert } from '../../lib/errors';
 import { colors, spacing, borderRadius, fontSize, fontWeight, shadows } from '../../constants/theme';
-import { TIMEZONE_OPTIONS } from '../../components/CreateMeetingModal';
+import { TIMEZONE_OPTIONS } from '../../components/TimezonePicker';
 
 export default function ProfileScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<ProfileStackParamList>>();
-  const { profile, signOut, isLeader, isAdmin, refreshProfile } = useAuth();
+  const { profile, signOut, isOrganizer, isAdmin, refreshProfile } = useAuth();
   const { currentGroup, groups, setCurrentGroup, isGroupAdmin, canApproveRequests, pendingRequests, refreshPendingRequests, updateGroupTimezone } = useGroup();
 
   // Refresh pending requests when screen is focused
   useFocusEffect(
     useCallback(() => {
-      console.log('[ProfileScreen] Focus effect - canApproveRequests:', canApproveRequests, 'currentGroup role:', currentGroup?.role, 'pendingRequests:', pendingRequests.length);
       if (canApproveRequests) {
-        console.log('[ProfileScreen] Refreshing pending requests on focus');
         refreshPendingRequests();
       }
-    }, [canApproveRequests, refreshPendingRequests, currentGroup?.role, pendingRequests.length])
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [canApproveRequests, currentGroup?.id])
   );
   const [showGroupPicker, setShowGroupPicker] = useState(false);
   const [showTimezonePicker, setShowTimezonePicker] = useState(false);
@@ -38,7 +37,7 @@ export default function ProfileScreen() {
 
   const getRoleBadge = () => {
     if (isAdmin) return { text: 'Admin', color: colors.error.main };
-    if (isLeader) return { text: 'Leader', color: colors.primary[600] };
+    if (isOrganizer) return { text: 'Organizer', color: colors.primary[600] };
     return { text: 'Member', color: colors.primary[500] };
   };
 

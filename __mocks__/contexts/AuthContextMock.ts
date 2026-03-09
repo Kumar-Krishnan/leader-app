@@ -18,7 +18,7 @@ export interface MockAuthContextType {
   signIn: jest.Mock;
   signOut: jest.Mock;
   refreshProfile: jest.Mock;
-  isLeader: boolean;
+  isOrganizer: boolean;
   isAdmin: boolean;
   isConfigured: boolean;
 }
@@ -42,7 +42,7 @@ export function createMockAuthContext(
     signIn: jest.fn().mockResolvedValue({ error: null }),
     signOut: jest.fn().mockResolvedValue(undefined),
     refreshProfile: jest.fn().mockResolvedValue(undefined),
-    isLeader: profile?.role === 'leader' || profile?.role === 'admin',
+    isOrganizer: profile?.role === 'organizer' || profile?.role === 'admin',
     isAdmin: profile?.role === 'admin',
     isConfigured: true,
     ...overrides,
@@ -57,7 +57,7 @@ export function createMockAuthContextUnauthenticated(): MockAuthContextType {
     session: null,
     user: null,
     profile: null,
-    isLeader: false,
+    isOrganizer: false,
     isAdmin: false,
   });
 }
@@ -83,12 +83,12 @@ export function createMockAuthContextAsLeader(): MockAuthContextType {
     id: user.id,
     email: user.email,
     full_name: 'Leader User',
-    role: 'leader',
+    role: 'organizer',
   });
   return createMockAuthContext({
     user,
     profile,
-    isLeader: true,
+    isOrganizer: true,
     isAdmin: false,
   });
 }
@@ -107,7 +107,7 @@ export function createMockAuthContextAsAdmin(): MockAuthContextType {
   return createMockAuthContext({
     user,
     profile,
-    isLeader: true,
+    isOrganizer: true,
     isAdmin: true,
   });
 }

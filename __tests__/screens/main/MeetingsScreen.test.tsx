@@ -31,6 +31,11 @@ jest.mock('../../../src/contexts/GroupContext', () => ({
 jest.mock('../../../src/hooks/useMeetings', () => ({
   useMeetings: () => mockUseMeetingsResult,
   RSVPStatus: {},
+  isUserMeetingLeader: (meeting: any, userId: string) => {
+    if (meeting.created_by === userId) return true;
+    if (meeting.co_leaders?.some((cl: any) => cl.user_id === userId)) return true;
+    return false;
+  },
 }));
 
 describe('MeetingsScreen', () => {
@@ -75,7 +80,7 @@ describe('MeetingsScreen', () => {
     mockAuthContext = createMockAuthContext({
       user: mockUser,
       profile: null,
-      isLeader: false,
+      isOrganizer: false,
       isAdmin: false,
     });
 
@@ -451,6 +456,99 @@ describe('MeetingsScreen', () => {
       // There will be multiple "✓ Yes" buttons (one in original card, one in modal)
       const yesButtons = getAllByText('✓ Yes');
       expect(yesButtons.length).toBeGreaterThan(0);
+    });
+  });
+
+  it('should show skip button for co-leaders on series meetings', () => {
+    // User is a co-leader (not creator) of a series meeting
+    const seriesMeeting = createMockMeetingWithAttendees({
+      id: 'series-meeting-1',
+      group_id: 'group-id',
+      title: 'Co-Led Series',
+      series_id: 'series-1',
+      series_index: 1,
+      created_by: 'other-user-id', // different creator
+      attendees: [],
+      co_leaders: [
+        { id: 'cl-1', meeting_id: 'series-meeting-1', user_id: 'user-id', created_at: '2026-01-01T00:00:00Z' },
+      ],
+    } as any);
+
+    mockGroupContext = createMockGroupContext({
+      currentGroup: mockGroup,
+      isGroupLeader: true,
+    });
+
+    const getSeriesMeetings = jest.fn().mockReturnValue([seriesMeeting]);
+    mockUseMeetingsResult = createMockUseMeetings({
+      meetings: [seriesMeeting],
+      getSeriesMeetings,
+    });
+
+    const { getByText } = render(<MeetingsScreen />);
+    expect(getByText('Skip This Week')).toBeTruthy();
+  });
+
+  it('should not show skip button for non-leaders on series meetings', () => {
+    // User is NOT a creator or co-leader
+    const seriesMeeting = createMockMeetingWithAttendees({
+      id: 'series-meeting-1',
+      group_id: 'group-id',
+      title: 'Other Series',
+      series_id: 'series-1',
+      series_index: 1,
+      created_by: 'other-user-id',
+      attendees: [],
+      co_leaders: [],
+    } as any);
+
+    mockGroupContext = createMockGroupContext({
+      currentGroup: mockGroup,
+      isGroupLeader: true,
+    });
+
+    const getSeriesMeetings = jest.fn().mockReturnValue([seriesMeeting]);
+    mockUseMeetingsResult = createMockUseMeetings({
+      meetings: [seriesMeeting],
+      getSeriesMeetings,
+    });
+
+    const { queryByText } = render(<MeetingsScreen />);
+    expect(queryByText('Skip This Week')).toBeNull();
+  });
+
+  it('should show edit button for co-leaders in series view modal', async () => {
+    const seriesMeeting = createMockMeetingWithAttendees({
+      id: 'series-meeting-1',
+      group_id: 'group-id',
+      title: 'Co-Led Series Edit',
+      series_id: 'series-1',
+      series_index: 1,
+      created_by: 'other-user-id',
+      attendees: [],
+      co_leaders: [
+        { id: 'cl-1', meeting_id: 'series-meeting-1', user_id: 'user-id', created_at: '2026-01-01T00:00:00Z' },
+      ],
+    } as any);
+
+    mockGroupContext = createMockGroupContext({
+      currentGroup: mockGroup,
+      isGroupLeader: true,
+    });
+
+    const getSeriesMeetings = jest.fn().mockReturnValue([seriesMeeting]);
+    mockUseMeetingsResult = createMockUseMeetings({
+      meetings: [seriesMeeting],
+      getSeriesMeetings,
+    });
+
+    const { getByText } = render(<MeetingsScreen />);
+
+    // Tap on the series card to open series view modal
+    fireEvent.press(getByText('Tap to view all meetings'));
+
+    await waitFor(() => {
+      expect(getByText('Edit')).toBeTruthy();
     });
   });
 });

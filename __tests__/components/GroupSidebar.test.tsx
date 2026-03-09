@@ -111,7 +111,7 @@ jest.mock('../../src/contexts/GroupContext', () => ({
 let mockAuthContext: any = {
   user: mockUser,
   profile: mockProfile,
-  isLeader: false,
+  isOrganizer: false,
   isAdmin: false,
   loading: false,
 };
@@ -138,7 +138,7 @@ describe('GroupSidebar', () => {
     mockAuthContext = {
       user: mockUser,
       profile: mockProfile,
-      isLeader: false,
+      isOrganizer: false,
       isAdmin: false,
       loading: false,
     };
@@ -331,14 +331,14 @@ describe('GroupSidebar', () => {
 
   describe('Create Group', () => {
     it('should show Create Group button only for leaders', () => {
-      mockAuthContext.isLeader = false;
+      mockAuthContext.isOrganizer = false;
       const { queryByText } = render(<GroupSidebar {...mockDrawerProps} />);
 
       expect(queryByText('Create Group')).toBeNull();
     });
 
     it('should show Create Group button for leaders', () => {
-      mockAuthContext.isLeader = true;
+      mockAuthContext.isOrganizer = true;
       mockAuthContext.profile = mockLeaderProfile;
 
       const { getByText } = render(<GroupSidebar {...mockDrawerProps} />);
@@ -347,7 +347,7 @@ describe('GroupSidebar', () => {
     });
 
     it('should open create modal when button is pressed', () => {
-      mockAuthContext.isLeader = true;
+      mockAuthContext.isOrganizer = true;
 
       const { getByText, getByPlaceholderText } = render(<GroupSidebar {...mockDrawerProps} />);
 
@@ -358,7 +358,7 @@ describe('GroupSidebar', () => {
     });
 
     it('should show error when creating with empty name', async () => {
-      mockAuthContext.isLeader = true;
+      mockAuthContext.isOrganizer = true;
 
       const { getByText, getAllByText } = render(<GroupSidebar {...mockDrawerProps} />);
 
@@ -375,7 +375,7 @@ describe('GroupSidebar', () => {
     });
 
     it('should call createGroup with name and description', async () => {
-      mockAuthContext.isLeader = true;
+      mockAuthContext.isOrganizer = true;
 
       const { getByText, getByPlaceholderText, getAllByText } = render(<GroupSidebar {...mockDrawerProps} />);
 
@@ -399,7 +399,7 @@ describe('GroupSidebar', () => {
     });
 
     it('should close modal after successful creation', async () => {
-      mockAuthContext.isLeader = true;
+      mockAuthContext.isOrganizer = true;
 
       const { getByText, getByPlaceholderText, getAllByText, queryByPlaceholderText } = render(
         <GroupSidebar {...mockDrawerProps} />
@@ -419,7 +419,7 @@ describe('GroupSidebar', () => {
     });
 
     it('should show error message on create failure', async () => {
-      mockAuthContext.isLeader = true;
+      mockAuthContext.isOrganizer = true;
       mockGroupContext.createGroup = jest.fn().mockResolvedValue({
         error: { message: 'Failed to create group' }
       });
@@ -442,7 +442,7 @@ describe('GroupSidebar', () => {
     });
 
     it('should close create modal when X is pressed', () => {
-      mockAuthContext.isLeader = true;
+      mockAuthContext.isOrganizer = true;
 
       const { getByText, queryByPlaceholderText } = render(<GroupSidebar {...mockDrawerProps} />);
 

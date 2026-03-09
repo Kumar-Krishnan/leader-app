@@ -350,6 +350,21 @@ authorization_url_path = "/oauth/consent"
 # Allow dynamic client registration
 allow_dynamic_registration = false
 
+[functions.send-meeting-email]
+verify_jwt = false
+
+[functions.send-invite-email]
+verify_jwt = false
+
+[functions.send-group-email]
+verify_jwt = false
+
+[functions.generate-meeting-reminders]
+verify_jwt = false
+
+[functions.meeting-confirmation-page]
+verify_jwt = false
+
 [edge_runtime]
 enabled = true
 # Supported request policies: `oneshot`, `per_worker`.

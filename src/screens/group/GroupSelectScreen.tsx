@@ -27,7 +27,7 @@ export default function GroupSelectScreen() {
     myPendingRequests,
     loading 
   } = useGroup();
-  const { isLeader } = useAuth();
+  const { isOrganizer } = useAuth();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [groupName, setGroupName] = useState('');
@@ -122,7 +122,7 @@ export default function GroupSelectScreen() {
           <Text style={styles.emptyIcon}>👥</Text>
           <Text style={styles.emptyTitle}>No groups yet</Text>
           <Text style={styles.emptyText}>
-            Request to join a group with a code{isLeader ? ' or create a new one' : ''}.
+            Request to join a group with a code{isOrganizer ? ' or create a new one' : ''}.
           </Text>
         </View>
       ) : (
@@ -196,7 +196,7 @@ export default function GroupSelectScreen() {
           <Text style={styles.joinButtonText}>Request to Join Group</Text>
         </TouchableOpacity>
 
-        {isLeader && (
+        {isOrganizer && (
           <TouchableOpacity
             style={styles.createButton}
             onPress={() => {

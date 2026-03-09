@@ -13,6 +13,15 @@ import { logger } from '../lib/logger';
 export type RSVPStatus = 'invited' | 'accepted' | 'declined' | 'maybe';
 
 /**
+ * Check if a user is a meeting leader (creator or co-leader)
+ */
+export function isUserMeetingLeader(meeting: MeetingWithAttendees, userId: string): boolean {
+  if (meeting.created_by === userId) return true;
+  if (meeting.co_leaders?.some(cl => cl.user_id === userId)) return true;
+  return false;
+}
+
+/**
  * Return type for the useMeetings hook
  */
 export interface UseMeetingsResult {
@@ -46,6 +55,27 @@ export interface UseMeetingsResult {
     customDescription?: string,
     customMessage?: string,
     descriptionFirst?: boolean
+  ) => Promise<boolean>;
+  /** Add attendees to all meetings in a series */
+  addAttendeesToSeries: (
+    seriesId: string,
+    members: { id: string; type: 'user' | 'placeholder' }[]
+  ) => Promise<boolean>;
+  /** Remove an attendee from all meetings in a series */
+  removeAttendeeFromSeries: (
+    seriesId: string,
+    memberId: string,
+    memberType: 'user' | 'placeholder'
+  ) => Promise<boolean>;
+  /** Add co-leaders to all meetings in a series */
+  addCoLeadersToSeries: (
+    seriesId: string,
+    userIds: string[]
+  ) => Promise<boolean>;
+  /** Remove a co-leader from all meetings in a series */
+  removeCoLeaderFromSeries: (
+    seriesId: string,
+    userId: string
   ) => Promise<boolean>;
 }
 
@@ -421,6 +451,196 @@ export function useMeetings(options?: { includePast?: boolean }): UseMeetingsRes
     }
   }, [user, clearError, handleError]);
 
+  /**
+   * Add attendees to all meetings in a series
+   */
+  const addAttendeesToSeries = useCallback(async (
+    seriesId: string,
+    members: { id: string; type: 'user' | 'placeholder' }[]
+  ): Promise<boolean> => {
+    try {
+      const seriesMeetingIds = meetings
+        .filter(m => m.series_id === seriesId)
+        .map(m => m.id);
+
+      if (seriesMeetingIds.length === 0) {
+        setError('No meetings found in series');
+        return false;
+      }
+
+      // Fetch existing attendees to avoid duplicates
+      const { data: existingAttendees, error: fetchError } =
+        await meetingsRepo.fetchMeetingAttendeesByMeetings(seriesMeetingIds);
+
+      if (fetchError) throw fetchError;
+
+      const existingSet = new Set(
+        (existingAttendees || []).map(a => {
+          const id = a.user_id || a.placeholder_id;
+          return `${a.meeting_id}:${id}`;
+        })
+      );
+
+      const newAttendees = seriesMeetingIds.flatMap(meetingId =>
+        members
+          .filter(member => !existingSet.has(`${meetingId}:${member.id}`))
+          .map(member => ({
+            meeting_id: meetingId,
+            user_id: member.type === 'user' ? member.id : null,
+            placeholder_id: member.type === 'placeholder' ? member.id : null,
+            status: 'invited' as const,
+          }))
+      );
+
+      if (newAttendees.length > 0) {
+        const { error: insertError } = await meetingsRepo.createMeetingAttendees(newAttendees);
+        if (insertError) throw insertError;
+      }
+
+      // Refetch to get updated attendee data with profiles
+      await fetchMeetings();
+
+      return true;
+    } catch (err) {
+      handleError(err, 'addAttendeesToSeries');
+      return false;
+    }
+  }, [meetings, handleError, fetchMeetings, setError]);
+
+  /**
+   * Remove an attendee from all meetings in a series
+   */
+  const removeAttendeeFromSeries = useCallback(async (
+    seriesId: string,
+    memberId: string,
+    memberType: 'user' | 'placeholder'
+  ): Promise<boolean> => {
+    try {
+      const seriesMeetingIds = meetings
+        .filter(m => m.series_id === seriesId)
+        .map(m => m.id);
+
+      if (seriesMeetingIds.length === 0) {
+        setError('No meetings found in series');
+        return false;
+      }
+
+      const { error: deleteError } = await meetingsRepo.deleteMeetingAttendees(
+        seriesMeetingIds, memberId, memberType
+      );
+
+      if (deleteError) throw deleteError;
+
+      // Update local state - remove attendee from all series meetings
+      setMeetings(prev => prev.map(meeting => {
+        if (meeting.series_id === seriesId) {
+          return {
+            ...meeting,
+            attendees: meeting.attendees?.filter(a => {
+              if (memberType === 'user') return a.user_id !== memberId;
+              return a.placeholder_id !== memberId;
+            }),
+          };
+        }
+        return meeting;
+      }));
+
+      return true;
+    } catch (err) {
+      handleError(err, 'removeAttendeeFromSeries');
+      return false;
+    }
+  }, [meetings, handleError, setError]);
+
+  /**
+   * Add co-leaders to all meetings in a series
+   */
+  const addCoLeadersToSeries = useCallback(async (
+    seriesId: string,
+    userIds: string[]
+  ): Promise<boolean> => {
+    try {
+      const seriesMeetingIds = meetings
+        .filter(m => m.series_id === seriesId)
+        .map(m => m.id);
+
+      if (seriesMeetingIds.length === 0) {
+        setError('No meetings found in series');
+        return false;
+      }
+
+      // Fetch existing co-leaders to avoid duplicates
+      const { data: existing, error: fetchError } =
+        await meetingsRepo.fetchMeetingCoLeadersByMeetings(seriesMeetingIds);
+
+      if (fetchError) throw fetchError;
+
+      const existingSet = new Set(
+        (existing || []).map((cl: any) => `${cl.meeting_id}:${cl.user_id}`)
+      );
+
+      const newCoLeaders = seriesMeetingIds.flatMap(meetingId =>
+        userIds
+          .filter(userId => !existingSet.has(`${meetingId}:${userId}`))
+          .map(userId => ({ meeting_id: meetingId, user_id: userId }))
+      );
+
+      if (newCoLeaders.length > 0) {
+        const { error: insertError } = await meetingsRepo.createMeetingCoLeaders(newCoLeaders);
+        if (insertError) throw insertError;
+      }
+
+      // Refetch to get updated data with profiles
+      await fetchMeetings();
+
+      return true;
+    } catch (err) {
+      handleError(err, 'addCoLeadersToSeries');
+      return false;
+    }
+  }, [meetings, handleError, fetchMeetings, setError]);
+
+  /**
+   * Remove a co-leader from all meetings in a series
+   */
+  const removeCoLeaderFromSeries = useCallback(async (
+    seriesId: string,
+    userId: string
+  ): Promise<boolean> => {
+    try {
+      const seriesMeetingIds = meetings
+        .filter(m => m.series_id === seriesId)
+        .map(m => m.id);
+
+      if (seriesMeetingIds.length === 0) {
+        setError('No meetings found in series');
+        return false;
+      }
+
+      const { error: deleteError } = await meetingsRepo.deleteMeetingCoLeaders(
+        seriesMeetingIds, userId
+      );
+
+      if (deleteError) throw deleteError;
+
+      // Update local state - remove co-leader from all series meetings
+      setMeetings(prev => prev.map(meeting => {
+        if (meeting.series_id === seriesId) {
+          return {
+            ...meeting,
+            co_leaders: meeting.co_leaders?.filter(cl => cl.user_id !== userId),
+          };
+        }
+        return meeting;
+      }));
+
+      return true;
+    } catch (err) {
+      handleError(err, 'removeCoLeaderFromSeries');
+      return false;
+    }
+  }, [meetings, handleError, setError]);
+
   // Fetch meetings when group changes
   useEffect(() => {
     fetchMeetings();
@@ -440,5 +660,9 @@ export function useMeetings(options?: { includePast?: boolean }): UseMeetingsRes
     getSeriesMeetings,
     skipMeeting,
     sendMeetingEmail,
+    addAttendeesToSeries,
+    removeAttendeeFromSeries,
+    addCoLeadersToSeries,
+    removeCoLeaderFromSeries,
   };
 }

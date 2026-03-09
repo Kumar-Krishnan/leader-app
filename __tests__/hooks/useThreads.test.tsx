@@ -43,7 +43,7 @@ const mockThread2 = {
 let mockAuthContext = {
   user: mockUser,
   profile: null,
-  isLeader: false,
+  isOrganizer: false,
   isAdmin: false,
 };
 
@@ -80,7 +80,7 @@ describe('useThreads', () => {
     mockAuthContext = {
       user: mockUser,
       profile: null,
-      isLeader: false,
+      isOrganizer: false,
       isAdmin: false,
     };
 

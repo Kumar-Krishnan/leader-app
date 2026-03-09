@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -14,10 +14,12 @@ import {
 } from 'react-native';
 import { DrawerContentComponentProps } from '@react-navigation/drawer';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { useGroup } from '../contexts/GroupContext';
 import { useAuth } from '../contexts/AuthContext';
 import { colors, spacing, borderRadius, fontSize, fontWeight } from '../constants/theme';
 import SendGroupEmailModal from './SendGroupEmailModal';
+import { useGroupNotifications } from '../hooks/useGroupNotifications';
 
 const ROLE_COLORS: Record<string, string> = {
   admin: colors.error.main,
@@ -36,7 +38,17 @@ const ROLE_LABELS: Record<string, string> = {
 export default function GroupSidebar(props: DrawerContentComponentProps) {
   const insets = useSafeAreaInsets();
   const { groups, currentGroup, setCurrentGroup, createGroup, requestToJoin, myPendingRequests } = useGroup();
-  const { isLeader, profile } = useAuth();
+  const { isOrganizer, profile } = useAuth();
+
+  // Notification dots
+  const { unreadGroups, pendingReminderGroups, refresh: refreshNotifications } = useGroupNotifications();
+
+  // Refresh notifications when drawer is focused
+  useFocusEffect(
+    useCallback(() => {
+      refreshNotifications();
+    }, [refreshNotifications])
+  );
 
   // Modal states
   const [showJoinModal, setShowJoinModal] = useState(false);
@@ -116,16 +128,30 @@ export default function GroupSidebar(props: DrawerContentComponentProps) {
           const roleColor = ROLE_COLORS[group.role] || ROLE_COLORS.member;
           const roleLabel = ROLE_LABELS[group.role] || group.role;
 
+          const unreadCount = unreadGroups[group.id] ?? 0;
+          const hasPendingReminder = (pendingReminderGroups[group.id] ?? 0) > 0
+            && ['leader', 'admin', 'leader-helper'].includes(group.role);
+
           return (
             <TouchableOpacity
               key={group.id}
               style={[styles.groupItem, isActive && styles.groupItemActive]}
               onPress={() => handleSelectGroup(group)}
             >
-              <View style={styles.groupIcon}>
-                <Text style={styles.groupIconText}>
-                  {group.name.charAt(0).toUpperCase()}
-                </Text>
+              <View style={styles.groupIconWrapper}>
+                <View style={styles.groupIcon}>
+                  <Text style={styles.groupIconText}>
+                    {group.name.charAt(0).toUpperCase()}
+                  </Text>
+                </View>
+                {hasPendingReminder && <View style={styles.reminderDot} />}
+                {unreadCount > 0 && (
+                  <View style={styles.unreadBadge}>
+                    <Text style={styles.unreadBadgeText}>
+                      {unreadCount > 99 ? '99+' : unreadCount}
+                    </Text>
+                  </View>
+                )}
               </View>
               <View style={styles.groupInfo}>
                 <Text style={[styles.groupName, isActive && styles.groupNameActive]} numberOfLines={1}>
@@ -192,7 +218,7 @@ export default function GroupSidebar(props: DrawerContentComponentProps) {
           <Text style={styles.joinButtonText}>Join Group</Text>
         </TouchableOpacity>
 
-        {isLeader && (
+        {isOrganizer && (
           <TouchableOpacity
             style={styles.createButton}
             onPress={() => {
@@ -371,6 +397,9 @@ const styles = StyleSheet.create({
     borderColor: colors.primary[500],
     backgroundColor: colors.accent.light,
   },
+  groupIconWrapper: {
+    position: 'relative',
+  },
   groupIcon: {
     width: 40,
     height: 40,
@@ -378,6 +407,36 @@ const styles = StyleSheet.create({
     backgroundColor: colors.neutral[700],
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  reminderDot: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: colors.error.main,
+    borderWidth: 1.5,
+    borderColor: colors.card.background,
+  },
+  unreadBadge: {
+    position: 'absolute',
+    top: -6,
+    right: -10,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: colors.warning.main,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+    borderWidth: 1.5,
+    borderColor: colors.card.background,
+  },
+  unreadBadgeText: {
+    fontSize: 10,
+    fontWeight: fontWeight.bold,
+    color: colors.text.inverse,
   },
   groupIconText: {
     fontSize: fontSize.xl,

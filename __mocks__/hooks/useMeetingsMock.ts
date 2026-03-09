@@ -27,6 +27,10 @@ export function createMockUseMeetings(
     getSeriesMeetings: jest.fn().mockReturnValue([]),
     skipMeeting: jest.fn().mockResolvedValue(true),
     sendMeetingEmail: jest.fn().mockResolvedValue(true),
+    addAttendeesToSeries: jest.fn().mockResolvedValue(true),
+    removeAttendeeFromSeries: jest.fn().mockResolvedValue(true),
+    addCoLeadersToSeries: jest.fn().mockResolvedValue(true),
+    removeCoLeaderFromSeries: jest.fn().mockResolvedValue(true),
     ...overrides,
   };
 }
@@ -106,6 +110,10 @@ export function createMockUseMeetingsWithSpies() {
     getSeriesMeetings: jest.fn().mockReturnValue([]),
     skipMeeting: jest.fn().mockResolvedValue(true),
     sendMeetingEmail: jest.fn().mockResolvedValue(true),
+    addAttendeesToSeries: jest.fn().mockResolvedValue(true),
+    removeAttendeeFromSeries: jest.fn().mockResolvedValue(true),
+    addCoLeadersToSeries: jest.fn().mockResolvedValue(true),
+    removeCoLeaderFromSeries: jest.fn().mockResolvedValue(true),
   };
 
   const mock = createMockUseMeetings(spies);

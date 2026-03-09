@@ -25,7 +25,7 @@ const mockProfile = {
   email: 'test@example.com',
   full_name: 'Test User',
   avatar_url: null,
-  role: 'user' as const,
+  role: 'standard' as const,
   notification_preferences: {
     messages: true,
     meetings: true,
@@ -73,14 +73,14 @@ import { AuthProvider, useAuth } from '../../src/contexts/AuthContext';
 
 // Test component
 const TestComponent: React.FC = () => {
-  const { user, loading, isLeader, isAdmin } = useAuth();
+  const { user, loading, isOrganizer, isAdmin } = useAuth();
   
   if (loading) return <Text testID="loading">Loading...</Text>;
   if (user) {
     return (
       <>
         <Text testID="user-email">{user.email}</Text>
-        <Text testID="is-leader">{isLeader ? 'yes' : 'no'}</Text>
+        <Text testID="is-organizer">{isOrganizer ? 'yes' : 'no'}</Text>
         <Text testID="is-admin">{isAdmin ? 'yes' : 'no'}</Text>
       </>
     );
@@ -277,7 +277,7 @@ describe('AuthContext', () => {
   });
 
   describe('role checks', () => {
-    it('should set isLeader for leader role', async () => {
+    it('should set isOrganizer for organizer role', async () => {
       mockSupabaseInstance._mocks.getSession.mockResolvedValue({
         data: { session: mockSession },
         error: null,
@@ -287,15 +287,15 @@ describe('AuthContext', () => {
         select: jest.fn().mockReturnThis(),
         eq: jest.fn().mockReturnThis(),
         single: jest.fn().mockResolvedValue({ 
-          data: { ...mockProfile, role: 'leader' }, 
-          error: null 
+          data: { ...mockProfile, role: 'organizer' },
+          error: null
         }),
       });
 
       const { getByTestId } = renderWithAuth();
 
       await waitFor(() => {
-        expect(getByTestId('is-leader').props.children).toBe('yes');
+        expect(getByTestId('is-organizer').props.children).toBe('yes');
       });
     });
 
@@ -318,7 +318,7 @@ describe('AuthContext', () => {
 
       await waitFor(() => {
         expect(getByTestId('is-admin').props.children).toBe('yes');
-        expect(getByTestId('is-leader').props.children).toBe('yes');
+        expect(getByTestId('is-organizer').props.children).toBe('yes');
       });
     });
   });

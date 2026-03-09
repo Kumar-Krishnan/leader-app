@@ -17,7 +17,7 @@ const mockProfile = {
   id: 'test-user-id',
   email: 'test@example.com',
   full_name: 'Test User',
-  role: 'leader',
+  role: 'organizer',
 };
 
 const mockGroup = {

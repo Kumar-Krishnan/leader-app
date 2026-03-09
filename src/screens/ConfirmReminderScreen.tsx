@@ -8,9 +8,10 @@ import {
   TouchableOpacity,
   ActivityIndicator,
 } from 'react-native';
-import { useRoute } from '@react-navigation/native';
+import { useRoute, useNavigation, CommonActions } from '@react-navigation/native';
 import { supabase } from '../lib/supabase';
 import { colors, spacing, borderRadius, fontSize, fontWeight } from '../constants/theme';
+import { formatDate, formatTime, formatTimezoneShort } from '../lib/formatters';
 
 interface MeetingInfo {
   meeting: {
@@ -30,6 +31,7 @@ type ScreenState = 'loading' | 'form' | 'sending' | 'success' | 'error';
 
 export default function ConfirmReminderScreen() {
   const route = useRoute();
+  const navigation = useNavigation();
   const token = (route.params as any)?.token as string | undefined;
 
   const [state, setState] = useState<ScreenState>('loading');
@@ -111,33 +113,6 @@ export default function ConfirmReminderScreen() {
     }
   };
 
-  const formatDate = (isoDate: string, tz: string) => {
-    return new Date(isoDate).toLocaleDateString('en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      timeZone: tz,
-    });
-  };
-
-  const formatTime = (isoDate: string, tz: string) => {
-    return new Date(isoDate).toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-      timeZone: tz,
-    });
-  };
-
-  const formatTzShort = (isoDate: string, tz: string) => {
-    const parts = new Intl.DateTimeFormat('en-US', {
-      timeZone: tz,
-      timeZoneName: 'short',
-    }).formatToParts(new Date(isoDate));
-    return parts.find((p) => p.type === 'timeZoneName')?.value || '';
-  };
-
   // Loading
   if (state === 'loading') {
     return (
@@ -159,6 +134,12 @@ export default function ConfirmReminderScreen() {
     );
   }
 
+  const goToApp = () => {
+    navigation.dispatch(
+      CommonActions.reset({ index: 0, routes: [{ name: 'Main' }] })
+    );
+  };
+
   // Success
   if (state === 'success') {
     return (
@@ -171,6 +152,9 @@ export default function ConfirmReminderScreen() {
         {data && (
           <Text style={styles.successMeetingTitle}>{data.meeting.title}</Text>
         )}
+        <TouchableOpacity style={styles.goToAppButton} onPress={goToApp}>
+          <Text style={styles.goToAppButtonText}>Go to App</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -181,7 +165,7 @@ export default function ConfirmReminderScreen() {
   const tz = data.resolvedTimezone;
   const formattedDate = formatDate(data.meeting.date, tz);
   const formattedTime = formatTime(data.meeting.date, tz);
-  const tzShort = formatTzShort(data.meeting.date, tz);
+  const tzShort = formatTimezoneShort(data.meeting.date, tz);
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -445,5 +429,17 @@ const styles = StyleSheet.create({
     fontWeight: fontWeight.semibold,
     color: colors.primary[500],
     marginTop: spacing.lg,
+  },
+  goToAppButton: {
+    backgroundColor: colors.primary[500],
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.xxl,
+    paddingVertical: spacing.md,
+    marginTop: spacing.xl,
+  },
+  goToAppButtonText: {
+    fontSize: fontSize.lg,
+    fontWeight: fontWeight.semibold,
+    color: colors.text.inverse,
   },
 });

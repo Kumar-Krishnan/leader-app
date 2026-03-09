@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Modal, ScrollView } from 'react-native';
 import { useGroup } from '../../contexts/GroupContext';
 import { useAuth } from '../../contexts/AuthContext';
-import { useMeetings, RSVPStatus } from '../../hooks/useMeetings';
+import { useMeetings, RSVPStatus, isUserMeetingLeader } from '../../hooks/useMeetings';
 import { MeetingWithAttendees } from '../../types/database';
 import CreateMeetingModal from '../../components/CreateMeetingModal';
 import MeetingSeriesEditorModal from '../../components/MeetingSeriesEditorModal';
@@ -11,6 +11,7 @@ import Avatar from '../../components/Avatar';
 import ScreenHeader from '../../components/ScreenHeader';
 import { showAlert, showDestructiveConfirm } from '../../lib/errors';
 import { colors, spacing, borderRadius, fontSize, fontWeight, shadows } from '../../constants/theme';
+import { formatMonthAbbrev, formatDayOfMonth, formatTime, formatDateShort } from '../../lib/formatters';
 
 // Display item can be either a single meeting or a series (represented by its next meeting)
 interface DisplayItem {
@@ -47,7 +48,7 @@ interface SeriesViewModalState {
 }
 
 export default function MeetingsScreen() {
-  const { isGroupLeader } = useGroup();
+  const { isGroupLeader, currentGroup } = useGroup();
   const { user } = useAuth();
   const [showPast, setShowPast] = useState(false);
 
@@ -65,6 +66,10 @@ export default function MeetingsScreen() {
     getSeriesMeetings,
     skipMeeting,
     sendMeetingEmail,
+    addAttendeesToSeries,
+    removeAttendeeFromSeries,
+    addCoLeadersToSeries,
+    removeCoLeaderFromSeries,
   } = useMeetings({ includePast: showPast });
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [rsvpModal, setRsvpModal] = useState<RSVPModalState>({
@@ -285,9 +290,9 @@ export default function MeetingsScreen() {
         <View style={styles.meetingHeader}>
           <View style={styles.dateBox}>
             <Text style={styles.dateMonth}>
-              {new Date(meeting.date).toLocaleDateString('en-US', { month: 'short' }).toUpperCase()}
+              {formatMonthAbbrev(meeting.date)}
             </Text>
-            <Text style={styles.dateDay}>{new Date(meeting.date).getDate()}</Text>
+            <Text style={styles.dateDay}>{formatDayOfMonth(meeting.date)}</Text>
           </View>
           <View style={styles.meetingInfo}>
             <View style={styles.titleRow}>
@@ -320,8 +325,8 @@ export default function MeetingsScreen() {
             </View>
             <Text style={styles.meetingDetails}>
               {isSeries ? 'Next: ' : ''}
-              {new Date(meeting.date).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
-              {meeting.end_date ? ` – ${new Date(meeting.end_date).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}` : ''}
+              {formatTime(meeting.date)}
+              {meeting.end_date ? ` – ${formatTime(meeting.end_date)}` : ''}
               {meeting.location ? ` • ${meeting.location}` : ''}
             </Text>
 
@@ -374,7 +379,7 @@ export default function MeetingsScreen() {
         </View>
 
         {/* Skip button for series - allows skipping upcoming meeting from main view */}
-        {isSeries && meeting.created_by === user?.id && isGroupLeader && (
+        {isSeries && isUserMeetingLeader(meeting, user?.id || '') && isGroupLeader && (
           <View style={styles.seriesSkipSection}>
             <TouchableOpacity
               style={styles.seriesSkipButton}
@@ -594,8 +599,13 @@ export default function MeetingsScreen() {
         seriesId={seriesEditorModal.seriesId}
         seriesTitle={seriesEditorModal.seriesTitle}
         meetings={seriesEditorModal.seriesId ? getSeriesMeetings(seriesEditorModal.seriesId) : []}
+        groupId={currentGroup?.id || ''}
         onUpdateMeeting={updateMeeting}
         onSkipMeeting={skipMeeting}
+        onAddAttendees={addAttendeesToSeries}
+        onRemoveAttendee={removeAttendeeFromSeries}
+        onAddCoLeaders={addCoLeadersToSeries}
+        onRemoveCoLeader={removeCoLeaderFromSeries}
         onRefresh={refetch}
       />
 
@@ -621,7 +631,7 @@ export default function MeetingsScreen() {
               <Text style={styles.seriesViewDoneButton}>Done</Text>
             </TouchableOpacity>
             <Text style={styles.seriesViewTitle}>{seriesViewModal.seriesTitle}</Text>
-            {seriesViewModal.meetings[0]?.created_by === user?.id && isGroupLeader && (
+            {seriesViewModal.meetings[0] && isUserMeetingLeader(seriesViewModal.meetings[0], user?.id || '') && isGroupLeader && (
               <TouchableOpacity
                 onPress={() => {
                   setSeriesViewModal(prev => ({ ...prev, visible: false }));
@@ -635,7 +645,7 @@ export default function MeetingsScreen() {
                 <Text style={styles.seriesViewEditButton}>Edit</Text>
               </TouchableOpacity>
             )}
-            {!(seriesViewModal.meetings[0]?.created_by === user?.id && isGroupLeader) && (
+            {!(seriesViewModal.meetings[0] && isUserMeetingLeader(seriesViewModal.meetings[0], user?.id || '') && isGroupLeader) && (
               <View style={{ width: 40 }} />
             )}
           </View>
@@ -655,24 +665,17 @@ export default function MeetingsScreen() {
                     </View>
                     <View style={styles.seriesViewMeetingInfo}>
                       <Text style={styles.seriesViewMeetingDate}>
-                        {new Date(meeting.date).toLocaleDateString('en-US', {
-                          weekday: 'short',
-                          month: 'short',
-                          day: 'numeric',
-                        })}
+                        {formatDateShort(meeting.date)}
                         {' at '}
-                        {new Date(meeting.date).toLocaleTimeString('en-US', {
-                          hour: 'numeric',
-                          minute: '2-digit',
-                        })}
-                        {meeting.end_date ? ` – ${new Date(meeting.end_date).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}` : ''}
+                        {formatTime(meeting.date)}
+                        {meeting.end_date ? ` – ${formatTime(meeting.end_date)}` : ''}
                       </Text>
                       {meeting.description && (
                         <Text style={styles.seriesViewMeetingDescription}>{meeting.description}</Text>
                       )}
                     </View>
                     {/* Action buttons for organizers */}
-                    {meeting.created_by === user?.id && isGroupLeader && (
+                    {isUserMeetingLeader(meeting, user?.id || '') && isGroupLeader && (
                       <View style={styles.seriesViewActionButtons}>
                         <TouchableOpacity
                           style={styles.seriesViewEmailButton}

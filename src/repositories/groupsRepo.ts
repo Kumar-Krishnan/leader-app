@@ -85,3 +85,15 @@ export function updateGroupTimezone(groupId: string, timezone: string) {
     .update({ timezone } as any)
     .eq('id', groupId);
 }
+
+export function getUnreadThreadGroups(userId: string) {
+  return (supabase as any).rpc('get_unread_thread_groups', {
+    p_user_id: userId,
+  });
+}
+
+export function getPendingReminderGroups(userId: string) {
+  return (supabase as any).rpc('get_pending_reminder_groups', {
+    p_user_id: userId,
+  });
+}

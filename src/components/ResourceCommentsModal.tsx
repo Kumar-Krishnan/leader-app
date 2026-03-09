@@ -17,7 +17,11 @@ import { realtimeService } from '../services/realtime';
 import { useAuth } from '../contexts/AuthContext';
 import { ResourceCommentWithUser } from '../types/database';
 import Avatar from './Avatar';
+import MentionTextInput from './MentionTextInput';
+import MentionText from './MentionText';
 import { showAlert, showDestructiveConfirm } from '../lib/errors';
+import { getTimeAgo } from '../lib/formatters';
+import { colors, spacing, borderRadius, fontSize, fontWeight } from '../constants/theme';
 
 /**
  * Props for the ResourceCommentsModal component
@@ -155,12 +159,17 @@ export default function ResourceCommentsModal({
 
     if (!confirm) return;
 
+    // Optimistically remove from UI
+    setComments(prev => prev.filter(c => c.id !== commentId));
+
     try {
       const { error } = await deleteComment(commentId);
 
       if (error) throw error;
     } catch (error) {
       console.error('[ResourceComments] Error deleting comment:', error);
+      // Reload to restore if delete failed
+      loadComments();
     }
   };
 
@@ -182,7 +191,7 @@ export default function ResourceCommentsModal({
             </Text>
             <Text style={styles.commentTime}>{timeAgo}</Text>
           </View>
-          <Text style={styles.commentText}>{item.content}</Text>
+          <MentionText text={item.content} style={styles.commentText} />
           {isOwn && (
             <TouchableOpacity
               style={styles.deleteButton}
@@ -223,7 +232,7 @@ export default function ResourceCommentsModal({
 
           {loading ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#3B82F6" />
+              <ActivityIndicator size="large" color={colors.blue[500]} />
             </View>
           ) : (
             <FlatList
@@ -235,58 +244,29 @@ export default function ResourceCommentsModal({
             />
           )}
 
-          <View style={styles.inputContainer}>
-            <Avatar
-              uri={profile?.avatar_url}
-              name={profile?.full_name}
-              size={32}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Add a comment..."
-              placeholderTextColor="#64748B"
-              value={newComment}
-              onChangeText={setNewComment}
-              multiline
-              maxLength={500}
-            />
-            <TouchableOpacity
-              style={[styles.sendButton, (!newComment.trim() || sending) && styles.sendButtonDisabled]}
-              onPress={handleSendComment}
-              disabled={!newComment.trim() || sending}
-            >
-              {sending ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <Text style={styles.sendButtonText}>↑</Text>
-              )}
-            </TouchableOpacity>
-          </View>
+          <MentionTextInput
+            value={newComment}
+            onChangeText={setNewComment}
+            placeholder="Add a comment..."
+            maxLength={500}
+            onSubmit={handleSendComment}
+            sending={sending}
+            showSendButton
+            leftElement={
+              <Avatar
+                uri={profile?.avatar_url}
+                name={profile?.full_name}
+                size={32}
+              />
+            }
+            containerStyle={styles.inputContainer}
+          />
         </View>
       </KeyboardAvoidingView>
     </Modal>
   );
 }
 
-/**
- * Formats a date as a human-readable relative time string.
- *
- * @param date - The date to format
- * @returns A string like "just now", "5m ago", "2h ago", "3d ago", or a locale date string
- */
-function getTimeAgo(date: Date): string {
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-  const diffHours = Math.floor(diffMs / 3600000);
-  const diffDays = Math.floor(diffMs / 86400000);
-
-  if (diffMins < 1) return 'just now';
-  if (diffMins < 60) return `${diffMins}m ago`;
-  if (diffHours < 24) return `${diffHours}h ago`;
-  if (diffDays < 7) return `${diffDays}d ago`;
-  return date.toLocaleDateString();
-}
 
 const styles = StyleSheet.create({
   overlay: {
@@ -295,7 +275,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   container: {
-    backgroundColor: '#1E293B',
+    backgroundColor: colors.slate[800],
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     maxHeight: '80%',
@@ -304,34 +284,34 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 20,
+    padding: spacing.xl,
     borderBottomWidth: 1,
-    borderBottomColor: '#334155',
+    borderBottomColor: colors.slate[700],
   },
   headerContent: {
     flex: 1,
   },
   title: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#F8FAFC',
+    fontSize: fontSize.xl,
+    fontWeight: fontWeight.bold,
+    color: colors.slate[50],
   },
   subtitle: {
-    fontSize: 14,
-    color: '#94A3B8',
+    fontSize: fontSize.md,
+    color: colors.slate[400],
     marginTop: 2,
   },
   closeButton: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#334155',
+    backgroundColor: colors.slate[700],
     justifyContent: 'center',
     alignItems: 'center',
   },
   closeButtonText: {
-    fontSize: 16,
-    color: '#94A3B8',
+    fontSize: fontSize.lg,
+    color: colors.slate[400],
   },
   loadingContainer: {
     flex: 1,
@@ -340,50 +320,50 @@ const styles = StyleSheet.create({
     minHeight: 200,
   },
   commentList: {
-    padding: 16,
+    padding: spacing.lg,
   },
   emptyList: {
     flex: 1,
   },
   commentRow: {
     flexDirection: 'row',
-    marginBottom: 16,
+    marginBottom: spacing.lg,
   },
   commentContent: {
     flex: 1,
-    marginLeft: 12,
-    backgroundColor: '#0F172A',
-    borderRadius: 12,
-    padding: 12,
+    marginLeft: spacing.md,
+    backgroundColor: colors.slate[900],
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
   },
   commentHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: spacing.xs,
   },
   commentAuthor: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#F8FAFC',
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.semibold,
+    color: colors.slate[50],
   },
   commentTime: {
-    fontSize: 12,
-    color: '#64748B',
+    fontSize: fontSize.sm,
+    color: colors.slate[500],
   },
   commentText: {
-    fontSize: 14,
-    color: '#CBD5E1',
+    fontSize: fontSize.md,
+    color: colors.slate[300],
     lineHeight: 20,
   },
   deleteButton: {
     alignSelf: 'flex-start',
-    marginTop: 8,
+    marginTop: spacing.sm,
   },
   deleteButtonText: {
-    fontSize: 12,
-    color: '#EF4444',
-    fontWeight: '500',
+    fontSize: fontSize.sm,
+    color: colors.red[500],
+    fontWeight: fontWeight.medium,
   },
   emptyState: {
     flex: 1,
@@ -393,54 +373,25 @@ const styles = StyleSheet.create({
   },
   emptyIcon: {
     fontSize: 48,
-    marginBottom: 12,
+    marginBottom: spacing.md,
   },
   emptyTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#F8FAFC',
-    marginBottom: 4,
+    fontSize: fontSize.lg,
+    fontWeight: fontWeight.semibold,
+    color: colors.slate[50],
+    marginBottom: spacing.xs,
   },
   emptyText: {
-    fontSize: 14,
-    color: '#94A3B8',
+    fontSize: fontSize.md,
+    color: colors.slate[400],
     textAlign: 'center',
   },
   inputContainer: {
-    flexDirection: 'row',
-    padding: 12,
-    paddingBottom: Platform.OS === 'ios' ? 28 : 12,
-    backgroundColor: '#0F172A',
+    padding: spacing.md,
+    paddingBottom: Platform.OS === 'ios' ? 28 : spacing.md,
+    backgroundColor: colors.slate[900],
     borderTopWidth: 1,
-    borderTopColor: '#334155',
-    alignItems: 'flex-end',
-    gap: 8,
-  },
-  input: {
-    flex: 1,
-    backgroundColor: '#1E293B',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    fontSize: 14,
-    color: '#F8FAFC',
-    maxHeight: 80,
-  },
-  sendButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#3B82F6',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  sendButtonDisabled: {
-    backgroundColor: '#334155',
-  },
-  sendButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '600',
+    borderTopColor: colors.slate[700],
   },
 });
 

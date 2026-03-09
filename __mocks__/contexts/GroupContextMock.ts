@@ -31,6 +31,8 @@ export interface MockGroupContextType {
   approveRequest: jest.Mock;
   rejectRequest: jest.Mock;
   updateMemberRole: jest.Mock;
+  groupMembers: any[];
+  refreshGroupMembers: jest.Mock;
 }
 
 /**
@@ -67,6 +69,8 @@ export function createMockGroupContext(
     approveRequest: jest.fn().mockResolvedValue({ error: null }),
     rejectRequest: jest.fn().mockResolvedValue({ error: null }),
     updateMemberRole: jest.fn().mockResolvedValue({ error: null }),
+    groupMembers: [],
+    refreshGroupMembers: jest.fn().mockResolvedValue(undefined),
     ...overrides,
   };
 }
@@ -163,7 +167,7 @@ export function createMockGroupContextWithPendingRequests(
         email: `user${i + 1}@example.com`,
         full_name: `User ${i + 1}`,
         avatar_url: null,
-        role: 'user' as const,
+        role: 'standard' as const,
         notification_preferences: {
           messages: true,
           meetings: true,

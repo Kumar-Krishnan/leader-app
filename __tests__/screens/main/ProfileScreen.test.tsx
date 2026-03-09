@@ -22,7 +22,7 @@ const mockProfile = {
   id: 'user-id',
   email: 'test@example.com',
   full_name: 'John Doe',
-  role: 'user' as const,
+  role: 'standard' as const,
   notification_preferences: {
     push_enabled: true,
     messages: true,
@@ -52,7 +52,7 @@ const mockAdminGroup = {
 let mockAuthContext = {
   profile: mockProfile,
   signOut: jest.fn(),
-  isLeader: false,
+  isOrganizer: false,
   isAdmin: false,
 };
 
@@ -83,7 +83,7 @@ describe('ProfileScreen', () => {
     mockAuthContext = {
       profile: mockProfile,
       signOut: jest.fn(),
-      isLeader: false,
+      isOrganizer: false,
       isAdmin: false,
     };
     
@@ -117,12 +117,12 @@ describe('ProfileScreen', () => {
     expect(getByText('Member')).toBeTruthy();
   });
 
-  it('should show Leader badge for leaders', () => {
-    mockAuthContext.isLeader = true;
+  it('should show Organizer badge for organizers', () => {
+    mockAuthContext.isOrganizer = true;
 
     const { getByText } = render(<ProfileScreen />);
 
-    expect(getByText('Leader')).toBeTruthy();
+    expect(getByText('Organizer')).toBeTruthy();
   });
 
   it('should show Admin badge for admins', () => {

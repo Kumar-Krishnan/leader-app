@@ -15,7 +15,7 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
-  isLeader: boolean;
+  isOrganizer: boolean;
   isAdmin: boolean;
   isConfigured: boolean;
 }
@@ -202,7 +202,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const isLeader = profile?.role === 'leader' || profile?.role === 'admin';
+  const isOrganizer = profile?.role === 'organizer' || profile?.role === 'admin';
   const isAdmin = profile?.role === 'admin';
 
   return (
@@ -216,7 +216,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         signIn,
         signOut,
         refreshProfile,
-        isLeader,
+        isOrganizer,
         isAdmin,
         isConfigured: isSupabaseConfigured,
       }}

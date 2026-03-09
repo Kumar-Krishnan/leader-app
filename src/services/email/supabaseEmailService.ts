@@ -5,15 +5,29 @@ export class SupabaseEmailService implements EmailService {
   async sendMeetingEmail(
     params: SendMeetingEmailParams
   ): Promise<{ success: boolean; error?: string }> {
-    const { data, error } = await supabase.functions.invoke(
-      'send-meeting-email',
-      { body: params }
-    );
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData?.session?.access_token;
 
-    if (error) {
-      return { success: false, error: error.message };
+    const url = `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/send-meeting-email`;
+    const anonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': anonKey!,
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(params),
+    });
+
+    const text = await resp.text();
+
+    if (!resp.ok) {
+      return { success: false, error: `HTTP ${resp.status}: ${text}` };
     }
 
+    const data = JSON.parse(text);
     if (data?.error) {
       return { success: false, error: data.error };
     }

@@ -1,7 +1,9 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as groupsRepo from '../repositories/groupsRepo';
+import * as membersRepo from '../repositories/membersRepo';
 import { Group, GroupRole, GroupJoinRequest, GroupJoinRequestWithDetails } from '../types/database';
+import { MemberWithProfile } from '../hooks/useGroupMembers';
 import { useAuth } from './AuthContext';
 
 interface GroupWithMembership extends Group {
@@ -27,17 +29,20 @@ interface GroupContextType {
   rejectRequest: (requestId: string) => Promise<{ error: Error | null }>;
   updateMemberRole: (memberId: string, newRole: GroupRole) => Promise<{ error: Error | null }>;
   updateGroupTimezone: (groupId: string, timezone: string) => Promise<{ error: Error | null }>;
+  groupMembers: MemberWithProfile[];
+  refreshGroupMembers: () => Promise<void>;
 }
 
 const GroupContext = createContext<GroupContextType | undefined>(undefined);
 
 export function GroupProvider({ children }: { children: React.ReactNode }) {
-  const { user, isLeader, loading: authLoading } = useAuth();
+  const { user, isOrganizer, loading: authLoading } = useAuth();
   const [groups, setGroups] = useState<GroupWithMembership[]>([]);
   const [currentGroup, setCurrentGroup] = useState<GroupWithMembership | null>(null);
   const [pendingRequests, setPendingRequests] = useState<GroupJoinRequestWithDetails[]>([]);
   const [myPendingRequests, setMyPendingRequests] = useState<GroupJoinRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [groupMembers, setGroupMembers] = useState<MemberWithProfile[]>([]);
 
   // Track if we've already loaded data for this user to prevent duplicate loads
   const [loadedUserId, setLoadedUserId] = useState<string | null>(null);
@@ -46,6 +51,38 @@ export function GroupProvider({ children }: { children: React.ReactNode }) {
   const isGroupLeader = currentGroup?.role === 'leader' || currentGroup?.role === 'admin';
   const isGroupAdmin = currentGroup?.role === 'admin';
   const canApproveRequests = currentGroup?.role === 'leader-helper' || currentGroup?.role === 'leader' || currentGroup?.role === 'admin';
+
+  const fetchGroupMembers = useCallback(async () => {
+    if (!currentGroup) {
+      setGroupMembers([]);
+      return;
+    }
+    try {
+      const { data, error } = await membersRepo.fetchMembers(currentGroup.id);
+      if (error) {
+        console.error('[GroupContext] Error fetching group members:', error);
+        setGroupMembers([]);
+        return;
+      }
+      const transformed: MemberWithProfile[] = (data || []).map((member: any) => ({
+        ...member,
+        user: member.user || null,
+        placeholder: member.placeholder || null,
+        isPlaceholder: member.placeholder_id !== null,
+        displayName: member.user?.full_name || member.placeholder?.full_name || 'Unknown',
+        displayEmail: member.user?.email || member.placeholder?.email || '',
+      }));
+      setGroupMembers(transformed);
+    } catch (err) {
+      console.error('[GroupContext] Exception fetching group members:', err);
+      setGroupMembers([]);
+    }
+  }, [currentGroup?.id]);
+
+  // Fetch group members when currentGroup changes
+  useEffect(() => {
+    fetchGroupMembers();
+  }, [fetchGroupMembers]);
 
   useEffect(() => {
     console.log('[GroupContext] useEffect triggered, authLoading:', authLoading, 'user:', user?.id, 'loadedUserId:', loadedUserId);
@@ -244,7 +281,7 @@ export function GroupProvider({ children }: { children: React.ReactNode }) {
 
   const createGroup = async (name: string, description?: string) => {
     if (!user) return { group: null, error: new Error('Not authenticated') };
-    if (!isLeader) return { group: null, error: new Error('Only leaders can create groups') };
+    if (!isOrganizer) return { group: null, error: new Error('Only leaders can create groups') };
 
     try {
       // Generate a random 6-character code
@@ -360,6 +397,8 @@ export function GroupProvider({ children }: { children: React.ReactNode }) {
         rejectRequest,
         updateMemberRole,
         updateGroupTimezone,
+        groupMembers,
+        refreshGroupMembers: fetchGroupMembers,
       }}
     >
       {children}

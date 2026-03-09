@@ -550,6 +550,12 @@ serve(async (req) => {
       })
       .filter((r): r is { email: string; name: string | null } => r !== null);
 
+    // Include the meeting organizer so they also get the reminder
+    const organizerEmail = typedMeeting.profiles.email;
+    if (organizerEmail && !recipients.some((r) => r.email === organizerEmail)) {
+      recipients.push({ email: organizerEmail, name: typedMeeting.profiles.full_name });
+    }
+
     console.log(`Meeting ${typedMeeting.id}: ${attendeeCount} attendees, ${recipients.length} with email`);
 
     const wantsJson = req.headers.get('accept')?.includes('application/json');
@@ -619,6 +625,37 @@ serve(async (req) => {
 
       if (currentToken?.confirmed_at) {
         return errorResponse(req, 409, 'Already Sent', 'The reminder for this meeting has already been sent.');
+      }
+
+      // Check if ANY token for this meeting already sent attendee emails (another co-leader beat us)
+      const { data: otherSentTokens } = await supabase
+        .from('meeting_reminder_tokens')
+        .select('id')
+        .eq('meeting_id', typedToken.meeting_id)
+        .not('attendee_email_sent_at', 'is', null)
+        .limit(1);
+
+      if (otherSentTokens && otherSentTokens.length > 0) {
+        // Mark this token as confirmed but skip sending emails
+        await supabase
+          .from('meeting_reminder_tokens')
+          .update({
+            custom_description: customDescription,
+            custom_message: customMessage,
+            confirmed_at: new Date().toISOString(),
+          })
+          .eq('id', typedToken.id);
+
+        if (wantsJson) {
+          return new Response(
+            JSON.stringify({ success: true, message: 'Reminders already sent by another co-leader', attendeeCount: 0 }),
+            { status: 200, headers: jsonHeaders }
+          );
+        }
+        return new Response(
+          renderErrorPage('Already Sent', 'Another co-leader has already sent the reminder emails for this meeting.'),
+          { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' } }
+        );
       }
 
       // Update token with custom content and confirmed_at

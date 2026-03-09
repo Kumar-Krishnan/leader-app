@@ -307,21 +307,6 @@ serve(async (req) => {
 
     for (const meeting of meetings) {
       try {
-        // Check if token already exists for this meeting
-        const { data: existingToken } = await supabase
-          .from('meeting_reminder_tokens')
-          .select('id, reminder_sent_at')
-          .eq('meeting_id', meeting.id)
-          .single();
-
-        if (existingToken?.reminder_sent_at) {
-          console.log(
-            `Skipping meeting ${meeting.id}: reminder already sent`
-          );
-          skipped++;
-          continue;
-        }
-
         // Get attendee count
         const { count: attendeeCount } = await supabase
           .from('meeting_attendees')
@@ -329,131 +314,178 @@ serve(async (req) => {
           .eq('meeting_id', meeting.id)
           .in('status', ['invited', 'accepted']);
 
-        // Generate secure token
-        const token = generateSecureToken();
-        const expiresAt = new Date(
-          now.getTime() + 7 * 24 * 60 * 60 * 1000
-        ).toISOString(); // 7 days
+        // Build list of leaders: creator + co-leaders
+        const { data: coLeaders } = await supabase
+          .from('meeting_co_leaders')
+          .select('user_id, profiles:profiles!meeting_co_leaders_user_id_fkey(email, full_name)')
+          .eq('meeting_id', meeting.id);
 
-        // Create or update token record
-        const tokenData = {
-          meeting_id: meeting.id,
-          leader_id: meeting.created_by,
-          token,
-          expires_at: expiresAt,
-          reminder_sent_at: null as string | null,
-        };
-
-        let tokenRecord;
-        if (existingToken) {
-          // Update existing token
-          const { data, error } = await supabase
-            .from('meeting_reminder_tokens')
-            .update({ token, expires_at: expiresAt })
-            .eq('id', existingToken.id)
-            .select()
-            .single();
-
-          if (error) throw error;
-          tokenRecord = data;
-        } else {
-          // Insert new token
-          const { data, error } = await supabase
-            .from('meeting_reminder_tokens')
-            .insert(tokenData)
-            .select()
-            .single();
-
-          if (error) throw error;
-          tokenRecord = data;
+        interface LeaderInfo {
+          id: string;
+          email: string;
+          full_name: string | null;
         }
 
-        // Build confirmation URL - link to the app, not the edge function
-        const appUrl = Deno.env.get('APP_URL') || 'https://leader-app.netlify.app';
-        const confirmationUrl = `${appUrl}/confirm-reminder?token=${token}`;
+        const creatorProfile = meeting.profiles as { email: string; full_name: string | null };
+        const allLeaders: LeaderInfo[] = [
+          { id: meeting.created_by, email: creatorProfile.email, full_name: creatorProfile.full_name },
+        ];
 
-        // Prepare meeting data for email
+        for (const cl of coLeaders || []) {
+          const profile = cl.profiles as { email: string; full_name: string | null } | null;
+          if (profile?.email) {
+            allLeaders.push({ id: cl.user_id, email: profile.email, full_name: profile.full_name });
+          }
+        }
+
+        // Prepare meeting data for email template
         const groupData = meeting.groups as { name: string; timezone: string | null };
         const resolvedTimezone = (meeting as any).timezone || groupData.timezone || 'America/New_York';
-        const meetingWithDetails: MeetingWithDetails = {
-          ...meeting,
-          group: groupData,
-          leader: meeting.profiles as { email: string; full_name: string | null },
-          attendee_count: attendeeCount || 0,
-          resolvedTimezone,
-        };
-
-        // Generate email content
-        const htmlContent = generateLeaderReminderHtml(
-          meetingWithDetails,
-          confirmationUrl
-        );
-        const textContent = generateLeaderReminderText(
-          meetingWithDetails,
-          confirmationUrl
-        );
-
         const dateShort = formatDateShort(meeting.date, resolvedTimezone);
+        const appUrl = Deno.env.get('APP_URL') || 'https://leader-app.netlify.app';
 
-        // Send email via SendGrid
-        const sendgridResponse = await fetch(
-          'https://api.sendgrid.com/v3/mail/send',
-          {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${sendgridApiKey}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              personalizations: [
-                {
-                  to: [
+        // Process each leader (creator + co-leaders)
+        for (const leader of allLeaders) {
+          try {
+            // Check if token already exists for this meeting+leader
+            const { data: existingToken } = await supabase
+              .from('meeting_reminder_tokens')
+              .select('id, reminder_sent_at')
+              .eq('meeting_id', meeting.id)
+              .eq('leader_id', leader.id)
+              .single();
+
+            if (existingToken?.reminder_sent_at) {
+              console.log(
+                `Skipping meeting ${meeting.id} for leader ${leader.id}: reminder already sent`
+              );
+              skipped++;
+              continue;
+            }
+
+            // Generate secure token
+            const token = generateSecureToken();
+            const expiresAt = new Date(
+              now.getTime() + 7 * 24 * 60 * 60 * 1000
+            ).toISOString(); // 7 days
+
+            let tokenRecord;
+            if (existingToken) {
+              // Update existing token
+              const { data, error } = await supabase
+                .from('meeting_reminder_tokens')
+                .update({ token, expires_at: expiresAt })
+                .eq('id', existingToken.id)
+                .select()
+                .single();
+
+              if (error) throw error;
+              tokenRecord = data;
+            } else {
+              // Insert new token
+              const { data, error } = await supabase
+                .from('meeting_reminder_tokens')
+                .insert({
+                  meeting_id: meeting.id,
+                  leader_id: leader.id,
+                  token,
+                  expires_at: expiresAt,
+                  reminder_sent_at: null as string | null,
+                })
+                .select()
+                .single();
+
+              if (error) throw error;
+              tokenRecord = data;
+            }
+
+            // Build confirmation URL
+            const confirmationUrl = `${appUrl}/confirm-reminder?token=${token}`;
+
+            const meetingWithDetails: MeetingWithDetails = {
+              ...meeting,
+              group: groupData,
+              leader: { email: leader.email, full_name: leader.full_name },
+              attendee_count: attendeeCount || 0,
+              resolvedTimezone,
+            };
+
+            // Generate email content
+            const htmlContent = generateLeaderReminderHtml(
+              meetingWithDetails,
+              confirmationUrl
+            );
+            const textContent = generateLeaderReminderText(
+              meetingWithDetails,
+              confirmationUrl
+            );
+
+            // Send email via SendGrid
+            const sendgridResponse = await fetch(
+              'https://api.sendgrid.com/v3/mail/send',
+              {
+                method: 'POST',
+                headers: {
+                  Authorization: `Bearer ${sendgridApiKey}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  personalizations: [
                     {
-                      email: meetingWithDetails.leader.email,
-                      name: meetingWithDetails.leader.full_name || undefined,
+                      to: [
+                        {
+                          email: leader.email,
+                          name: leader.full_name || undefined,
+                        },
+                      ],
                     },
                   ],
-                },
-              ],
-              from: {
-                email: fromEmail,
-                name: fromName,
-              },
-              subject: `[Action Required] Confirm reminder for "${meeting.title}" - ${dateShort}`,
-              content: [
-                {
-                  type: 'text/plain',
-                  value: textContent,
-                },
-                {
-                  type: 'text/html',
-                  value: htmlContent,
-                },
-              ],
-            }),
+                  from: {
+                    email: fromEmail,
+                    name: fromName,
+                  },
+                  subject: `[Action Required] Confirm reminder for "${meeting.title}" - ${dateShort}`,
+                  content: [
+                    {
+                      type: 'text/plain',
+                      value: textContent,
+                    },
+                    {
+                      type: 'text/html',
+                      value: htmlContent,
+                    },
+                  ],
+                }),
+              }
+            );
+
+            if (!sendgridResponse.ok) {
+              const errorBody = await sendgridResponse.text();
+              console.error(
+                `SendGrid error for meeting ${meeting.id}, leader ${leader.id}:`,
+                sendgridResponse.status,
+                errorBody
+              );
+              throw new Error(`SendGrid API error: ${sendgridResponse.status}`);
+            }
+
+            // Update token with reminder_sent_at
+            await supabase
+              .from('meeting_reminder_tokens')
+              .update({ reminder_sent_at: new Date().toISOString() })
+              .eq('id', tokenRecord.id);
+
+            console.log(
+              `Sent reminder for meeting ${meeting.id} to ${leader.email}`
+            );
+            processed++;
+          } catch (leaderError) {
+            console.error(`Error processing leader ${leader.id} for meeting ${meeting.id}:`, leaderError);
+            errors.push(
+              `Meeting ${meeting.id}, Leader ${leader.id}: ${leaderError instanceof Error ? leaderError.message : 'Unknown error'}`
+            );
           }
-        );
-
-        if (!sendgridResponse.ok) {
-          const errorBody = await sendgridResponse.text();
-          console.error(
-            `SendGrid error for meeting ${meeting.id}:`,
-            sendgridResponse.status,
-            errorBody
-          );
-          throw new Error(`SendGrid API error: ${sendgridResponse.status}`);
         }
-
-        // Update token with reminder_sent_at
-        await supabase
-          .from('meeting_reminder_tokens')
-          .update({ reminder_sent_at: new Date().toISOString() })
-          .eq('id', tokenRecord.id);
-
-        console.log(
-          `Sent reminder for meeting ${meeting.id} to ${meetingWithDetails.leader.email}`
-        );
-        processed++;
       } catch (error) {
         console.error(`Error processing meeting ${meeting.id}:`, error);
         errors.push(

@@ -106,6 +106,43 @@ export const colors = {
     main: '#F9C80E',
     light: 'rgba(249, 200, 14, 0.2)',
   },
+
+  // ── Tailwind Slate palette ──────────────────────────────────────
+  // Used by modals, thread UI, and most newer components.
+  slate: {
+    50: '#F8FAFC',
+    100: '#F1F5F9',
+    200: '#E2E8F0',
+    300: '#CBD5E1',
+    400: '#94A3B8',
+    500: '#64748B',
+    600: '#475569',
+    700: '#334155',
+    800: '#1E293B',
+    900: '#0F172A',
+  },
+
+  blue: {
+    400: '#60A5FA',
+    500: '#3B82F6',
+    600: '#2563EB',
+  },
+
+  red: {
+    400: '#F87171',
+    500: '#EF4444',
+    600: '#DC2626',
+  },
+
+  amber: {
+    500: '#F59E0B',
+    600: '#D97706',
+  },
+
+  violet: {
+    400: '#A78BFA',
+    600: '#7C3AED',
+  },
 };
 
 export const spacing = {

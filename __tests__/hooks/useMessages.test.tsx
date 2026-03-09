@@ -22,7 +22,7 @@ const mockMessage = {
     id: 'user-id',
     email: 'test@example.com',
     full_name: 'Test User',
-    role: 'user',
+    role: 'standard',
   },
 };
 

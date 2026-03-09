@@ -9,27 +9,23 @@ import {
   ScrollView,
   ActivityIndicator,
   Platform,
-  FlatList,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useAuth } from '../contexts/AuthContext';
 import { useGroup } from '../contexts/GroupContext';
-import { fetchMembers } from '../repositories/membersRepo';
-import { createMeetings, createMeetingAttendees } from '../repositories/meetingsRepo';
-import { Profile, PlaceholderProfile } from '../types/database';
+import { createMeetings, createMeetingAttendees, createMeetingCoLeaders } from '../repositories/meetingsRepo';
+import { InvitableMember } from '../types/members';
+import { useInvitableMembers } from '../hooks/useInvitableMembers';
+import { formatDateNoYear, formatDateForInput } from '../lib/formatters';
+import { colors, spacing, borderRadius, fontSize, fontWeight } from '../constants/theme';
+import MemberCheckList from './MemberCheckList';
+import TimePicker, { timeLabel } from './TimePicker';
+import TimezonePicker from './TimezonePicker';
+import RecurrencePicker, { RecurrenceType } from './RecurrencePicker';
 
 interface SeriesInfo {
   seriesId: string;
   seriesTitle: string;
-}
-
-/** Member that can be invited (either real user or placeholder) */
-interface InvitableMember {
-  id: string;
-  type: 'user' | 'placeholder';
-  displayName: string;
-  email: string;
-  avatarUrl?: string | null;
 }
 
 interface Props {
@@ -37,55 +33,6 @@ interface Props {
   onClose: () => void;
   onCreated: (seriesInfo?: SeriesInfo) => void;
 }
-
-type RecurrenceType = 'none' | 'weekly' | 'biweekly' | 'monthly';
-
-// ── Timezone options ─────────────────────────────────────────────────
-
-export const TIMEZONE_OPTIONS = [
-  { label: 'Eastern', value: 'America/New_York' },
-  { label: 'Central', value: 'America/Chicago' },
-  { label: 'Mountain', value: 'America/Denver' },
-  { label: 'Pacific', value: 'America/Los_Angeles' },
-  { label: 'Alaska', value: 'America/Anchorage' },
-  { label: 'Hawaii', value: 'Pacific/Honolulu' },
-  { label: 'GMT/London', value: 'Europe/London' },
-  { label: 'Central Europe', value: 'Europe/Paris' },
-  { label: 'Japan', value: 'Asia/Tokyo' },
-  { label: 'Australia East', value: 'Australia/Sydney' },
-] as const;
-
-function timezoneLabel(value: string): string {
-  return TIMEZONE_OPTIONS.find(tz => tz.value === value)?.label ?? value;
-}
-
-// ── Time option helpers ──────────────────────────────────────────────
-
-interface TimeOption {
-  minutes: number; // minutes since midnight (0–1425)
-  label: string;   // e.g. "9:00pm"
-}
-
-function buildTimeOptions(): TimeOption[] {
-  const options: TimeOption[] = [];
-  for (let m = 0; m < 24 * 60; m += 15) {
-    const h24 = Math.floor(m / 60);
-    const min = m % 60;
-    const period = h24 < 12 ? 'am' : 'pm';
-    const h12 = h24 === 0 ? 12 : h24 > 12 ? h24 - 12 : h24;
-    options.push({ minutes: m, label: `${h12}:${String(min).padStart(2, '0')}${period}` });
-  }
-  return options;
-}
-
-const TIME_OPTIONS = buildTimeOptions();
-
-function timeLabel(minutes: number | null): string {
-  if (minutes === null) return '';
-  return TIME_OPTIONS.find(t => t.minutes === minutes)?.label ?? '';
-}
-
-// ── Component ────────────────────────────────────────────────────────
 
 export default function CreateMeetingModal({ visible, onClose, onCreated }: Props) {
   const { user } = useAuth();
@@ -97,17 +44,14 @@ export default function CreateMeetingModal({ visible, onClose, onCreated }: Prop
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Timezone state
+  // Timezone
   const [timezone, setTimezone] = useState(
     currentGroup?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone
   );
-  const [showTimezonePicker, setShowTimezonePicker] = useState(false);
 
-  // Time state
+  // Time
   const [startMinutes, setStartMinutes] = useState<number | null>(null);
   const [endMinutes, setEndMinutes] = useState<number | null>(null);
-  const [activeDropdown, setActiveDropdown] = useState<'start' | 'end' | null>(null);
-  const timeListRef = useRef<FlatList>(null);
   const timeSelected = startMinutes !== null;
 
   // Date picker (native)
@@ -119,9 +63,9 @@ export default function CreateMeetingModal({ visible, onClose, onCreated }: Prop
   const [recurrenceCount, setRecurrenceCount] = useState('4');
 
   // Members
-  const [groupMembers, setGroupMembers] = useState<InvitableMember[]>([]);
+  const { members: groupMembers, loading: loadingMembers, refetch: fetchGroupMembers } = useInvitableMembers(currentGroup?.id);
   const [selectedMembers, setSelectedMembers] = useState<Set<string>>(new Set());
-  const [loadingMembers, setLoadingMembers] = useState(false);
+  const [selectedCoLeaders, setSelectedCoLeaders] = useState<Set<string>>(new Set());
 
   // ── Reset on open ────────────────────────────────────────────────
 
@@ -133,52 +77,21 @@ export default function CreateMeetingModal({ visible, onClose, onCreated }: Prop
       setSelectedDate(d);
       setStartMinutes(null);
       setEndMinutes(null);
-      setActiveDropdown(null);
       setRecurrence('none');
       setRecurrenceCount('4');
       setTimezone(currentGroup.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone);
-      setShowTimezonePicker(false);
     }
   }, [visible, currentGroup]);
 
-  // ── Members ──────────────────────────────────────────────────────
-
-  const fetchGroupMembers = async () => {
-    if (!currentGroup) return;
-    setLoadingMembers(true);
-    try {
-      const { data, error } = await fetchMembers(currentGroup.id);
-
-      if (error) throw error;
-
-      const members: InvitableMember[] = [];
-      for (const item of (data || []) as any[]) {
-        if (item.user_id && item.user) {
-          members.push({
-            id: item.user_id,
-            type: 'user',
-            displayName: item.user.full_name || item.user.email,
-            email: item.user.email,
-            avatarUrl: item.user.avatar_url,
-          });
-        } else if (item.placeholder_id && item.placeholder) {
-          members.push({
-            id: item.placeholder_id,
-            type: 'placeholder',
-            displayName: item.placeholder.full_name,
-            email: item.placeholder.email,
-            avatarUrl: null,
-          });
-        }
-      }
-      setGroupMembers(members);
-      setSelectedMembers(new Set(members.map(m => m.id)));
-    } catch (err) {
-      console.error('Error fetching group members:', err);
-    } finally {
-      setLoadingMembers(false);
+  // Select all members once they load
+  useEffect(() => {
+    if (groupMembers.length > 0 && visible) {
+      setSelectedMembers(new Set(groupMembers.map(m => m.id)));
+      setSelectedCoLeaders(new Set());
     }
-  };
+  }, [groupMembers, visible]);
+
+  // ── Members ──────────────────────────────────────────────────────
 
   const toggleMember = (id: string) => {
     setSelectedMembers(prev => {
@@ -190,6 +103,34 @@ export default function CreateMeetingModal({ visible, onClose, onCreated }: Prop
 
   const selectAll = () => setSelectedMembers(new Set(groupMembers.map(m => m.id)));
   const selectNone = () => setSelectedMembers(new Set());
+
+  const eligibleCoLeaders = groupMembers.filter(
+    m => m.type === 'user' && m.id !== user?.id &&
+    ['leader', 'leader-helper', 'admin'].includes(m.groupRole || '')
+  );
+
+  const toggleCoLeader = (id: string) => {
+    setSelectedCoLeaders(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  // ── Time callbacks ─────────────────────────────────────────────
+
+  const handleStartChange = (minutes: number) => {
+    setStartMinutes(minutes);
+    const autoEnd = (minutes + 60) % (24 * 60);
+    setEndMinutes(autoEnd);
+    const d = new Date(selectedDate);
+    d.setHours(Math.floor(minutes / 60), minutes % 60, 0, 0);
+    setSelectedDate(d);
+  };
+
+  const handleEndChange = (minutes: number) => {
+    setEndMinutes(minutes);
+  };
 
   // ── Date helpers ─────────────────────────────────────────────────
 
@@ -223,63 +164,6 @@ export default function CreateMeetingModal({ visible, onClose, onCreated }: Prop
     setSelectedDate(nd);
   };
 
-  const formatDateForInput = (date: Date) => {
-    const y = date.getFullYear();
-    const m = String(date.getMonth() + 1).padStart(2, '0');
-    const d = String(date.getDate()).padStart(2, '0');
-    return `${y}-${m}-${d}`;
-  };
-
-  // ── Time dropdown ────────────────────────────────────────────────
-
-  const openDropdown = (which: 'start' | 'end') => {
-    setActiveDropdown(which);
-    setTimeout(() => {
-      const current = which === 'start' ? startMinutes : endMinutes;
-      const target = current ?? 19 * 60; // default scroll near 7pm
-      const idx = TIME_OPTIONS.findIndex(t => t.minutes >= target);
-      if (idx >= 0 && timeListRef.current) {
-        timeListRef.current.scrollToIndex({ index: Math.max(0, idx - 2), animated: false });
-      }
-    }, 100);
-  };
-
-  const onTimeSelect = (minutes: number) => {
-    if (activeDropdown === 'start') {
-      setStartMinutes(minutes);
-      // Auto-set end to start + 60 min (wrap at midnight)
-      const autoEnd = (minutes + 60) % (24 * 60);
-      setEndMinutes(autoEnd);
-      // Update selectedDate
-      const d = new Date(selectedDate);
-      d.setHours(Math.floor(minutes / 60), minutes % 60, 0, 0);
-      setSelectedDate(d);
-    } else {
-      setEndMinutes(minutes);
-    }
-    setActiveDropdown(null);
-  };
-
-  // Filter end-time options: show times after start (with wrap)
-  const dropdownOptions = activeDropdown === 'end' && startMinutes !== null
-    ? TIME_OPTIONS.filter(t => t.minutes > startMinutes)
-    : TIME_OPTIONS;
-
-  const renderTimeRow = ({ item }: { item: TimeOption }) => {
-    const current = activeDropdown === 'start' ? startMinutes : endMinutes;
-    const isActive = item.minutes === current;
-    return (
-      <TouchableOpacity
-        style={[styles.dropdownItem, isActive && styles.dropdownItemActive]}
-        onPress={() => onTimeSelect(item.minutes)}
-      >
-        <Text style={[styles.dropdownItemText, isActive && styles.dropdownItemTextActive]}>
-          {item.label}
-        </Text>
-      </TouchableOpacity>
-    );
-  };
-
   // ── Create / Close ───────────────────────────────────────────────
 
   const handleCreate = async () => {
@@ -300,7 +184,6 @@ export default function CreateMeetingModal({ visible, onClose, onCreated }: Prop
       const eventDates = generateRecurringDates(selectedDate, recurrence, count);
       const seriesId = recurrence !== 'none' ? crypto.randomUUID() : null;
 
-      // Build end_date from endMinutes relative to each event's start date
       const eventsToCreate = eventDates.map((eventDate, index) => {
         const base: any = {
           title: title.trim(),
@@ -319,7 +202,6 @@ export default function CreateMeetingModal({ visible, onClose, onCreated }: Prop
         if (endMinutes !== null) {
           const endDate = new Date(eventDate);
           endDate.setHours(Math.floor(endMinutes / 60), endMinutes % 60, 0, 0);
-          // If end is before start (e.g. past midnight), push to next day
           if (endDate <= eventDate) endDate.setDate(endDate.getDate() + 1);
           base.end_date = endDate.toISOString();
         }
@@ -327,7 +209,6 @@ export default function CreateMeetingModal({ visible, onClose, onCreated }: Prop
       });
 
       const { data: meetings, error: meetingError } = await createMeetings(eventsToCreate);
-
       if (meetingError) throw meetingError;
 
       if (selectedMembers.size > 0 && meetings) {
@@ -350,9 +231,21 @@ export default function CreateMeetingModal({ visible, onClose, onCreated }: Prop
         }
       }
 
-      const seriesInfo = seriesId ? { seriesId, seriesTitle: title.trim() } : undefined;
+      if (selectedCoLeaders.size > 0 && meetings) {
+        const allCoLeaders = (meetings as any[]).flatMap((meeting: any) =>
+          Array.from(selectedCoLeaders).map(userId => ({
+            meeting_id: meeting.id,
+            user_id: userId,
+          }))
+        );
 
-      // Reset
+        if (allCoLeaders.length > 0) {
+          const { error: coLeadersError } = await createMeetingCoLeaders(allCoLeaders);
+          if (coLeadersError) throw coLeadersError;
+        }
+      }
+
+      const seriesInfo = seriesId ? { seriesId, seriesTitle: title.trim() } : undefined;
       resetForm();
       onCreated(seriesInfo);
       onClose();
@@ -373,13 +266,12 @@ export default function CreateMeetingModal({ visible, onClose, onCreated }: Prop
     setLocation('');
     setStartMinutes(null);
     setEndMinutes(null);
-    setActiveDropdown(null);
     setRecurrence('none');
     setRecurrenceCount('4');
     setTimezone(currentGroup?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone);
-    setShowTimezonePicker(false);
     setError('');
     setSelectedMembers(new Set());
+    setSelectedCoLeaders(new Set());
   };
 
   const handleClose = () => {
@@ -397,7 +289,6 @@ export default function CreateMeetingModal({ visible, onClose, onCreated }: Prop
       onRequestClose={handleClose}
     >
       <View style={styles.container}>
-        {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={handleClose}>
             <Text style={styles.cancelButton}>Cancel</Text>
@@ -405,7 +296,7 @@ export default function CreateMeetingModal({ visible, onClose, onCreated }: Prop
           <Text style={styles.headerTitle}>New Event</Text>
           <TouchableOpacity onPress={handleCreate} disabled={loading}>
             {loading ? (
-              <ActivityIndicator size="small" color="#3B82F6" />
+              <ActivityIndicator size="small" color={colors.blue[500]} />
             ) : (
               <Text style={styles.createButton}>Create</Text>
             )}
@@ -425,7 +316,7 @@ export default function CreateMeetingModal({ visible, onClose, onCreated }: Prop
             <TextInput
               style={styles.input}
               placeholder="Event title"
-              placeholderTextColor="#64748B"
+              placeholderTextColor={colors.slate[500]}
               value={title}
               onChangeText={setTitle}
             />
@@ -433,14 +324,14 @@ export default function CreateMeetingModal({ visible, onClose, onCreated }: Prop
             <TextInput
               style={[styles.input, styles.textArea]}
               placeholder="Description (optional)"
-              placeholderTextColor="#64748B"
+              placeholderTextColor={colors.slate[500]}
               value={description}
               onChangeText={setDescription}
               multiline
               numberOfLines={3}
             />
 
-            {/* ── Date ── */}
+            {/* Date */}
             <Text style={styles.fieldLabel}>Date</Text>
             {Platform.OS === 'web' ? (
               <View style={styles.dateFieldWeb}>
@@ -468,40 +359,20 @@ export default function CreateMeetingModal({ visible, onClose, onCreated }: Prop
                 onPress={() => setShowDatePicker(true)}
               >
                 <Text style={styles.pickerButtonText}>
-                  {selectedDate.toLocaleDateString('en-US', {
-                    weekday: 'long',
-                    month: 'long',
-                    day: 'numeric',
-                  })}
+                  {formatDateNoYear(selectedDate)}
                 </Text>
               </TouchableOpacity>
             )}
 
-            {/* ── Time ── */}
+            {/* Time */}
             <Text style={styles.fieldLabel}>Time</Text>
-            <View style={styles.timeRow}>
-              <TouchableOpacity
-                style={[styles.timeChip, activeDropdown === 'start' && styles.timeChipActive]}
-                onPress={() => openDropdown('start')}
-              >
-                <Text style={[styles.timeChipText, !timeSelected && styles.timeChipPlaceholder]}>
-                  {timeSelected ? timeLabel(startMinutes) : 'Start'}
-                </Text>
-              </TouchableOpacity>
+            <TimePicker
+              startMinutes={startMinutes}
+              endMinutes={endMinutes}
+              onStartChange={handleStartChange}
+              onEndChange={handleEndChange}
+            />
 
-              <Text style={styles.timeDash}>–</Text>
-
-              <TouchableOpacity
-                style={[styles.timeChip, activeDropdown === 'end' && styles.timeChipActive]}
-                onPress={() => openDropdown('end')}
-              >
-                <Text style={[styles.timeChipText, endMinutes === null && styles.timeChipPlaceholder]}>
-                  {endMinutes !== null ? timeLabel(endMinutes) : 'End'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Native date picker */}
             {showDatePicker && Platform.OS !== 'web' && (
               <DateTimePicker
                 value={selectedDate}
@@ -511,94 +382,28 @@ export default function CreateMeetingModal({ visible, onClose, onCreated }: Prop
               />
             )}
 
-            {/* Time dropdown (shared for start / end) */}
-            {activeDropdown && (
-              <View style={styles.dropdownContainer}>
-                <FlatList
-                  ref={timeListRef}
-                  data={dropdownOptions}
-                  renderItem={renderTimeRow}
-                  keyExtractor={(item) => String(item.minutes)}
-                  style={styles.dropdownList}
-                  getItemLayout={(_, index) => ({ length: 44, offset: 44 * index, index })}
-                  onScrollToIndexFailed={() => {}}
-                />
-              </View>
-            )}
-
             {/* Timezone */}
             <Text style={styles.fieldLabel}>Timezone</Text>
-            <TouchableOpacity
-              style={[styles.pickerButton, showTimezonePicker && { borderColor: '#3B82F6' }]}
-              onPress={() => setShowTimezonePicker(!showTimezonePicker)}
-            >
-              <Text style={styles.pickerButtonText}>{timezoneLabel(timezone)}</Text>
-            </TouchableOpacity>
-
-            {showTimezonePicker && (
-              <View style={styles.dropdownContainer}>
-                <ScrollView style={styles.dropdownList} nestedScrollEnabled>
-                  {TIMEZONE_OPTIONS.map((tz) => (
-                    <TouchableOpacity
-                      key={tz.value}
-                      style={[styles.dropdownItem, timezone === tz.value && styles.dropdownItemActive]}
-                      onPress={() => {
-                        setTimezone(tz.value);
-                        setShowTimezonePicker(false);
-                      }}
-                    >
-                      <Text style={[styles.dropdownItemText, timezone === tz.value && styles.dropdownItemTextActive]}>
-                        {tz.label}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-            )}
+            <TimezonePicker value={timezone} onChange={setTimezone} />
 
             {/* Recurrence */}
-            <View style={styles.recurrenceSection}>
-              <Text style={styles.fieldLabel}>Repeat</Text>
-              <View style={styles.recurrenceOptions}>
-                {(['none', 'weekly', 'biweekly', 'monthly'] as const).map(type => (
-                  <TouchableOpacity
-                    key={type}
-                    style={[styles.recurrenceOption, recurrence === type && styles.recurrenceOptionActive]}
-                    onPress={() => setRecurrence(type)}
-                  >
-                    <Text style={[styles.recurrenceOptionText, recurrence === type && styles.recurrenceOptionTextActive]}>
-                      {type === 'none' ? 'Once' : type === 'biweekly' ? 'Bi-weekly' : type.charAt(0).toUpperCase() + type.slice(1)}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              {recurrence !== 'none' && (
-                <View style={styles.recurrenceCountRow}>
-                  <Text style={styles.recurrenceCountLabel}>Number of occurrences:</Text>
-                  <TextInput
-                    style={styles.recurrenceCountInput}
-                    placeholder="4"
-                    placeholderTextColor="#64748B"
-                    value={recurrenceCount}
-                    onChangeText={setRecurrenceCount}
-                    keyboardType="number-pad"
-                    maxLength={2}
-                  />
-                </View>
-              )}
-            </View>
+            <RecurrencePicker
+              recurrence={recurrence}
+              onRecurrenceChange={setRecurrence}
+              count={recurrenceCount}
+              onCountChange={setRecurrenceCount}
+            />
 
             <TextInput
               style={styles.input}
               placeholder="Location (optional)"
-              placeholderTextColor="#64748B"
+              placeholderTextColor={colors.slate[500]}
               value={location}
               onChangeText={setLocation}
             />
           </View>
 
-          {/* ── Invite Members ── */}
+          {/* Invite Members */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Invite Members</Text>
@@ -612,267 +417,104 @@ export default function CreateMeetingModal({ visible, onClose, onCreated }: Prop
               </View>
             </View>
 
-            {loadingMembers ? (
-              <ActivityIndicator size="small" color="#3B82F6" style={styles.loadingMembers} />
-            ) : (
-              <View style={styles.membersList}>
-                {groupMembers.map((member) => (
-                  <TouchableOpacity
-                    key={member.id}
-                    style={[styles.memberItem, selectedMembers.has(member.id) && styles.memberItemSelected]}
-                    onPress={() => toggleMember(member.id)}
-                  >
-                    {member.type === 'placeholder' ? (
-                      <View style={styles.placeholderAvatar}>
-                        <Text style={styles.placeholderAvatarText}>?</Text>
-                      </View>
-                    ) : (
-                      <View style={styles.memberAvatar}>
-                        <Text style={styles.memberAvatarText}>
-                          {member.displayName?.[0] || member.email[0].toUpperCase()}
-                        </Text>
-                      </View>
-                    )}
-                    <View style={styles.memberInfo}>
-                      <View style={styles.memberNameRow}>
-                        <Text style={styles.memberName}>{member.displayName}</Text>
-                        {member.type === 'placeholder' && (
-                          <View style={styles.placeholderBadge}>
-                            <Text style={styles.placeholderBadgeText}>Placeholder</Text>
-                          </View>
-                        )}
-                      </View>
-                      <Text style={styles.memberEmail}>{member.email}</Text>
-                    </View>
-                    <View style={[styles.checkbox, selectedMembers.has(member.id) && styles.checkboxChecked]}>
-                      {selectedMembers.has(member.id) && <Text style={styles.checkmark}>✓</Text>}
-                    </View>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
+            <MemberCheckList
+              members={groupMembers}
+              selectedIds={selectedMembers}
+              onToggle={toggleMember}
+              loading={loadingMembers}
+            />
 
             <Text style={styles.selectedCount}>
               {selectedMembers.size} of {groupMembers.length} members invited
             </Text>
           </View>
+
+          {/* Co-Leaders (optional) */}
+          {eligibleCoLeaders.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Co-Leaders (Optional)</Text>
+              <Text style={styles.coLeaderHint}>
+                Co-leaders can edit, skip, and send reminders for this event.
+              </Text>
+              <MemberCheckList
+                members={eligibleCoLeaders}
+                selectedIds={selectedCoLeaders}
+                onToggle={toggleCoLeader}
+              />
+            </View>
+          )}
         </ScrollView>
       </View>
     </Modal>
   );
 }
 
-// ── Styles ──────────────────────────────────────────────────────────
-
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0F172A' },
+  container: { flex: 1, backgroundColor: colors.slate[900] },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
+    padding: spacing.lg,
     borderBottomWidth: 1,
-    borderBottomColor: '#334155',
+    borderBottomColor: colors.slate[700],
   },
-  headerTitle: { fontSize: 17, fontWeight: '600', color: '#F8FAFC' },
-  cancelButton: { fontSize: 16, color: '#94A3B8' },
-  createButton: { fontSize: 16, color: '#3B82F6', fontWeight: '600' },
-  content: { flex: 1, padding: 16 },
+  headerTitle: { fontSize: 17, fontWeight: fontWeight.semibold, color: colors.slate[50] },
+  cancelButton: { fontSize: fontSize.lg, color: colors.slate[400] },
+  createButton: { fontSize: fontSize.lg, color: colors.blue[500], fontWeight: fontWeight.semibold },
+  content: { flex: 1, padding: spacing.lg },
   errorContainer: {
     backgroundColor: 'rgba(239, 68, 68, 0.1)',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 16,
+    padding: spacing.md,
+    borderRadius: borderRadius.sm,
+    marginBottom: spacing.lg,
   },
-  errorText: { color: '#EF4444', fontSize: 14 },
-  section: { marginBottom: 24 },
+  errorText: { color: colors.red[500], fontSize: fontSize.md },
+  section: { marginBottom: spacing.xxl },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: spacing.md,
   },
   sectionTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#94A3B8',
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.semibold,
+    color: colors.slate[400],
     textTransform: 'uppercase',
     letterSpacing: 0.5,
-    marginBottom: 12,
+    marginBottom: spacing.md,
   },
   input: {
-    backgroundColor: '#1E293B',
-    borderRadius: 12,
+    backgroundColor: colors.slate[800],
+    borderRadius: borderRadius.md,
     padding: 14,
-    fontSize: 16,
-    color: '#F8FAFC',
-    marginBottom: 12,
+    fontSize: fontSize.lg,
+    color: colors.slate[50],
+    marginBottom: spacing.md,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: colors.slate[700],
   },
   textArea: { minHeight: 80, textAlignVertical: 'top' },
-  fieldLabel: { fontSize: 12, color: '#94A3B8', marginBottom: 6 },
-
-  // ── Date field ───────────────────────────────────────────────────
-  dateFieldWeb: {
-    marginBottom: 12,
-  },
+  fieldLabel: { fontSize: fontSize.sm, color: colors.slate[400], marginBottom: 6 },
+  dateFieldWeb: { marginBottom: spacing.md },
   pickerButton: {
-    backgroundColor: '#1E293B',
-    borderRadius: 12,
+    backgroundColor: colors.slate[800],
+    borderRadius: borderRadius.md,
     padding: 14,
     borderWidth: 1,
-    borderColor: '#334155',
-    marginBottom: 12,
+    borderColor: colors.slate[700],
+    marginBottom: spacing.md,
   },
-  pickerButtonText: {
-    fontSize: 16,
-    color: '#F8FAFC',
-  },
-
-  // ── Time row ────────────────────────────────────────────────────
-  timeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-    gap: 10,
-  },
-  timeChip: {
-    flex: 1,
-    backgroundColor: '#1E293B',
-    borderRadius: 12,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: '#334155',
-    alignItems: 'center',
-  },
-  timeChipActive: {
-    borderColor: '#3B82F6',
-  },
-  timeChipText: {
-    fontSize: 16,
-    color: '#F8FAFC',
-  },
-  timeChipPlaceholder: {
-    color: '#64748B',
-  },
-  timeDash: {
-    color: '#64748B',
-    fontSize: 18,
-  },
-
-  // ── Time dropdown ────────────────────────────────────────────────
-  dropdownContainer: {
-    backgroundColor: '#1E293B',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#334155',
-    marginBottom: 12,
-    maxHeight: 264,
-    overflow: 'hidden',
-  },
-  dropdownList: {
-    maxHeight: 264,
-  },
-  dropdownItem: {
-    paddingVertical: 11,
-    paddingHorizontal: 16,
-    height: 44,
-    justifyContent: 'center',
-  },
-  dropdownItemActive: {
-    backgroundColor: 'rgba(59, 130, 246, 0.15)',
-  },
-  dropdownItemText: {
-    fontSize: 16,
-    color: '#F8FAFC',
-  },
-  dropdownItemTextActive: {
-    color: '#3B82F6',
-    fontWeight: '600',
-  },
-
-  // ── Recurrence ───────────────────────────────────────────────────
-  recurrenceSection: { marginBottom: 12 },
-  recurrenceOptions: { flexDirection: 'row', gap: 8, marginBottom: 12 },
-  recurrenceOption: {
-    flex: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    backgroundColor: '#1E293B',
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#334155',
-    alignItems: 'center',
-  },
-  recurrenceOptionActive: {
-    borderColor: '#3B82F6',
-    backgroundColor: 'rgba(59, 130, 246, 0.15)',
-  },
-  recurrenceOptionText: { fontSize: 14, fontWeight: '500', color: '#94A3B8' },
-  recurrenceOptionTextActive: { color: '#3B82F6' },
-  recurrenceCountRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  recurrenceCountLabel: { fontSize: 14, color: '#94A3B8', flex: 1 },
-  recurrenceCountInput: {
-    backgroundColor: '#1E293B',
-    borderRadius: 8,
-    padding: 10,
-    fontSize: 16,
-    color: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#334155',
-    width: 60,
-    textAlign: 'center',
-  },
-
-  // ── Members ──────────────────────────────────────────────────────
-  selectionButtons: { flexDirection: 'row', gap: 8 },
+  pickerButtonText: { fontSize: fontSize.lg, color: colors.slate[50] },
+  selectionButtons: { flexDirection: 'row', gap: spacing.sm },
   selectionButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    backgroundColor: '#1E293B',
-    borderRadius: 12,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    backgroundColor: colors.slate[800],
+    borderRadius: borderRadius.md,
   },
-  selectionButtonText: { color: '#3B82F6', fontSize: 13, fontWeight: '500' },
-  loadingMembers: { padding: 20 },
-  membersList: { gap: 8 },
-  memberItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#1E293B',
-    borderRadius: 12,
-    padding: 12,
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  memberItemSelected: {
-    borderColor: '#3B82F6',
-    backgroundColor: 'rgba(59, 130, 246, 0.1)',
-  },
-  memberAvatar: {
-    width: 40, height: 40, borderRadius: 20,
-    backgroundColor: '#3B82F6', justifyContent: 'center', alignItems: 'center',
-  },
-  memberAvatarText: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  placeholderAvatar: {
-    width: 40, height: 40, borderRadius: 20,
-    backgroundColor: '#475569', justifyContent: 'center', alignItems: 'center',
-  },
-  placeholderAvatarText: { color: '#94A3B8', fontSize: 18, fontWeight: '600' },
-  memberInfo: { flex: 1, marginLeft: 12 },
-  memberNameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  memberName: { fontSize: 15, fontWeight: '500', color: '#F8FAFC' },
-  placeholderBadge: {
-    backgroundColor: '#F59E0B', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8,
-  },
-  placeholderBadgeText: { color: '#fff', fontSize: 10, fontWeight: '600' },
-  memberEmail: { fontSize: 13, color: '#94A3B8', marginTop: 2 },
-  checkbox: {
-    width: 24, height: 24, borderRadius: 12,
-    borderWidth: 2, borderColor: '#475569',
-    justifyContent: 'center', alignItems: 'center',
-  },
-  checkboxChecked: { backgroundColor: '#3B82F6', borderColor: '#3B82F6' },
-  checkmark: { color: '#fff', fontSize: 14, fontWeight: '700' },
-  selectedCount: { fontSize: 13, color: '#64748B', textAlign: 'center', marginTop: 12 },
+  selectionButtonText: { color: colors.blue[500], fontSize: 13, fontWeight: fontWeight.medium },
+  selectedCount: { fontSize: 13, color: colors.slate[500], textAlign: 'center', marginTop: spacing.md },
+  coLeaderHint: { fontSize: 13, color: colors.slate[500], marginBottom: spacing.md },
 });

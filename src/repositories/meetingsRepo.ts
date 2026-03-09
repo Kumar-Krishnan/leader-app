@@ -14,6 +14,11 @@ export function fetchMeetings(groupId: string, includePast: boolean = false) {
         is_series_rsvp,
         user:profiles(id, full_name, email),
         placeholder:placeholder_profiles(id, full_name, email)
+      ),
+      co_leaders:meeting_co_leaders(
+        id,
+        user_id,
+        user:profiles(id, full_name, email)
       )
     `)
     .eq('group_id', groupId);
@@ -107,6 +112,26 @@ export function createMeetingAttendees(data: any[]) {
     .insert(data);
 }
 
+export function deleteMeetingAttendees(
+  meetingIds: string[],
+  memberId: string,
+  memberType: 'user' | 'placeholder'
+) {
+  const column = memberType === 'user' ? 'user_id' : 'placeholder_id';
+  return supabase
+    .from('meeting_attendees')
+    .delete()
+    .in('meeting_id', meetingIds)
+    .eq(column, memberId);
+}
+
+export function fetchMeetingAttendeesByMeetings(meetingIds: string[]) {
+  return supabase
+    .from('meeting_attendees')
+    .select('id, meeting_id, user_id, placeholder_id, status, is_series_rsvp')
+    .in('meeting_id', meetingIds);
+}
+
 export function updateAttendeeRsvp(
   attendeeId: string,
   status: AttendeeStatus,
@@ -121,4 +146,25 @@ export function updateAttendeeRsvp(
       responded_at: respondedAt,
     })
     .eq('id', attendeeId);
+}
+
+export function createMeetingCoLeaders(data: { meeting_id: string; user_id: string }[]) {
+  return (supabase as any)
+    .from('meeting_co_leaders')
+    .insert(data);
+}
+
+export function deleteMeetingCoLeaders(meetingIds: string[], userId: string) {
+  return (supabase as any)
+    .from('meeting_co_leaders')
+    .delete()
+    .in('meeting_id', meetingIds)
+    .eq('user_id', userId);
+}
+
+export function fetchMeetingCoLeadersByMeetings(meetingIds: string[]) {
+  return (supabase as any)
+    .from('meeting_co_leaders')
+    .select('id, meeting_id, user_id')
+    .in('meeting_id', meetingIds);
 }

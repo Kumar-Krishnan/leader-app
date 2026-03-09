@@ -22,7 +22,7 @@ const mockMember = {
     id: 'user-1',
     email: 'user@example.com',
     full_name: 'John Doe',
-    role: 'user',
+    role: 'standard',
   },
   placeholder: null,
 };
@@ -38,7 +38,7 @@ const mockLeader = {
     id: 'user-2',
     email: 'leader@example.com',
     full_name: 'Jane Leader',
-    role: 'leader',
+    role: 'organizer',
   },
   placeholder: null,
 };

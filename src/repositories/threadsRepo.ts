@@ -35,3 +35,11 @@ export function archiveThread(threadId: string) {
     .update({ is_archived: true })
     .eq('id', threadId);
 }
+
+export function updateThreadLastRead(threadId: string, userId: string) {
+  return (supabase
+    .from('thread_members') as any)
+    .update({ last_read_at: new Date().toISOString() })
+    .eq('thread_id', threadId)
+    .eq('user_id', userId);
+}

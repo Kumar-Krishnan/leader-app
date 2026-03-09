@@ -26,7 +26,7 @@ const mockSender = {
   id: 'sender-id',
   email: 'sender@example.com',
   full_name: 'John Doe',
-  role: 'user' as const,
+  role: 'standard' as const,
 };
 
 const mockMessage = {
@@ -50,7 +50,7 @@ const mockMyMessage = {
     id: 'user-id',
     email: 'test@example.com',
     full_name: 'Test User',
-    role: 'user' as const,
+    role: 'standard' as const,
   },
 };
 
@@ -58,12 +58,19 @@ const mockMyMessage = {
 let mockAuthContext = {
   user: mockUser,
   profile: null,
-  isLeader: false,
+  isOrganizer: false,
   isAdmin: false,
 };
 
 jest.mock('../../../src/contexts/AuthContext', () => ({
   useAuth: () => mockAuthContext,
+}));
+
+jest.mock('../../../src/contexts/GroupContext', () => ({
+  useGroup: () => ({
+    groupMembers: [],
+    refreshGroupMembers: jest.fn(),
+  }),
 }));
 
 // Mock useMessages hook
@@ -90,7 +97,7 @@ describe('ThreadDetailScreen', () => {
     mockAuthContext = {
       user: mockUser,
       profile: null,
-      isLeader: false,
+      isOrganizer: false,
       isAdmin: false,
     };
 

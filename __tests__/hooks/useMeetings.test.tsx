@@ -592,6 +592,148 @@ describe('useMeetings', () => {
     });
   });
 
+  describe('addAttendeesToSeries', () => {
+    const mockSeriesMeetingsForAttendees = [
+      { ...mockMeeting, id: 'meeting-1', series_id: 'series-1', series_index: 1 },
+      { ...mockMeeting, id: 'meeting-2', series_id: 'series-1', series_index: 2 },
+    ];
+
+    it('should create attendee records for all series meetings', async () => {
+      // Initial fetch returns series meetings
+      (supabase.from as jest.Mock).mockReturnValue(createMockChain(mockSeriesMeetingsForAttendees));
+
+      const { result } = renderHook(() => useMeetings());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      // Mock for fetchMeetingAttendeesByMeetings (select + in) and createMeetingAttendees (insert)
+      const mockChain = {
+        select: jest.fn().mockReturnThis(),
+        in: jest.fn().mockResolvedValue({ data: [], error: null }),
+        insert: jest.fn().mockResolvedValue({ data: {}, error: null }),
+        eq: jest.fn().mockReturnThis(),
+        gte: jest.fn().mockReturnThis(),
+        order: jest.fn().mockResolvedValue({ data: mockSeriesMeetingsForAttendees, error: null }),
+      };
+      (supabase.from as jest.Mock).mockReturnValue(mockChain);
+
+      let success;
+      await act(async () => {
+        success = await result.current.addAttendeesToSeries('series-1', [
+          { id: 'new-user', type: 'user' },
+        ]);
+      });
+
+      expect(success).toBe(true);
+    });
+
+    it('should return false when no meetings found in series', async () => {
+      (supabase.from as jest.Mock).mockReturnValue(createMockChain([mockMeeting])); // no series meetings
+
+      const { result } = renderHook(() => useMeetings());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      let success;
+      await act(async () => {
+        success = await result.current.addAttendeesToSeries('non-existent-series', [
+          { id: 'new-user', type: 'user' },
+        ]);
+      });
+
+      expect(success).toBe(false);
+    });
+  });
+
+  describe('removeAttendeeFromSeries', () => {
+    const mockSeriesMeetingsWithAttendees = [
+      {
+        ...mockMeeting,
+        id: 'meeting-1',
+        series_id: 'series-1',
+        series_index: 1,
+        attendees: [
+          {
+            id: 'attendee-1',
+            user_id: 'user-to-remove',
+            placeholder_id: null,
+            status: 'invited',
+            is_series_rsvp: false,
+            user: { id: 'user-to-remove', full_name: 'Remove Me', email: 'remove@example.com' },
+          },
+        ],
+      },
+      {
+        ...mockMeeting,
+        id: 'meeting-2',
+        series_id: 'series-1',
+        series_index: 2,
+        attendees: [
+          {
+            id: 'attendee-2',
+            user_id: 'user-to-remove',
+            placeholder_id: null,
+            status: 'invited',
+            is_series_rsvp: false,
+            user: { id: 'user-to-remove', full_name: 'Remove Me', email: 'remove@example.com' },
+          },
+        ],
+      },
+    ];
+
+    it('should delete attendee records across series and update local state', async () => {
+      (supabase.from as jest.Mock).mockReturnValue(createMockChain(mockSeriesMeetingsWithAttendees));
+
+      const { result } = renderHook(() => useMeetings());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      // Mock for the delete call
+      const deleteChain = {
+        delete: jest.fn().mockReturnThis(),
+        in: jest.fn().mockReturnThis(),
+        eq: jest.fn().mockResolvedValue({ data: {}, error: null }),
+      };
+      (supabase.from as jest.Mock).mockReturnValue(deleteChain);
+
+      let success;
+      await act(async () => {
+        success = await result.current.removeAttendeeFromSeries('series-1', 'user-to-remove', 'user');
+      });
+
+      expect(success).toBe(true);
+
+      // Check local state was updated - attendees should be removed
+      const meeting1 = result.current.meetings.find(m => m.id === 'meeting-1');
+      const meeting2 = result.current.meetings.find(m => m.id === 'meeting-2');
+      expect(meeting1?.attendees).toHaveLength(0);
+      expect(meeting2?.attendees).toHaveLength(0);
+    });
+
+    it('should return false when no meetings found in series', async () => {
+      (supabase.from as jest.Mock).mockReturnValue(createMockChain([mockMeeting])); // no series meetings
+
+      const { result } = renderHook(() => useMeetings());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      let success;
+      await act(async () => {
+        success = await result.current.removeAttendeeFromSeries('non-existent-series', 'user-1', 'user');
+      });
+
+      expect(success).toBe(false);
+    });
+  });
+
   describe('sendMeetingEmail', () => {
     const mockMeetingWithAttendees = {
       ...mockMeeting,

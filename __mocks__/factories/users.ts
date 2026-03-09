@@ -46,7 +46,7 @@ export function createMockProfile(overrides: DeepPartial<Profile> = {}): Profile
     email: 'test@example.com',
     full_name: 'Test User',
     avatar_url: null,
-    role: 'user' as UserRole,
+    role: 'standard' as UserRole,
     notification_preferences: defaultNotificationPrefs,
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-01T00:00:00Z',
@@ -94,7 +94,7 @@ export function createMockLeaderUser() {
     id: user.id,
     email: user.email,
     full_name: 'Leader User',
-    role: 'leader',
+    role: 'organizer',
   });
   const session = createMockSession({ user });
   return { user, profile, session };

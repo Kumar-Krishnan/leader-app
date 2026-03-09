@@ -81,7 +81,7 @@ describe('ThreadsScreen', () => {
     mockAuthContext = createMockAuthContext({
       user: mockUser,
       profile: null,
-      isLeader: false,
+      isOrganizer: false,
       isAdmin: false,
     });
 

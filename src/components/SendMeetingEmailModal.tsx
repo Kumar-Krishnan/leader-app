@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { MeetingWithAttendees } from '../types/database';
 import { colors, spacing, borderRadius, fontSize, fontWeight, shadows } from '../constants/theme';
+import { formatDateNoYear, formatTime } from '../lib/formatters';
 
 interface SendMeetingEmailModalProps {
   visible: boolean;
@@ -61,21 +62,9 @@ export default function SendMeetingEmailModal({
 
   if (!meeting) return null;
 
-  const formattedDate = new Date(meeting.date).toLocaleDateString('en-US', {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-  });
-  const startTime = new Date(meeting.date).toLocaleTimeString('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-  });
-  const endTime = meeting.end_date
-    ? new Date(meeting.end_date).toLocaleTimeString('en-US', {
-        hour: 'numeric',
-        minute: '2-digit',
-      })
-    : null;
+  const formattedDate = formatDateNoYear(meeting.date);
+  const startTime = formatTime(meeting.date);
+  const endTime = meeting.end_date ? formatTime(meeting.end_date) : null;
   const formattedTime = endTime ? `${startTime} – ${endTime}` : startTime;
 
   const renderTextField = (

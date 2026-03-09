@@ -1,10 +1,10 @@
 /**
  * Global user role in the application
- * - user: Regular user
- * - leader: Can create groups and manage content
+ * - standard: Regular user
+ * - organizer: Can create groups and manage content
  * - admin: Full system access
  */
-export type UserRole = 'user' | 'leader' | 'admin';
+export type UserRole = 'standard' | 'organizer' | 'admin';
 
 /**
  * Role within a specific group
@@ -223,10 +223,22 @@ export interface MeetingAttendeeWithProfile extends MeetingAttendee {
 }
 
 /**
+ * Co-leader record for a meeting
+ */
+export interface MeetingCoLeader {
+  id: string;
+  meeting_id: string;
+  user_id: string;
+  created_at: string;
+  user?: Profile;
+}
+
+/**
  * Meeting with attendee list populated
  */
 export interface MeetingWithAttendees extends Meeting {
   attendees?: MeetingAttendeeWithProfile[];
+  co_leaders?: MeetingCoLeader[];
 }
 
 /**

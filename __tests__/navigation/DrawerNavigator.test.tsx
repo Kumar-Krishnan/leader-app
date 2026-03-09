@@ -66,7 +66,7 @@ jest.mock('../../src/contexts/AuthContext', () => ({
   useAuth: () => ({
     user: { id: 'test-user' },
     profile: { full_name: 'Test User' },
-    isLeader: false,
+    isOrganizer: false,
   }),
 }));
 

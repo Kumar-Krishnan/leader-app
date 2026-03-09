@@ -31,6 +31,11 @@ jest.mock('../../src/contexts/GroupContext', () => ({
 jest.mock('../../src/hooks/useMeetings', () => ({
   useMeetings: () => mockUseMeetingsResult,
   RSVPStatus: {},
+  isUserMeetingLeader: (meeting: any, userId: string) => {
+    if (meeting.created_by === userId) return true;
+    if (meeting.co_leaders?.some((cl: any) => cl.user_id === userId)) return true;
+    return false;
+  },
 }));
 
 describe('Meeting end_date display', () => {
@@ -47,7 +52,7 @@ describe('Meeting end_date display', () => {
     mockAuthContext = createMockAuthContext({
       user: mockUser,
       profile: null,
-      isLeader: false,
+      isOrganizer: false,
       isAdmin: false,
     });
 
